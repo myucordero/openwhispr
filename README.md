@@ -449,9 +449,9 @@ Improve transcription accuracy for specific words, names, or technical terms:
 open-whispr/
 ├── main.js              # Electron main process & IPC handlers
 ├── preload.js           # Electron preload script & API bridge
-├── setup.js             # First-time setup script
+├── setup.js             # Local env bootstrap script
 ├── package.json         # Dependencies and scripts
-├── env.example          # Environment variables template
+├── .env.example         # Environment variables template
 ├── CHANGELOG.md         # Project changelog
 ├── src/
 │   ├── App.jsx          # Main dictation interface
@@ -497,7 +497,6 @@ open-whispr/
 
 - `npm run dev` - Start development with hot reload
 - `npm run start` - Start production build
-- `npm run setup` - First-time setup (creates .env file)
 - `npm run build:renderer` - Build the React app only
 - `npm run download:whisper-cpp` - Download whisper.cpp for the current platform
 - `npm run download:whisper-cpp:all` - Download whisper.cpp for all platforms
@@ -516,6 +515,8 @@ open-whispr/
 - `npm run format` - Format code with Prettier
 - `npm run clean` - Clean build artifacts
 - `npm run preview` - Preview production build
+- `npm run doctor:local` - Validate local-first setup and binary/model readiness
+- `npm test` - Run local setup contract tests
 
 ### Architecture
 
@@ -565,32 +566,30 @@ Note: build/pack/dist scripts automatically download whisper.cpp, llama-server, 
 
 ### Environment Variables
 
-Create a `.env` file in the root directory (or use `npm run setup`):
+Create a `.env` file by copying `.env.example`:
+
+```bash
+cp .env.example .env
+```
 
 ```env
-# OpenAI API Configuration (optional - only needed for cloud processing)
-OPENAI_API_KEY=your_openai_api_key_here
+# Local-first development defaults
+VITE_DEV_SERVER_PORT=5191
+OPENWHISPR_DEV_SERVER_PORT=5191
 
-# Optional: Customize the Whisper model
+# Optional cloud provider keys (disabled by default)
+# OPENAI_API_KEY=your_openai_api_key_here
+# ANTHROPIC_API_KEY=your_anthropic_api_key_here
+# GEMINI_API_KEY=your_gemini_api_key_here
+# GROQ_API_KEY=your_groq_api_key_here
+# MISTRAL_API_KEY=your_mistral_api_key_here
+
+# Optional cloud transcription knobs
 WHISPER_MODEL=whisper-1
-
-# Optional: Set language for better transcription accuracy
 LANGUAGE=
 
-# Optional: Anthropic API Configuration
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
-
-# Optional: Google Gemini API Configuration
-GEMINI_API_KEY=your_gemini_api_key_here
-
-# Optional: Groq API Configuration (ultra-fast inference)
-GROQ_API_KEY=your_groq_api_key_here
-
-# Optional: Mistral API Configuration (Voxtral transcription)
-MISTRAL_API_KEY=your_mistral_api_key_here
-
 # Optional: Debug mode
-DEBUG=false
+# OPENWHISPR_LOG_LEVEL=debug
 ```
 
 ### Local Whisper Setup
@@ -665,8 +664,15 @@ OpenWhispr is designed with privacy and security in mind:
 - **Local Processing Option**: Keep your voice data completely private
 - **No Analytics**: We don't collect any usage data or telemetry
 - **Open Source**: All code is available for review
-- **Secure Storage**: API keys are stored securely in your system's keychain/credential manager
+- **Local Key Storage**: Keys can be persisted in app-managed `.env` data for local use - treat local user data as sensitive
 - **Minimal Permissions**: Only requests necessary permissions (microphone, accessibility)
+
+### Local Hardening (Personal Builds)
+
+- Keep `contextIsolation` enabled and avoid broad new IPC methods
+- Prefer local transcription by default; enable cloud keys only when needed
+- For personal packaged builds, keep Electron fuses hardened (for example disable `RunAsNode` and unnecessary CLI inspect/node options)
+- Run `npm run doctor:local` after updates to verify local binaries/models and port config
 
 ## Troubleshooting
 
