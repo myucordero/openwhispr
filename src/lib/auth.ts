@@ -168,7 +168,14 @@ export async function withSessionRefresh<T>(operation: () => Promise<T>): Promis
   }
 }
 
-const DESKTOP_OAUTH_CALLBACK_URL = "https://openwhispr.com/auth/desktop-callback";
+const DEFAULT_DESKTOP_OAUTH_CALLBACK_URL = "https://openwhispr.com/auth/desktop-callback";
+
+function getDesktopOAuthCallbackURL(protocol: string): string {
+  const configuredUrl = (import.meta.env.VITE_OPENWHISPR_OAUTH_CALLBACK_URL || "").trim();
+  const callbackUrl = configuredUrl || DEFAULT_DESKTOP_OAUTH_CALLBACK_URL;
+  const separator = callbackUrl.includes("?") ? "&" : "?";
+  return `${callbackUrl}${separator}protocol=${encodeURIComponent(protocol)}`;
+}
 
 export async function signInWithSocial(provider: SocialProvider): Promise<{ error?: Error }> {
   try {
@@ -181,7 +188,7 @@ export async function signInWithSocial(provider: SocialProvider): Promise<{ erro
       // does the POST server-side and 302s with the cookies attached.
       const protocol = (await window.electronAPI?.getOAuthProtocol?.()) || "openwhispr";
       const url = new URL(`${AUTH_URL}/api/desktop-signin/${provider}`);
-      url.searchParams.set("callbackURL", `${DESKTOP_OAUTH_CALLBACK_URL}?protocol=${protocol}`);
+      url.searchParams.set("callbackURL", getDesktopOAuthCallbackURL(protocol));
       openExternalLink(url.toString());
       return {};
     }
