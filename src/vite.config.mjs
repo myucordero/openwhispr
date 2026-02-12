@@ -7,7 +7,7 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DEFAULT_DEV_SERVER_PORT = 5183;
+const DEFAULT_DEV_SERVER_PORT = 5191;
 
 const parseDevServerPort = (rawPort) => {
   const normalizedPort = rawPort || String(DEFAULT_DEV_SERVER_PORT);
