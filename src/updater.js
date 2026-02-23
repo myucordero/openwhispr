@@ -40,7 +40,28 @@ class UpdateManager {
     // Setting channel to e.g. 'latest-arm64' makes the updater look for
     // 'latest-arm64-mac.yml' instead of the shared 'latest-mac.yml'.
     if (process.platform === "darwin") {
-      autoUpdater.channel = process.arch === "arm64" ? "latest-arm64" : "latest-x64";
+      let nativeArch = process.arch;
+
+      // Detect Rosetta: if an x64 build is running on Apple Silicon,
+      // sysctl.proc_translated returns "1". This self-heals users who
+      // got stuck on the x64 build from older releases.
+      if (process.arch === "x64") {
+        try {
+          const { execSync } = require("child_process");
+          const translated = execSync("sysctl -n sysctl.proc_translated", {
+            encoding: "utf8",
+            timeout: 3000,
+          }).trim();
+          if (translated === "1") {
+            console.log("🔄 Rosetta detected — switching update channel to arm64");
+            nativeArch = "arm64";
+          }
+        } catch {
+          // sysctl.proc_translated doesn't exist on real Intel Macs — ignore
+        }
+      }
+
+      autoUpdater.channel = nativeArch === "arm64" ? "latest-arm64" : "latest-x64";
     }
 
     // Disable auto-download - let user control when to download
