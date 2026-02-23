@@ -1,60 +1,68 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import AudioManager from "../helpers/audioManager";
 import logger from "../utils/logger";
 import { playStartCue, playStopCue } from "../utils/dictationCues";
 
 export const useAudioRecording = (toast, options = {}) => {
+  const { t } = useTranslation();
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [partialTranscript, setPartialTranscript] = useState("");
   const audioManagerRef = useRef(null);
+  const startLockRef = useRef(false);
+  const stopLockRef = useRef(false);
   const { onToggle } = options;
 
   const performStartRecording = useCallback(async () => {
-    if (!audioManagerRef.current) {
-      return false;
+    if (startLockRef.current) return false;
+    startLockRef.current = true;
+    try {
+      if (!audioManagerRef.current) return false;
+
+      const currentState = audioManagerRef.current.getState();
+      if (currentState.isRecording || currentState.isProcessing) return false;
+
+      const didStart = audioManagerRef.current.shouldUseStreaming()
+        ? await audioManagerRef.current.startStreamingRecording()
+        : await audioManagerRef.current.startRecording();
+
+      if (didStart) {
+        void playStartCue();
+      }
+
+      return didStart;
+    } finally {
+      startLockRef.current = false;
     }
-
-    const currentState = audioManagerRef.current.getState();
-    if (currentState.isRecording || currentState.isProcessing) {
-      return false;
-    }
-
-    const didStart = audioManagerRef.current.shouldUseStreaming()
-      ? await audioManagerRef.current.startStreamingRecording()
-      : await audioManagerRef.current.startRecording();
-
-    if (didStart) {
-      void playStartCue();
-    }
-
-    return didStart;
   }, []);
 
   const performStopRecording = useCallback(async () => {
-    if (!audioManagerRef.current) {
-      return false;
+    if (stopLockRef.current) return false;
+    stopLockRef.current = true;
+    try {
+      if (!audioManagerRef.current) return false;
+
+      const currentState = audioManagerRef.current.getState();
+      if (!currentState.isRecording && !currentState.isStreamingStartInProgress) return false;
+
+      if (currentState.isStreaming || currentState.isStreamingStartInProgress) {
+        void playStopCue();
+        return await audioManagerRef.current.stopStreamingRecording();
+      }
+
+      const didStop = audioManagerRef.current.stopRecording();
+
+      if (didStop) {
+        void playStopCue();
+      }
+
+      return didStop;
+    } finally {
+      stopLockRef.current = false;
     }
-
-    const currentState = audioManagerRef.current.getState();
-    if (!currentState.isRecording && !currentState.isStreamingStartInProgress) {
-      return false;
-    }
-
-    if (currentState.isStreaming || currentState.isStreamingStartInProgress) {
-      void playStopCue(); // streaming stop finalization is async, play cue immediately on stop action
-      return await audioManagerRef.current.stopStreamingRecording();
-    }
-
-    const didStop = audioManagerRef.current.stopRecording();
-
-    if (didStop) {
-      void playStopCue();
-    }
-
-    return didStop;
   }, []);
 
   useEffect(() => {
@@ -73,11 +81,11 @@ export const useAudioRecording = (toast, options = {}) => {
         // Provide specific titles for cloud error codes
         const title =
           error.code === "AUTH_EXPIRED"
-            ? "Session Expired"
+            ? t("hooks.audioRecording.errorTitles.sessionExpired")
             : error.code === "OFFLINE"
-              ? "You're Offline"
+              ? t("hooks.audioRecording.errorTitles.offline")
               : error.code === "LIMIT_REACHED"
-                ? "Daily Limit Reached"
+                ? t("hooks.audioRecording.errorTitles.dailyLimitReached")
                 : error.title;
 
         toast({
@@ -114,8 +122,8 @@ export const useAudioRecording = (toast, options = {}) => {
 
           if (result.source === "openai" && localStorage.getItem("useLocalWhisper") === "true") {
             toast({
-              title: "Fallback Mode",
-              description: "Local Whisper failed. Used OpenAI API instead.",
+              title: t("hooks.audioRecording.fallback.title"),
+              description: t("hooks.audioRecording.fallback.description"),
               variant: "default",
             });
           }
@@ -175,8 +183,8 @@ export const useAudioRecording = (toast, options = {}) => {
 
     const handleNoAudioDetected = () => {
       toast({
-        title: "No Audio Detected",
-        description: "The recording contained no detectable audio. Please try again.",
+        title: t("hooks.audioRecording.noAudio.title"),
+        description: t("hooks.audioRecording.noAudio.description"),
         variant: "default",
       });
     };
@@ -193,7 +201,7 @@ export const useAudioRecording = (toast, options = {}) => {
         audioManagerRef.current.cleanup();
       }
     };
-  }, [toast, onToggle, performStartRecording, performStopRecording]);
+  }, [toast, onToggle, performStartRecording, performStopRecording, t]);
 
   const startRecording = async () => {
     return performStartRecording();

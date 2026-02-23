@@ -120,6 +120,33 @@ npm run pack
 
 **Note**: On macOS, you may see a security warning when first opening the unsigned app. Right-click and select "Open" to bypass this.
 
+#### Windows
+
+**Native Paste Binary (`windows-fast-paste`)**:
+
+OpenWhispr ships a native C binary for pasting text on Windows, using the Win32 `SendInput` API. This is the **primary** paste mechanism — `nircmd` and PowerShell are only used as fallbacks if the native binary fails.
+
+How it works:
+
+- **Normal applications**: Simulates `Ctrl+V` via `SendInput` with virtual key codes (`VK_CONTROL` + `V`)
+- **Terminal emulators**: Detects the foreground window's class name and simulates `Ctrl+Shift+V` instead
+- **Terminal detection**: Recognizes Windows Terminal, cmd.exe, PowerShell, mintty (Git Bash), PuTTY, Alacritty, WezTerm, kitty, Hyper, MobaXterm, and ConEmu/Cmder
+- **Detect-only mode**: Supports `--detect-only` flag to report the foreground window class without sending keystrokes
+
+Compilation (handled automatically by the build system):
+
+```bash
+# MSVC
+cl /O2 windows-fast-paste.c /Fe:windows-fast-paste.exe user32.lib
+
+# MinGW
+gcc -O2 windows-fast-paste.c -o windows-fast-paste.exe -luser32
+```
+
+The build script (`scripts/build-windows-fast-paste.js`) first attempts to download a prebuilt binary from GitHub releases. If unavailable, it compiles from source using MSVC, MinGW-w64, or Clang. Falls back to `nircmd` or PowerShell `SendKeys` if neither option works.
+
+> ℹ️ **Note**: `CASCADIA_HOSTING_WINDOW_CLASS` covers all shells running inside Windows Terminal (PowerShell, CMD, WSL, etc.), so most modern Windows terminal usage is covered by a single class entry.
+
 #### Linux (Multiple Package Formats)
 
 OpenWhispr now supports multiple Linux package formats for maximum compatibility:
@@ -183,9 +210,42 @@ chmod +x dist/OpenWhispr-*.AppImage
 ./dist/OpenWhispr-*.AppImage
 ```
 
-**Optional Dependencies for Automatic Paste**:
+**Native Paste Binary (`linux-fast-paste`)**:
 
-The clipboard paste feature requires platform-specific tools:
+OpenWhispr ships a native C binary for pasting text on Linux, compiled automatically at build time. This is the **primary** paste mechanism — external tools like `xdotool` and `wtype` are only used as fallbacks if the native binary fails.
+
+How it works:
+
+- **X11**: Uses the XTest extension to synthesize `Ctrl+V` (or `Ctrl+Shift+V` in terminals) directly, with no external dependencies beyond X11 itself
+- **Wayland**: Uses the Linux `uinput` subsystem to create a virtual keyboard and inject keystrokes. Falls back to XTest via XWayland if uinput is unavailable
+- **Terminal detection**: Recognizes 20+ terminal emulators (kitty, alacritty, gnome-terminal, wezterm, ghostty, etc.) and automatically uses `Ctrl+Shift+V` instead of `Ctrl+V`
+- **Window targeting**: Can target a specific window ID via `--window` to ensure keystrokes reach the correct application
+
+Build dependencies (for compiling from source):
+
+```bash
+# Debian/Ubuntu
+sudo apt install gcc libx11-dev libxtst-dev
+
+# Fedora/RHEL
+sudo dnf install gcc libX11-devel libXtst-devel
+
+# Arch
+sudo pacman -S gcc libx11 libxtst
+```
+
+The build script (`scripts/build-linux-fast-paste.js`) runs during `npm run compile:linux-paste` and:
+
+1. Detects whether `linux/uinput.h` headers are available
+2. Compiles with `-DHAVE_UINPUT` if so (enables Wayland uinput support)
+3. Caches the binary and skips rebuilds unless the source or flags change
+4. Gracefully falls back to system tools if compilation fails
+
+If the native binary isn't available, OpenWhispr falls back to external paste tools in this order:
+
+**Fallback Dependencies for Automatic Paste**:
+
+The following tools are used as fallbacks when the native paste binary is unavailable or fails:
 
 **X11 (Traditional Linux Desktop)**:
 
@@ -251,7 +311,7 @@ sudo dnf install kdotool  # Fedora/RHEL
 sudo pacman -S kdotool    # Arch
 ```
 
-> ℹ️ **Note**: OpenWhispr automatically tries paste tools in this order: `wtype` → `ydotool` → `xdotool` (for XWayland apps). If no paste tool is installed, text will still be copied to the clipboard - you'll just need to paste manually with Ctrl+V.
+> ℹ️ **Note**: OpenWhispr automatically tries paste methods in this order: native `linux-fast-paste` binary (XTest or uinput) → `wtype` → `ydotool` → `xdotool` (for XWayland apps). If no paste method works, text will still be copied to the clipboard - you'll just need to paste manually with Ctrl+V.
 
 > ⚠️ **ydotool Requirements**: The `ydotoold` daemon must be running for ydotool to work. Start it manually with `sudo ydotoold &` or enable the systemd service as shown above.
 
@@ -441,7 +501,7 @@ open-whispr/
 - `npm run download:llama-server:all` - Download llama.cpp server for all platforms
 - `npm run download:sherpa-onnx` - Download sherpa-onnx for Parakeet local transcription
 - `npm run download:sherpa-onnx:all` - Download sherpa-onnx for all platforms
-- `npm run compile:native` - Compile native helpers (Globe key listener for macOS, key listener for Windows)
+- `npm run compile:native` - Compile native helpers (Globe key listener for macOS, key listener and fast paste for Windows, fast paste for Linux)
 - `npm run build` - Full build with signing (requires certificates)
 - `npm run build:mac` - macOS build with signing
 - `npm run build:win` - Windows build with signing
@@ -673,7 +733,7 @@ A: OpenWhispr supports 58 languages including English, Spanish, French, German, 
 
 ## Project Status
 
-OpenWhispr is actively maintained and ready for production use. Current version: 1.4.7
+OpenWhispr is actively maintained and ready for production use. Current version: 1.4.10
 
 - ✅ Core functionality complete
 - ✅ Cross-platform support (macOS, Windows, Linux)

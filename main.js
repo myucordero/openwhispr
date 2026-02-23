@@ -58,6 +58,7 @@ configureChannelUserDataPath();
 // the compositor to set up an ARGB visual before any windows are created.
 // --disable-gpu-compositing prevents GPU compositing conflicts with the compositor.
 if (process.platform === "linux") {
+  app.commandLine.appendSwitch("gtk-version", "3");
   app.commandLine.appendSwitch("enable-transparent-visuals");
   app.commandLine.appendSwitch("disable-gpu-compositing");
 }
@@ -66,15 +67,16 @@ if (process.platform === "linux") {
 // and GlobalShortcutsPortal for global shortcuts via xdg-desktop-portal
 if (process.platform === "linux" && process.env.XDG_SESSION_TYPE === "wayland") {
   app.commandLine.appendSwitch("ozone-platform-hint", "auto");
-  app.commandLine.appendSwitch("enable-features", "UseOzonePlatform,WaylandWindowDecorations,GlobalShortcutsPortal");
+  app.commandLine.appendSwitch(
+    "enable-features",
+    "UseOzonePlatform,WaylandWindowDecorations,GlobalShortcutsPortal"
+  );
 }
 
 // Group all windows under single taskbar entry on Windows
 if (process.platform === "win32") {
   const windowsAppId =
-    APP_CHANNEL === "production"
-      ? BASE_WINDOWS_APP_ID
-      : `${BASE_WINDOWS_APP_ID}.${APP_CHANNEL}`;
+    APP_CHANNEL === "production" ? BASE_WINDOWS_APP_ID : `${BASE_WINDOWS_APP_ID}.${APP_CHANNEL}`;
   app.setAppUserModelId(windowsAppId);
 }
 
@@ -87,7 +89,9 @@ function getOAuthProtocol() {
     return fromEnv;
   }
 
-  return DEFAULT_OAUTH_PROTOCOL_BY_CHANNEL[APP_CHANNEL] || DEFAULT_OAUTH_PROTOCOL_BY_CHANNEL.production;
+  return (
+    DEFAULT_OAUTH_PROTOCOL_BY_CHANNEL[APP_CHANNEL] || DEFAULT_OAUTH_PROTOCOL_BY_CHANNEL.production
+  );
 }
 
 const OAUTH_PROTOCOL = getOAuthProtocol();
@@ -156,6 +160,7 @@ const UpdateManager = require("./src/updater");
 const GlobeKeyManager = require("./src/helpers/globeKeyManager");
 const DevServerManager = require("./src/helpers/devServerManager");
 const WindowsKeyManager = require("./src/helpers/windowsKeyManager");
+const { i18nMain, changeLanguage } = require("./src/helpers/i18nMain");
 
 // Manager instances - initialized after app.whenReady()
 let debugLogger = null;
@@ -218,6 +223,9 @@ function initializeCoreManagers() {
   debugLogger.ensureFileLogging();
 
   environmentManager = new EnvironmentManager();
+  const uiLanguage = environmentManager.getUiLanguage();
+  process.env.UI_LANGUAGE = uiLanguage;
+  changeLanguage(uiLanguage);
   debugLogger.refreshLogLevel();
 
   windowManager = new WindowManager();
@@ -239,6 +247,7 @@ function initializeCoreManagers() {
     windowManager,
     updateManager,
     windowsKeyManager,
+    getTrayManager: () => trayManager,
   });
 }
 
@@ -256,29 +265,27 @@ function initializeDeferredManagers() {
       globeKeyAlertShown = true;
 
       const detailLines = [
-        error?.message || "Unknown error occurred while starting the Globe listener.",
-        "The Globe key shortcut will remain disabled; existing keyboard shortcuts continue to work.",
+        error?.message || i18nMain.t("startup.globeHotkey.details.unknown"),
+        i18nMain.t("startup.globeHotkey.details.fallback"),
       ];
 
       if (process.env.NODE_ENV === "development") {
-        detailLines.push(
-          "Run `npm run compile:globe` and rebuild the app to regenerate the listener binary."
-        );
+        detailLines.push(i18nMain.t("startup.globeHotkey.details.devHint"));
       } else {
-        detailLines.push("Try reinstalling OpenWhispr or contact support if the issue persists.");
+        detailLines.push(i18nMain.t("startup.globeHotkey.details.reinstallHint"));
       }
 
       dialog.showMessageBox({
         type: "warning",
-        title: "Globe Hotkey Unavailable",
-        message: "OpenWhispr could not activate the Globe key hotkey.",
+        title: i18nMain.t("startup.globeHotkey.title"),
+        message: i18nMain.t("startup.globeHotkey.message"),
         detail: detailLines.join("\n\n"),
       });
     });
   }
 }
 
-app.on('open-url', (event, url) => {
+app.on("open-url", (event, url) => {
   event.preventDefault();
   if (!url.startsWith(`${OAUTH_PROTOCOL}://`)) return;
 
@@ -300,7 +307,7 @@ function navigateControlPanelWithVerifier(verifier) {
   const appUrl = DevServerManager.getAppUrl(true);
 
   if (appUrl) {
-    const separator = appUrl.includes('?') ? '&' : '?';
+    const separator = appUrl.includes("?") ? "&" : "?";
     const urlWithVerifier = `${appUrl}${separator}neon_auth_session_verifier=${encodeURIComponent(verifier)}`;
     windowManager.controlPanelWindow.loadURL(urlWithVerifier);
   } else {
@@ -323,11 +330,11 @@ function navigateControlPanelWithVerifier(verifier) {
 function handleOAuthDeepLink(deepLinkUrl) {
   try {
     const parsed = new URL(deepLinkUrl);
-    const verifier = parsed.searchParams.get('neon_auth_session_verifier');
+    const verifier = parsed.searchParams.get("neon_auth_session_verifier");
     if (!verifier) return;
     navigateControlPanelWithVerifier(verifier);
   } catch (err) {
-    if (debugLogger) debugLogger.error('Failed to handle OAuth deep link:', err);
+    if (debugLogger) debugLogger.error("Failed to handle OAuth deep link:", err);
   }
 }
 
@@ -400,7 +407,9 @@ function startAuthBridgeServer() {
     navigateControlPanelWithVerifier(verifier);
 
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end("<html><body><h3>OpenWhispr sign-in complete.</h3><p>You can close this tab.</p></body></html>");
+    res.end(
+      "<html><body><h3>OpenWhispr sign-in complete.</h3><p>You can close this tab.</p></body></html>"
+    );
   });
 
   authBridgeServer.on("error", (error) => {
@@ -430,7 +439,9 @@ async function startApp() {
     (details, callback) => {
       try {
         details.requestHeaders["Origin"] = new URL(details.url).origin;
-      } catch { /* malformed URL — leave Origin as-is */ }
+      } catch {
+        /* malformed URL — leave Origin as-is */
+      }
       callback({ requestHeaders: details.requestHeaders });
     }
   );
@@ -521,7 +532,7 @@ async function startApp() {
       // Handle dictation if Globe is the current hotkey
       if (hotkeyManager.getCurrentHotkey && hotkeyManager.getCurrentHotkey() === "GLOBE") {
         if (isLiveWindow(windowManager.mainWindow)) {
-          const activationMode = await windowManager.getActivationMode();
+          const activationMode = windowManager.getActivationMode();
           if (activationMode === "push") {
             const now = Date.now();
             if (now - globeLastStopTime < POST_STOP_COOLDOWN_MS) return;
@@ -551,7 +562,7 @@ async function startApp() {
 
       // Handle push-to-talk release if Globe is the current hotkey
       if (hotkeyManager.getCurrentHotkey && hotkeyManager.getCurrentHotkey() === "GLOBE") {
-        const activationMode = await windowManager.getActivationMode();
+        const activationMode = windowManager.getActivationMode();
         if (activationMode === "push") {
           globeKeyDownTime = 0;
           globeLastStopTime = Date.now();
@@ -582,7 +593,7 @@ async function startApp() {
       if (currentHotkey !== modifier) return;
       if (!isLiveWindow(windowManager.mainWindow)) return;
 
-      const activationMode = await windowManager.getActivationMode();
+      const activationMode = windowManager.getActivationMode();
       if (activationMode === "push") {
         const now = Date.now();
         if (now - rightModLastStopTime < POST_STOP_COOLDOWN_MS) return;
@@ -607,7 +618,7 @@ async function startApp() {
       if (currentHotkey !== modifier) return;
       if (!isLiveWindow(windowManager.mainWindow)) return;
 
-      const activationMode = await windowManager.getActivationMode();
+      const activationMode = windowManager.getActivationMode();
       if (activationMode === "push") {
         rightModDownTime = 0;
         rightModLastStopTime = Date.now();
@@ -636,22 +647,11 @@ async function startApp() {
   // Set up Windows Push-to-Talk handling
   if (process.platform === "win32") {
     debugLogger.debug("[Push-to-Talk] Windows Push-to-Talk setup starting");
-    let winKeyDownTime = 0;
-    let winKeyIsRecording = false;
-    let winLastStopTime = 0;
 
-    const WIN_MIN_HOLD_DURATION_MS = 150;
-    const WIN_POST_STOP_COOLDOWN_MS = 300;
+    const isValidHotkey = (hotkey) => hotkey && hotkey !== "GLOBE";
 
-    // Helper to check if hotkey is valid for Windows key listener
-    const isValidHotkey = (hotkey) => {
-      if (!hotkey) return false;
-      if (hotkey === "GLOBE") return false;
-      return true;
-    };
-
-    // Right-side single modifiers need the native listener even in tap mode
-    const isRightSideMod = (hotkey) => /^Right(Control|Ctrl|Alt|Option|Shift|Super|Win|Meta|Command|Cmd)$/i.test(hotkey);
+    const isRightSideMod = (hotkey) =>
+      /^Right(Control|Ctrl|Alt|Option|Shift|Super|Win|Meta|Command|Cmd)$/i.test(hotkey);
 
     const { isModifierOnlyHotkey } = require("./src/helpers/hotkeyManager");
 
@@ -661,60 +661,29 @@ async function startApp() {
       return isRightSideMod(hotkey) || isModifierOnlyHotkey(hotkey);
     };
 
-    windowsKeyManager.on("key-down", async (key) => {
-      debugLogger.debug("[Push-to-Talk] Key DOWN received", { key });
+    windowsKeyManager.on("key-down", (_key) => {
       if (!isLiveWindow(windowManager.mainWindow)) return;
 
-      const activationMode = await windowManager.getActivationMode();
-      debugLogger.debug("[Push-to-Talk] Activation mode check", { activationMode });
+      const activationMode = windowManager.getActivationMode();
       if (activationMode === "push") {
-        const now = Date.now();
-        if (now - winLastStopTime < WIN_POST_STOP_COOLDOWN_MS) {
-          debugLogger.debug("[Push-to-Talk] Ignoring KEY_DOWN during post-stop cooldown");
-          return;
-        }
-
-        debugLogger.debug("[Push-to-Talk] Starting recording sequence");
-        windowManager.showDictationPanel();
-        const pressTime = now;
-        winKeyDownTime = pressTime;
-        winKeyIsRecording = false;
-        setTimeout(async () => {
-          if (winKeyDownTime === pressTime && !winKeyIsRecording) {
-            winKeyIsRecording = true;
-            debugLogger.debug("[Push-to-Talk] Sending start dictation command");
-            windowManager.sendStartDictation();
-          }
-        }, WIN_MIN_HOLD_DURATION_MS);
+        windowManager.startWindowsPushToTalk();
       } else if (activationMode === "tap") {
         windowManager.showDictationPanel();
         windowManager.mainWindow.webContents.send("toggle-dictation");
       }
     });
 
-    windowsKeyManager.on("key-up", async () => {
-      debugLogger.debug("[Push-to-Talk] Key UP received");
+    windowsKeyManager.on("key-up", () => {
       if (!isLiveWindow(windowManager.mainWindow)) return;
 
-      const activationMode = await windowManager.getActivationMode();
+      const activationMode = windowManager.getActivationMode();
       if (activationMode === "push") {
-        const wasRecording = winKeyIsRecording;
-        winKeyDownTime = 0;
-        winKeyIsRecording = false;
-        winLastStopTime = Date.now();
-        if (wasRecording) {
-          debugLogger.debug("[Push-to-Talk] Sending stop dictation command");
-          windowManager.sendStopDictation();
-        } else {
-          debugLogger.debug("[Push-to-Talk] Short tap detected, hiding panel");
-          windowManager.hideDictationPanel();
-        }
+        windowManager.handleWindowsPushKeyUp();
       }
     });
 
     windowsKeyManager.on("error", (error) => {
       debugLogger.warn("[Push-to-Talk] Windows key listener error", { error: error.message });
-      windowManager.setWindowsPushToTalkAvailable(false);
       if (isLiveWindow(windowManager.mainWindow)) {
         windowManager.mainWindow.webContents.send("windows-ptt-unavailable", {
           reason: "error",
@@ -724,65 +693,50 @@ async function startApp() {
     });
 
     windowsKeyManager.on("unavailable", () => {
-      debugLogger.debug("[Push-to-Talk] Windows key listener not available - falling back to toggle mode");
-      windowManager.setWindowsPushToTalkAvailable(false);
+      debugLogger.debug(
+        "[Push-to-Talk] Windows key listener not available - falling back to toggle mode"
+      );
       if (isLiveWindow(windowManager.mainWindow)) {
         windowManager.mainWindow.webContents.send("windows-ptt-unavailable", {
           reason: "binary_not_found",
-          message: "Push-to-Talk native listener not available",
+          message: i18nMain.t("windows.pttUnavailable"),
         });
       }
     });
 
     windowsKeyManager.on("ready", () => {
       debugLogger.debug("[Push-to-Talk] WindowsKeyManager is ready and listening");
-      windowManager.setWindowsPushToTalkAvailable(true);
     });
 
-    // Start the Windows key listener with the current hotkey
-    const startWindowsKeyListener = async () => {
-      debugLogger.debug("[Push-to-Talk] Checking if should start Windows key listener");
-      if (!isLiveWindow(windowManager.mainWindow)) {
-        debugLogger.debug("[Push-to-Talk] Main window not live, skipping");
-        return;
-      }
-      const activationMode = await windowManager.getActivationMode();
+    const startWindowsKeyListener = () => {
+      if (!isLiveWindow(windowManager.mainWindow)) return;
+      const activationMode = windowManager.getActivationMode();
       const currentHotkey = hotkeyManager.getCurrentHotkey();
-      debugLogger.debug("[Push-to-Talk] Current state", { activationMode, currentHotkey });
 
       if (needsNativeListener(currentHotkey, activationMode)) {
-        debugLogger.debug("[Push-to-Talk] Starting Windows key listener", { hotkey: currentHotkey });
         windowsKeyManager.start(currentHotkey);
-      } else {
-        debugLogger.debug("[Push-to-Talk] Native listener not needed for current configuration");
       }
     };
 
     const STARTUP_DELAY_MS = 3000;
-    debugLogger.debug("[Push-to-Talk] Scheduling listener start", { delayMs: STARTUP_DELAY_MS });
     setTimeout(startWindowsKeyListener, STARTUP_DELAY_MS);
 
-    // Listen for activation mode changes from renderer
-    ipcMain.on("activation-mode-changed", async (_event, mode) => {
-      debugLogger.debug("[Push-to-Talk] IPC: Activation mode changed", { mode });
+    ipcMain.on("activation-mode-changed", (_event, mode) => {
+      windowManager.resetWindowsPushState();
       const currentHotkey = hotkeyManager.getCurrentHotkey();
       if (needsNativeListener(currentHotkey, mode)) {
-        debugLogger.debug("[Push-to-Talk] Starting listener", { hotkey: currentHotkey });
         windowsKeyManager.start(currentHotkey);
       } else {
-        debugLogger.debug("[Push-to-Talk] Stopping listener");
         windowsKeyManager.stop();
       }
     });
 
-    // Listen for hotkey changes from renderer
-    ipcMain.on("hotkey-changed", async (_event, hotkey) => {
-      debugLogger.debug("[Push-to-Talk] IPC: Hotkey changed", { hotkey });
+    ipcMain.on("hotkey-changed", (_event, hotkey) => {
       if (!isLiveWindow(windowManager.mainWindow)) return;
-      const activationMode = await windowManager.getActivationMode();
+      windowManager.resetWindowsPushState();
+      const activationMode = windowManager.getActivationMode();
       windowsKeyManager.stop();
       if (needsNativeListener(hotkey, activationMode)) {
-        debugLogger.debug("[Push-to-Talk] Starting listener for new hotkey", { hotkey });
         windowsKeyManager.start(hotkey);
       }
     });
@@ -821,28 +775,31 @@ if (gotSingleInstanceLock) {
     }
 
     // Check for OAuth protocol URL in command line arguments (Windows/Linux)
-    const url = commandLine.find(arg => arg.startsWith(`${OAUTH_PROTOCOL}://`));
+    const url = commandLine.find((arg) => arg.startsWith(`${OAUTH_PROTOCOL}://`));
     if (url) {
       handleOAuthDeepLink(url);
     }
   });
 
-  app.whenReady().then(() => {
-    // On Linux, --enable-transparent-visuals requires a short delay before creating
-    // windows to allow the compositor to set up the ARGB visual correctly.
-    // Without this delay, transparent windows flicker on both X11 and Wayland.
-    const delay = process.platform === "linux" ? 300 : 0;
-    return new Promise((resolve) => setTimeout(resolve, delay));
-  }).then(() => {
-    startApp().catch((error) => {
-      console.error("Failed to start app:", error);
-      dialog.showErrorBox(
-        "OpenWhispr Startup Error",
-        `Failed to start the application:\n\n${error.message}\n\nPlease report this issue.`
-      );
-      app.exit(1);
+  app
+    .whenReady()
+    .then(() => {
+      // On Linux, --enable-transparent-visuals requires a short delay before creating
+      // windows to allow the compositor to set up the ARGB visual correctly.
+      // Without this delay, transparent windows flicker on both X11 and Wayland.
+      const delay = process.platform === "linux" ? 300 : 0;
+      return new Promise((resolve) => setTimeout(resolve, delay));
+    })
+    .then(() => {
+      startApp().catch((error) => {
+        console.error("Failed to start app:", error);
+        dialog.showErrorBox(
+          i18nMain.t("startup.error.title"),
+          i18nMain.t("startup.error.message", { error: error.message })
+        );
+        app.exit(1);
+      });
     });
-  });
 
   app.on("window-all-closed", () => {
     // Don't quit on macOS when all windows are closed
