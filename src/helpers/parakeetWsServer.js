@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const WebSocket = require("ws");
 const debugLogger = require("./debugLogger");
-const os = require("os");
+const { getParakeetThreadCount } = require("./runtimeTuning");
 const {
   findAvailablePort,
   resolveBinaryPath,
@@ -76,7 +76,7 @@ class ParakeetWsServer {
       `--decoder=${path.join(modelDir, "decoder.int8.onnx")}`,
       `--joiner=${path.join(modelDir, "joiner.int8.onnx")}`,
       `--port=${this.port}`,
-      `--num-threads=${Math.max(1, Math.min(4, Math.floor(os.cpus().length * 0.75)))}`,
+      `--num-threads=${getParakeetThreadCount()}`,
     ];
 
     debugLogger.debug("Starting parakeet WS server", { port: this.port, modelName, args });
