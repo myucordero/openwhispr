@@ -24,6 +24,7 @@ import HistoryView from "./HistoryView";
 import type { CudaWhisperStatus } from "../types/electron";
 
 const platform = getCachedPlatform();
+const disableGpuPrompts = import.meta.env.VITE_DISABLE_GPU_PROMPTS === "1";
 
 const SettingsModal = React.lazy(() => import("./SettingsModal"));
 const ReferralModal = React.lazy(() => import("./ReferralModal"));
@@ -157,6 +158,7 @@ export default function ControlPanel() {
   }, [authLoaded, isSignedIn, setUseLocalWhisper, setCloudTranscriptionMode]);
 
   useEffect(() => {
+    if (disableGpuPrompts) return;
     if (platform === "darwin" || !useReasoningModel) return;
     if (localStorage.getItem("llamaVulkanBannerDismissed") === "true") return;
 
@@ -173,6 +175,7 @@ export default function ControlPanel() {
   }, [useReasoningModel]);
 
   const fetchCudaStatus = useCallback(() => {
+    if (disableGpuPrompts) return;
     if (platform === "darwin" || gpuBannerDismissed) return;
     if (!useLocalWhisper || localTranscriptionProvider !== "whisper") return;
     window.electronAPI
@@ -187,6 +190,7 @@ export default function ControlPanel() {
 
   const showGpuBanner =
     activeView === "home" &&
+    !disableGpuPrompts &&
     !gpuBannerDismissed &&
     cudaStatus?.gpuInfo.hasNvidiaGpu === true &&
     cudaStatus.downloaded === false;
@@ -450,7 +454,7 @@ export default function ControlPanel() {
                 </div>
               </div>
             )}
-            {vulkanBanner.show && activeView === "home" && (
+            {!disableGpuPrompts && vulkanBanner.show && activeView === "home" && (
               <div className="mx-4 mt-3 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
                 <div className="flex items-start gap-2">
                   <Zap className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />

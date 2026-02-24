@@ -1,6 +1,6 @@
 {
   "name": "open-whispr",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "A desktop dictation application using whisper.cpp for speech-to-text transcription",
   "main": "main.js",
   "private": true,
@@ -13,7 +13,6 @@
     "compile:native": "npm run compile:globe && npm run compile:fast-paste && npm run compile:winkeys && npm run compile:winpaste && npm run compile:linux-paste",
     "prestart": "npm run compile:native",
     "start": "electron .",
-    "predev": "npm run compile:native",
     "dev": "concurrently -k -r \"npm:dev:renderer\" \"npm:dev:main\"",
     "predev:main": "npm run compile:native",
     "dev:main": "cross-env NODE_ENV=development node scripts/run-electron.js --dev",
