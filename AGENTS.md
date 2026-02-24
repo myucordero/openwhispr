@@ -2,6 +2,51 @@
 
 This document provides comprehensive technical details about the OpenWhispr project architecture for AI assistants working on the codebase.
 
+## Dual-Clone Workflow (WSL + Windows)
+
+Use a strict two-clone setup to avoid cross-platform dependency and native module issues:
+
+- WSL clone for coding, analysis, tests, and Git operations
+  - Preferred path: `~/src/openwhispr`
+- Windows clone for runtime and packaging
+  - Preferred path: `C:\dev\openwhispr`
+
+Hard rules:
+
+- Never share `node_modules` between WSL and Windows.
+- Never run Linux `npm install`/`npm ci` in the Windows clone.
+- Never run Windows `npm.cmd install`/`npm ci` in the WSL clone.
+- Sync only through Git (`push`/`pull`), not by copying files between clones.
+- Do not validate Electron runtime in WSL for final app checks; use Windows clone.
+
+Daily workflow:
+
+1. WSL coding flow:
+   - `cd ~/src/openwhispr`
+   - `git pull --rebase`
+   - edit/test/lint in WSL
+   - `git add -A && git commit -m "..."`
+   - `git push`
+2. Windows validation flow:
+   - `cd C:\dev\openwhispr`
+   - `git pull --rebase`
+   - `npm ci`
+   - `npm run dev` (runtime check)
+   - `npm run build` or `npm run build:local:win` (packaging check)
+
+Line endings:
+
+- Keep `.gitattributes` committed and authoritative.
+- WSL global Git:
+  - `git config --global core.autocrlf input`
+  - `git config --global core.eol lf`
+- Windows global Git:
+  - `git config --global core.autocrlf true`
+
+If line endings drift, run once per clone:
+
+- `git add --renormalize .`
+
 ## Project Overview
 
 OpenWhispr is an Electron-based desktop dictation application that uses whisper.cpp for speech-to-text transcription. It supports both local (privacy-focused) and cloud (OpenAI API) processing modes.
