@@ -1,4 +1,4 @@
-const i18next = require("i18next");
+const i18next = require("./simpleI18n");
 
 const enTranslation = require("../locales/en/translation.json");
 const esTranslation = require("../locales/es/translation.json");

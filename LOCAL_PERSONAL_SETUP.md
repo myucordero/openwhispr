@@ -46,14 +46,22 @@ npm run download:sherpa-onnx
 
 We also pulled the Whisper `base` model and NVIDIA Parakeet `parakeet-tdt-0.6b-v3` archive via the helpers; they now live under `~/.cache/openwhispr/whisper-models` and `.../parakeet-models`, respectively, so the local transcription providers can start immediately.
 
-5. Build and run
+5. Build and run (without `npm run dev`)
 
 ```bash
-npm run build
-npm run dev
+npm run build:renderer
+npm run start
 ```
 
-The dev server listens on the odd port `5191` (see `.env`). VS Code has an `npm: dev` task in `.vscode/tasks.json`, so you can start the app from Run/Debug while preserving the custom port and hotkey setup. Run `npm run doctor:local` after setup to validate local binaries, model caches, and dev port alignment. The app launches successfully with those local models and transcribes, though the Whisper/Parakeet output stays fairly rough - keep custom dictionary words updated and experiment with higher-quality models if you need better accuracy.
+For a packaged local Windows app folder (no installer), run:
+
+```bash
+npm run build:local:win
+```
+
+This outputs `dist/win-unpacked/OpenWhispr.exe` so you can run the app directly without dev mode.
+
+The dev server listens on the odd port `5191` (see `.env`) and is only needed for `npm run dev`. VS Code has an `npm: dev` task in `.vscode/tasks.json` for development workflows. Run `npm run doctor:local` after setup to validate local binaries, model caches, and dev port alignment. The app launches successfully with those local models and transcribes, though the Whisper/Parakeet output stays fairly rough - keep custom dictionary words updated and experiment with higher-quality models if you need better accuracy.
 
 6. In-app first-run recommendations
 
@@ -100,8 +108,7 @@ Run this after syncing from upstream:
 ```bash
 npm ci
 npm run doctor:local
-npm run lint
-npm run build
+npm run build:renderer
 ```
 
 Then do a quick smoke test:

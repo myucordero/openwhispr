@@ -15,7 +15,9 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "i18next": ["./lib/simpleI18n"],
+      "react-i18next": ["./lib/reactI18nextShim"]
     },
     "baseUrl": "."
   },

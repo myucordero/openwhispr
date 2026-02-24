@@ -6,6 +6,7 @@ import logger from "../utils/logger";
 import { ensureAgentNameInDictionary } from "../utils/agentName";
 import { hasStoredByokKey } from "../utils/byokDetection";
 import type { LocalTranscriptionProvider } from "../types/electron";
+import i18n, { normalizeUiLanguage } from "../i18n";
 
 let _ReasoningService: typeof import("../services/ReasoningService").default | null = null;
 function getReasoningService() {
@@ -312,6 +313,11 @@ function useSettingsInternal() {
     },
   });
 
+  const [uiLanguage, setUiLanguageLocal] = useLocalStorage("uiLanguage", "en", {
+    serialize: String,
+    deserialize: String,
+  });
+
   // Privacy settings — both default to OFF
   const [cloudBackupEnabled, setCloudBackupEnabled] = useLocalStorage("cloudBackupEnabled", false, {
     serialize: String,
@@ -574,6 +580,22 @@ function useSettingsInternal() {
     [setFloatingIconAutoHideLocal]
   );
 
+  const setUiLanguage = useCallback(
+    (language: string) => {
+      const normalized = normalizeUiLanguage(language);
+      setUiLanguageLocal(normalized);
+      void i18n.changeLanguage(normalized);
+      window.electronAPI?.setUiLanguage?.(normalized).catch((err) =>
+        logger.warn(
+          "Failed to sync UI language to main process",
+          { error: (err as Error).message, language: normalized },
+          "settings"
+        )
+      );
+    },
+    [setUiLanguageLocal]
+  );
+
   // Microphone settings
   const [preferBuiltInMic, setPreferBuiltInMic] = useLocalStorage("preferBuiltInMic", true, {
     serialize: String,
@@ -714,6 +736,7 @@ function useSettingsInternal() {
     mistralApiKey,
     dictationKey,
     theme,
+    uiLanguage,
     setUseLocalWhisper,
     setWhisperModel,
     setLocalTranscriptionProvider,
@@ -743,6 +766,7 @@ function useSettingsInternal() {
     setCustomReasoningApiKey,
     setDictationKey,
     setTheme,
+    setUiLanguage,
     activationMode,
     setActivationMode,
     audioCuesEnabled,
