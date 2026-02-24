@@ -6,6 +6,7 @@ const http = require("http");
 const debugLogger = require("./debugLogger");
 const { killProcess } = require("../utils/process");
 const { getSafeTempDir } = require("./safeTempDir");
+const { getReasoningThreadCount, getRecommendedGpuLayers } = require("./runtimeTuning");
 const { app } = require("electron");
 const sidecarPidFile = require("./sidecarPidFile");
 
@@ -145,12 +146,16 @@ class LlamaServerManager {
       "--port",
       String(this.port),
       "--threads",
-      String(options.threads || 4),
+      String(options.threads || getReasoningThreadCount()),
       "--jinja",
     ];
 
     if (process.platform === "darwin") {
-      const args = [...baseArgs, "--n-gpu-layers", "99"];
+      const args = [
+        ...baseArgs,
+        "--n-gpu-layers",
+        String(options.gpuLayers || getRecommendedGpuLayers()),
+      ];
       await this._startWithBinary(
         binaryPaths.default,
         args,
@@ -171,7 +176,8 @@ class LlamaServerManager {
   }
 
   async _startWithGpuFallback(binaryPaths, baseArgs, options) {
-    const gpuArgs = [...baseArgs, "--n-gpu-layers", "99"];
+    const gpuLayers = String(options.gpuLayers || getRecommendedGpuLayers());
+    const gpuArgs = [...baseArgs, "--n-gpu-layers", gpuLayers];
     const cpuArgs = baseArgs;
 
     if (binaryPaths.vulkan) {
