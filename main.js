@@ -180,6 +180,10 @@ let whisperCudaManager = null;
 let globeKeyAlertShown = false;
 let authBridgeServer = null;
 
+function isTruthyEnv(value) {
+  return ["1", "true", "yes", "on"].includes((value || "").trim().toLowerCase());
+}
+
 function parseAuthBridgePort() {
   const raw = (process.env.OPENWHISPR_AUTH_BRIDGE_PORT || "").trim();
   if (!raw) return DEFAULT_AUTH_BRIDGE_PORT;
@@ -433,6 +437,71 @@ function startAuthBridgeServer() {
   });
 }
 
+async function autoEnableGpuAccelerationIfConfigured() {
+  if (!isTruthyEnv(process.env.LOCAL_AUTO_ENABLE_GPU)) {
+    return;
+  }
+
+  debugLogger?.info("LOCAL_AUTO_ENABLE_GPU is enabled; attempting GPU bootstrap");
+  let changedEnv = false;
+
+  if (whisperCudaManager) {
+    try {
+      const { detectNvidiaGpu } = require("./src/utils/gpuDetection");
+      const gpuInfo = await detectNvidiaGpu();
+      if (gpuInfo?.hasNvidiaGpu) {
+        if (!whisperCudaManager.isDownloaded()) {
+          debugLogger?.info("Auto-downloading CUDA Whisper binary", {
+            gpuName: gpuInfo.gpuName,
+          });
+          await whisperCudaManager.download();
+        }
+        if (process.env.WHISPER_CUDA_ENABLED !== "true") {
+          process.env.WHISPER_CUDA_ENABLED = "true";
+          changedEnv = true;
+        }
+      }
+    } catch (error) {
+      debugLogger?.warn("Automatic CUDA bootstrap failed", { error: error.message });
+    }
+  }
+
+  if (process.platform !== "darwin") {
+    try {
+      const { detectVulkanGpu } = require("./src/utils/vulkanDetection");
+      const gpuInfo = await detectVulkanGpu();
+      if (gpuInfo?.available) {
+        const LlamaVulkanManager = require("./src/helpers/llamaVulkanManager");
+        const vulkanManager = new LlamaVulkanManager();
+        if (vulkanManager.isSupported()) {
+          if (!vulkanManager.isDownloaded()) {
+            debugLogger?.info("Auto-downloading Vulkan llama-server binary", {
+              deviceName: gpuInfo.deviceName,
+            });
+            await vulkanManager.download();
+          }
+          if (process.env.LLAMA_VULKAN_ENABLED !== "true") {
+            process.env.LLAMA_VULKAN_ENABLED = "true";
+            changedEnv = true;
+          }
+          if (process.env.LLAMA_GPU_BACKEND) {
+            delete process.env.LLAMA_GPU_BACKEND;
+            changedEnv = true;
+          }
+        }
+      }
+    } catch (error) {
+      debugLogger?.warn("Automatic Vulkan bootstrap failed", { error: error.message });
+    }
+  }
+
+  if (changedEnv) {
+    environmentManager.saveAllKeysToEnvFile().catch((error) => {
+      debugLogger?.warn("Failed to persist auto-enabled GPU flags", { error: error.message });
+    });
+  }
+}
+
 // Main application startup
 async function startApp() {
   // Phase 1: Core managers + IPC handlers before windows
@@ -484,6 +553,11 @@ async function startApp() {
 
   // Phase 2: Initialize remaining managers after windows are visible
   initializeDeferredManagers();
+
+  // Optional personal mode: one-time GPU bootstrap (non-blocking).
+  autoEnableGpuAccelerationIfConfigured().catch((err) => {
+    debugLogger?.warn("GPU bootstrap task failed", { error: err.message });
+  });
 
   // Non-blocking server pre-warming
   const whisperSettings = {
