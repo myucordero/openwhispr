@@ -434,10 +434,21 @@ class ParakeetManager {
   }
 
   _runTarExtract(archivePath, extractDir) {
+    const tarCommand =
+      process.platform === "win32"
+        ? path.join(process.env.SystemRoot || "C:\\Windows", "System32", "tar.exe")
+        : "tar";
+    const isWindows = process.platform === "win32";
+    const tarArgs = isWindows
+      ? ["-xjf", path.basename(archivePath), "-C", path.basename(extractDir)]
+      : ["-xjf", archivePath, "-C", extractDir];
+    const spawnOptions = {
+      stdio: ["ignore", "pipe", "pipe"],
+      ...(isWindows ? { cwd: path.dirname(archivePath) } : {}),
+    };
+
     return new Promise((resolve, reject) => {
-      const tarProcess = spawn("tar", ["-xjf", archivePath, "-C", extractDir], {
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      const tarProcess = spawn(tarCommand, tarArgs, spawnOptions);
 
       let stderr = "";
 
