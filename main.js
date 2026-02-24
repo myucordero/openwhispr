@@ -450,6 +450,10 @@ async function autoEnableGpuAccelerationIfConfigured() {
       const { detectNvidiaGpu } = require("./src/utils/gpuDetection");
       const gpuInfo = await detectNvidiaGpu();
       if (gpuInfo?.hasNvidiaGpu) {
+        if (gpuInfo.vramMb && Number.isFinite(gpuInfo.vramMb)) {
+          process.env.LOCAL_GPU_VRAM_MB = String(gpuInfo.vramMb);
+          changedEnv = true;
+        }
         if (!whisperCudaManager.isDownloaded()) {
           debugLogger?.info("Auto-downloading CUDA Whisper binary", {
             gpuName: gpuInfo.gpuName,

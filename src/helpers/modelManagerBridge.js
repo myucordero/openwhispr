@@ -12,6 +12,7 @@ const {
 const modelRegistryData = require("../models/modelRegistryData.json");
 const LlamaServerManager = require("./llamaServer");
 const debugLogger = require("./debugLogger");
+const { getReasoningThreadCount, getRecommendedGpuLayers } = require("./runtimeTuning");
 
 const MIN_FILE_SIZE = 1_000_000; // 1MB minimum for valid model files
 
@@ -368,8 +369,8 @@ class ModelManager {
 
       await this.serverManager.start(modelPath, {
         contextSize: options.contextSize || modelInfo.model.contextLength || 4096,
-        threads: options.threads || 4,
-        gpuLayers: 99,
+        threads: options.threads || getReasoningThreadCount(),
+        gpuLayers: options.gpuLayers || getRecommendedGpuLayers(),
       });
       this.currentServerModelId = modelId;
 
@@ -441,8 +442,8 @@ class ModelManager {
     try {
       await this.serverManager.start(modelPath, {
         contextSize: modelInfo.model.contextLength || 4096,
-        threads: 4,
-        gpuLayers: 99,
+        threads: getReasoningThreadCount(),
+        gpuLayers: getRecommendedGpuLayers(),
       });
       this.currentServerModelId = modelId;
       debugLogger.info("llama-server pre-warmed", { modelId });

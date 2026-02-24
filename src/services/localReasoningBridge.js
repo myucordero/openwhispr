@@ -1,5 +1,6 @@
 const modelManager = require("../helpers/modelManagerBridge").default;
 const debugLogger = require("../helpers/debugLogger");
+const { getReasoningThreadCount } = require("../helpers/runtimeTuning");
 
 class LocalReasoningService {
   constructor() {
@@ -38,7 +39,7 @@ class LocalReasoningService {
         topP: config.topP || 0.9,
         repeatPenalty: config.repeatPenalty || 1.1,
         contextSize: config.contextSize || 4096,
-        threads: config.threads || 4,
+        threads: config.threads || getReasoningThreadCount(),
         systemPrompt: config.systemPrompt || "",
       };
 
