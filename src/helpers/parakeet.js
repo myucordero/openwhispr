@@ -435,8 +435,40 @@ class ParakeetManager {
   }
 
   async _runTarExtract(archivePath, extractDir) {
+    const tarCommand =
+      process.platform === "win32"
+        ? path.join(process.env.SystemRoot || "C:\\Windows", "System32", "tar.exe")
+        : "tar";
+    const isWindows = process.platform === "win32";
+    const tarArgs = isWindows
+      ? ["-xjf", path.basename(archivePath), "-C", path.basename(extractDir)]
+      : ["-xjf", archivePath, "-C", extractDir];
+    const spawnOptions = {
+      stdio: ["ignore", "pipe", "pipe"],
+      ...(isWindows ? { cwd: path.dirname(archivePath) } : {}),
+    };
     try {
-      await this._runSystemTar(archivePath, extractDir);
+      await new Promise((resolve, reject) => {
+        const tarProcess = spawn(tarCommand, tarArgs, spawnOptions);
+
+        let stderr = "";
+
+        tarProcess.stderr.on("data", (data) => {
+          stderr += data.toString();
+        });
+
+        tarProcess.on("close", (code) => {
+          if (code === 0) {
+            resolve();
+          } else {
+            reject(new Error(`tar extraction failed with code ${code}: ${stderr}`));
+          }
+        });
+
+        tarProcess.on("error", (err) => {
+          reject(new Error(`Failed to start tar process: ${err.message}`));
+        });
+      });
       return;
     } catch (err) {
       debugLogger.debug("System tar failed, falling back to JS extraction", {
@@ -447,32 +479,6 @@ class ParakeetManager {
     const unbzip2 = require("unbzip2-stream");
     const tar = require("tar");
     await pipeline(fs.createReadStream(archivePath), unbzip2(), tar.x({ cwd: extractDir }));
-  }
-
-  _runSystemTar(archivePath, extractDir) {
-    return new Promise((resolve, reject) => {
-      const tarProcess = spawn("tar", ["-xjf", archivePath, "-C", extractDir], {
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-
-      let stderr = "";
-
-      tarProcess.stderr.on("data", (data) => {
-        stderr += data.toString();
-      });
-
-      tarProcess.on("close", (code) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(new Error(`tar extraction failed with code ${code}: ${stderr}`));
-        }
-      });
-
-      tarProcess.on("error", (err) => {
-        reject(new Error(`Failed to start tar process: ${err.message}`));
-      });
-    });
   }
 
   async cancelDownload() {
