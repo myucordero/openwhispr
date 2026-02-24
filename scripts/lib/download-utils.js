@@ -1,7 +1,7 @@
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
+const { spawnSync } = require("child_process");
 
 const REQUEST_TIMEOUT = 30000;
 const MAX_RETRIES = 3;
@@ -230,28 +230,65 @@ function downloadFile(url, dest, retryCount = 0) {
   });
 }
 
-async function extractZip(zipPath, destDir) {
+function runCommand(command, args) {
+  const result = spawnSync(command, args, { stdio: "inherit" });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  if (result.status !== 0) {
+    throw new Error(`${command} exited with code ${result.status}`);
+  }
+}
+
+function getTarCommand() {
   if (process.platform === "win32") {
-    // Use unzipper package on Windows for better path handling
-    const unzipper = require("unzipper");
-    await fs
-      .createReadStream(zipPath)
-      .pipe(unzipper.Extract({ path: destDir }))
-      .promise();
+    return path.join(process.env.SystemRoot || "C:\\Windows", "System32", "tar.exe");
+  }
+  return "tar";
+}
+
+function escapePowerShellSingleQuotes(value) {
+  return value.replace(/'/g, "''");
+}
+
+function extractZip(zipPath, destDir) {
+  if (process.platform === "win32") {
+    const script = [
+      `$zip='${escapePowerShellSingleQuotes(zipPath)}'`,
+      `$dest='${escapePowerShellSingleQuotes(destDir)}'`,
+      "Expand-Archive -Path $zip -DestinationPath $dest -Force",
+    ].join("; ");
+
+    const powershellResult = spawnSync(
+      "powershell",
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+      { stdio: "inherit" }
+    );
+
+    if (powershellResult.error) {
+      throw powershellResult.error;
+    }
+
+    if (powershellResult.status !== 0) {
+      console.warn("  Expand-Archive failed, falling back to tar...");
+      runCommand(getTarCommand(), ["-xf", zipPath, "-C", destDir]);
+    }
   } else {
-    execSync(`unzip -o "${zipPath}" -d "${destDir}"`, { stdio: "inherit" });
+    runCommand("unzip", ["-o", zipPath, "-d", destDir]);
   }
 }
 
 function extractTarGz(tarPath, destDir) {
-  execSync(`tar -xzf "${tarPath}" -C "${destDir}"`, { stdio: "inherit" });
+  runCommand(getTarCommand(), ["-xzf", tarPath, "-C", destDir]);
 }
 
-async function extractArchive(archivePath, destDir) {
+function extractArchive(archivePath, destDir) {
   if (archivePath.endsWith(".tar.gz") || archivePath.endsWith(".tgz")) {
     extractTarGz(archivePath, destDir);
   } else {
-    await extractZip(archivePath, destDir);
+    extractZip(archivePath, destDir);
   }
 }
 

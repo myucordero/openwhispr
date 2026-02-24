@@ -290,7 +290,7 @@ $RECYCLE.BIN/
 .mcpjam/
 .mux/
 .neovate/
-.opencode/
+# .opencode/
 .openhands/
 .pi/
 .qoder/

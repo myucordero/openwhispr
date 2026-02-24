@@ -50,6 +50,8 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "."),
+        i18next: path.resolve(__dirname, "lib/simpleI18n.ts"),
+        "react-i18next": path.resolve(__dirname, "lib/reactI18nextShim.tsx"),
       },
     },
     server: {
