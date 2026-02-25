@@ -18,6 +18,104 @@ const HEALTH_CHECK_TIMEOUT_MS = 2000;
 const STARTUP_POLL_INTERVAL_MS = 500;
 const HEALTH_CHECK_FAILURE_THRESHOLD = 3;
 
+function asTrimmedString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function extractTextFromContent(content) {
+  if (!content) return "";
+
+  if (typeof content === "string") {
+    return content.trim();
+  }
+
+  if (Array.isArray(content)) {
+    const parts = [];
+    for (const chunk of content) {
+      if (typeof chunk === "string") {
+        const text = chunk.trim();
+        if (text) parts.push(text);
+        continue;
+      }
+      if (!chunk || typeof chunk !== "object") continue;
+      const candidate =
+        asTrimmedString(chunk.text) ||
+        asTrimmedString(chunk.value) ||
+        asTrimmedString(chunk.content) ||
+        asTrimmedString(chunk.reasoning_content);
+      if (candidate) parts.push(candidate);
+    }
+    return parts.join("\n").trim();
+  }
+
+  if (typeof content === "object") {
+    return (
+      asTrimmedString(content.text) ||
+      asTrimmedString(content.value) ||
+      asTrimmedString(content.content) ||
+      asTrimmedString(content.reasoning_content)
+    );
+  }
+
+  return "";
+}
+
+function extractReasoningText(reasoning) {
+  if (!reasoning) return "";
+
+  if (typeof reasoning === "string") {
+    return reasoning.trim();
+  }
+
+  if (Array.isArray(reasoning)) {
+    const parts = reasoning
+      .map((item) => extractReasoningText(item))
+      .filter((item) => typeof item === "string" && item.length > 0);
+    return parts.join("\n").trim();
+  }
+
+  if (typeof reasoning === "object") {
+    return (
+      asTrimmedString(reasoning.reasoning_content) ||
+      asTrimmedString(reasoning.content) ||
+      extractTextFromContent(reasoning.content) ||
+      extractReasoningText(reasoning.output) ||
+      extractReasoningText(reasoning.summary) ||
+      extractReasoningText(reasoning.text)
+    );
+  }
+
+  return "";
+}
+
+function extractLlamaChatCompletionText(response) {
+  if (!response || typeof response !== "object") return "";
+
+  const choices = Array.isArray(response.choices) ? response.choices : [];
+  for (const choice of choices) {
+    const message = choice?.message || choice?.delta || {};
+    const candidate =
+      extractTextFromContent(message?.content) ||
+      asTrimmedString(message?.reasoning_content) ||
+      extractReasoningText(message?.reasoning) ||
+      asTrimmedString(choice?.text) ||
+      asTrimmedString(choice?.reasoning_content) ||
+      extractReasoningText(choice?.reasoning);
+
+    if (candidate) return candidate;
+  }
+
+  return (
+    extractTextFromContent(response?.message?.content) ||
+    asTrimmedString(response?.message?.reasoning_content) ||
+    extractReasoningText(response?.message?.reasoning) ||
+    asTrimmedString(response?.text) ||
+    asTrimmedString(response?.output_text) ||
+    asTrimmedString(response?.reasoning_content) ||
+    extractReasoningText(response?.reasoning)
+  );
+}
+
 class LlamaServerManager {
   constructor() {
     this.process = null;
@@ -469,8 +567,25 @@ class LlamaServerManager {
 
             try {
               const response = JSON.parse(data);
-              const text = response.choices?.[0]?.message?.content || "";
-              resolve(text.trim());
+              const text = extractLlamaChatCompletionText(response);
+              if (!text) {
+                debugLogger.warn("llama-server returned empty completion payload", {
+                  hasChoices: Array.isArray(response?.choices),
+                  choiceCount: Array.isArray(response?.choices) ? response.choices.length : 0,
+                  topLevelKeys: Object.keys(response || {}),
+                  firstChoiceKeys: response?.choices?.[0] ? Object.keys(response.choices[0]) : [],
+                  firstMessageKeys: response?.choices?.[0]?.message
+                    ? Object.keys(response.choices[0].message)
+                    : [],
+                });
+                reject(
+                  new Error(
+                    "llama-server returned an empty completion payload (no assistant text found)"
+                  )
+                );
+                return;
+              }
+              resolve(text);
             } catch (e) {
               reject(new Error(`Failed to parse llama-server response: ${e.message}`));
             }
