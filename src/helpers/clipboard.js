@@ -461,14 +461,15 @@ class ClipboardManager {
     const webContents = options.webContents;
 
     try {
-      const shouldRestore = options.restoreClipboard !== false;
-      const originalClipboard = shouldRestore ? clipboard.readText() : null;
-      if (shouldRestore) {
-        this.safeLog(
-          "💾 Saved original clipboard content:",
-          originalClipboard.substring(0, 50) + "..."
-        );
-      }
+      const originalClipboard = clipboard.readText();
+      const shouldRestoreClipboard =
+        typeof options.restoreClipboard === "boolean"
+          ? options.restoreClipboard
+          : platform !== "win32";
+      this.safeLog(
+        "💾 Saved original clipboard content:",
+        originalClipboard.substring(0, 50) + "..."
+      );
 
       if (platform === "linux" && this._isWayland()) {
         this._writeClipboardWayland(text, webContents);
@@ -491,12 +492,12 @@ class ClipboardManager {
 
         this.safeLog("✅ Permissions granted, attempting to paste...");
         try {
-          await this.pasteMacOS(originalClipboard, options);
+          await this.pasteMacOS(originalClipboard, { ...options, shouldRestoreClipboard });
         } catch (firstError) {
           this.safeLog("⚠️ First paste attempt failed, retrying...", firstError?.message);
           clipboard.writeText(text);
           await new Promise((r) => setTimeout(r, 200));
-          await this.pasteMacOS(originalClipboard, options);
+          await this.pasteMacOS(originalClipboard, { ...options, shouldRestoreClipboard });
         }
       } else if (platform === "win32") {
         const winFastPaste = this.resolveWindowsFastPasteBinary();
@@ -506,9 +507,11 @@ class ClipboardManager {
           const nircmdPath = this.getNircmdPath();
           method = nircmdPath ? "nircmd" : "powershell";
         }
-        await this.pasteWindows(originalClipboard);
+        await this.pasteWindows(originalClipboard, { shouldRestoreClipboard });
       } else {
-        method = (await this.pasteLinux(originalClipboard, options)) || "linux-tools";
+        method =
+          (await this.pasteLinux(originalClipboard, { ...options, shouldRestoreClipboard })) ||
+          (this.resolveLinuxFastPasteBinary() ? "linux-xtest" : "linux-tools");
       }
 
       this.safeLog("✅ Paste operation complete", {
@@ -656,17 +659,18 @@ class ClipboardManager {
     });
   }
 
-  async pasteWindows(originalClipboard) {
+  async pasteWindows(originalClipboard, options = {}) {
     const fastPastePath = this.resolveWindowsFastPasteBinary();
 
     if (fastPastePath) {
-      return this.pasteWithFastPaste(fastPastePath, originalClipboard);
+      return this.pasteWithFastPaste(fastPastePath, originalClipboard, options);
     }
 
-    return this.pasteWithNircmdOrPowerShell(originalClipboard);
+    return this.pasteWithNircmdOrPowerShell(originalClipboard, options);
   }
 
-  async pasteWithFastPaste(fastPastePath, originalClipboard) {
+  async pasteWithFastPaste(fastPastePath, originalClipboard, options = {}) {
+    const shouldRestoreClipboard = options.shouldRestoreClipboard !== false;
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         let hasTimedOut = false;
@@ -702,11 +706,13 @@ class ClipboardManager {
               elapsedMs: elapsed,
               output,
             });
-            if (originalClipboard != null) {
+            if (shouldRestoreClipboard) {
               setTimeout(() => {
                 clipboard.writeText(originalClipboard);
                 this.safeLog("🔄 Clipboard restored");
               }, RESTORE_DELAYS.win32_nircmd);
+            } else {
+              this.safeLog("📋 Clipboard kept as dictated text (Windows)");
             }
             resolve();
           } else {
@@ -714,7 +720,9 @@ class ClipboardManager {
               `❌ Windows fast-paste failed (code ${code}), falling back to nircmd/PowerShell`,
               { elapsedMs: elapsed, stderr: stderrData.trim() }
             );
-            this.pasteWithNircmdOrPowerShell(originalClipboard).then(resolve).catch(reject);
+            this.pasteWithNircmdOrPowerShell(originalClipboard, options)
+              .then(resolve)
+              .catch(reject);
           }
         });
 
@@ -725,7 +733,7 @@ class ClipboardManager {
             elapsedMs: Date.now() - startTime,
             error: error.message,
           });
-          this.pasteWithNircmdOrPowerShell(originalClipboard).then(resolve).catch(reject);
+          this.pasteWithNircmdOrPowerShell(originalClipboard, options).then(resolve).catch(reject);
         });
 
         const timeoutId = setTimeout(() => {
@@ -733,21 +741,22 @@ class ClipboardManager {
           this.safeLog("⏱️ Windows fast-paste timeout, falling back to nircmd/PowerShell");
           killProcess(pasteProcess, "SIGKILL");
           pasteProcess.removeAllListeners();
-          this.pasteWithNircmdOrPowerShell(originalClipboard).then(resolve).catch(reject);
+          this.pasteWithNircmdOrPowerShell(originalClipboard, options).then(resolve).catch(reject);
         }, 2000);
       }, PASTE_DELAYS.win32_fast);
     });
   }
 
-  async pasteWithNircmdOrPowerShell(originalClipboard) {
+  async pasteWithNircmdOrPowerShell(originalClipboard, options = {}) {
     const nircmdPath = this.getNircmdPath();
     if (nircmdPath) {
-      return this.pasteWithNircmd(nircmdPath, originalClipboard);
+      return this.pasteWithNircmd(nircmdPath, originalClipboard, options);
     }
-    return this.pasteWithPowerShell(originalClipboard);
+    return this.pasteWithPowerShell(originalClipboard, options);
   }
 
-  async pasteWithNircmd(nircmdPath, originalClipboard) {
+  async pasteWithNircmd(nircmdPath, originalClipboard, options = {}) {
+    const shouldRestoreClipboard = options.shouldRestoreClipboard !== false;
     return new Promise((resolve, reject) => {
       const pasteDelay = PASTE_DELAYS.win32_nircmd;
       const restoreDelay = RESTORE_DELAYS.win32_nircmd;
@@ -777,11 +786,13 @@ class ClipboardManager {
               elapsedMs: elapsed,
               restoreDelayMs: restoreDelay,
             });
-            if (originalClipboard != null) {
+            if (shouldRestoreClipboard) {
               setTimeout(() => {
                 clipboard.writeText(originalClipboard);
                 this.safeLog("🔄 Clipboard restored");
               }, restoreDelay);
+            } else {
+              this.safeLog("📋 Clipboard kept as dictated text (Windows)");
             }
             resolve();
           } else {
@@ -789,7 +800,7 @@ class ClipboardManager {
               elapsedMs: elapsed,
               stderr: errorOutput,
             });
-            this.pasteWithPowerShell(originalClipboard).then(resolve).catch(reject);
+            this.pasteWithPowerShell(originalClipboard, options).then(resolve).catch(reject);
           }
         });
 
@@ -801,7 +812,7 @@ class ClipboardManager {
             elapsedMs: elapsed,
             error: error.message,
           });
-          this.pasteWithPowerShell(originalClipboard).then(resolve).catch(reject);
+          this.pasteWithPowerShell(originalClipboard, options).then(resolve).catch(reject);
         });
 
         const timeoutId = setTimeout(() => {
@@ -810,13 +821,14 @@ class ClipboardManager {
           this.safeLog(`⏱️ nircmd timeout, falling back to PowerShell`, { elapsedMs: elapsed });
           killProcess(pasteProcess, "SIGKILL");
           pasteProcess.removeAllListeners();
-          this.pasteWithPowerShell(originalClipboard).then(resolve).catch(reject);
+          this.pasteWithPowerShell(originalClipboard, options).then(resolve).catch(reject);
         }, 2000);
       }, pasteDelay);
     });
   }
 
-  async pasteWithPowerShell(originalClipboard) {
+  async pasteWithPowerShell(originalClipboard, options = {}) {
+    const shouldRestoreClipboard = options.shouldRestoreClipboard !== false;
     return new Promise((resolve, reject) => {
       const pasteDelay = PASTE_DELAYS.win32_pwsh;
       const restoreDelay = RESTORE_DELAYS.win32_pwsh;
@@ -855,11 +867,13 @@ class ClipboardManager {
               elapsedMs: elapsed,
               restoreDelayMs: restoreDelay,
             });
-            if (originalClipboard != null) {
+            if (shouldRestoreClipboard) {
               setTimeout(() => {
                 clipboard.writeText(originalClipboard);
                 this.safeLog("🔄 Clipboard restored");
               }, restoreDelay);
+            } else {
+              this.safeLog("📋 Clipboard kept as dictated text (Windows)");
             }
             resolve();
           } else {
