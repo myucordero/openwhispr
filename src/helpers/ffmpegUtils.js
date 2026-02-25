@@ -6,7 +6,13 @@ const debugLogger = require("./debugLogger");
 let cachedFFmpegPath = null;
 
 function getFFmpegPath() {
-  if (cachedFFmpegPath) return cachedFFmpegPath;
+  if (cachedFFmpegPath) {
+    if (fs.existsSync(cachedFFmpegPath)) {
+      return cachedFFmpegPath;
+    }
+    debugLogger.debug("Clearing stale cached FFmpeg path", { cachedFFmpegPath });
+    cachedFFmpegPath = null;
+  }
 
   try {
     let ffmpegPath = require("ffmpeg-static");
@@ -110,73 +116,86 @@ function isWavFormat(buffer) {
 function convertToWav(inputPath, outputPath, options = {}) {
   const { sampleRate = 16000, channels = 1 } = options;
 
-  return new Promise((resolve, reject) => {
-    const ffmpegPath = getFFmpegPath();
-    if (!ffmpegPath) {
-      reject(new Error("FFmpeg not found - required for audio conversion"));
-      return;
-    }
+  const args = [
+    "-i",
+    inputPath,
+    "-ar",
+    String(sampleRate),
+    "-ac",
+    String(channels),
+    "-c:a",
+    "pcm_s16le",
+    "-y", // Overwrite output file
+    outputPath,
+  ];
 
-    const args = [
-      "-i",
-      inputPath,
-      "-ar",
-      String(sampleRate),
-      "-ac",
-      String(channels),
-      "-c:a",
-      "pcm_s16le",
-      "-y", // Overwrite output file
-      outputPath,
-    ];
-
-    debugLogger.debug("Converting audio with FFmpeg", {
-      input: inputPath,
-      output: outputPath,
-      sampleRate,
-      channels,
-    });
-
-    const proc = spawn(ffmpegPath, args, {
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
-    });
-
-    let stderr = "";
-
-    proc.stderr.on("data", (data) => {
-      stderr += data.toString();
-    });
-
-    proc.on("error", (error) => {
-      reject(new Error(`FFmpeg process error: ${error.message}`));
-    });
-
-    proc.on("close", (code) => {
-      if (code !== 0) {
-        const stderrPreview = stderr.slice(-500).trim();
-        debugLogger.debug("FFmpeg conversion failed", { code, stderr: stderrPreview });
-        reject(
-          new Error(`FFmpeg exited with code ${code}${stderrPreview ? `: ${stderrPreview}` : ""}`)
-        );
-        return;
-      }
-
-      if (!fs.existsSync(outputPath)) {
-        reject(new Error("FFmpeg conversion produced no output file"));
-        return;
-      }
-
-      const stats = fs.statSync(outputPath);
-      if (stats.size === 0) {
-        reject(new Error("FFmpeg conversion produced empty output file"));
-        return;
-      }
-
-      debugLogger.debug("FFmpeg conversion complete", { outputSize: stats.size });
-      resolve();
-    });
+  debugLogger.debug("Converting audio with FFmpeg", {
+    input: inputPath,
+    output: outputPath,
+    sampleRate,
+    channels,
   });
+
+  const runConversion = (attempt = 0) =>
+    new Promise((resolve, reject) => {
+      const ffmpegPath = getFFmpegPath();
+      if (!ffmpegPath) {
+        reject(new Error("FFmpeg not found - required for audio conversion"));
+        return;
+      }
+
+      const proc = spawn(ffmpegPath, args, {
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
+      });
+
+      let stderr = "";
+
+      proc.stderr.on("data", (data) => {
+        stderr += data.toString();
+      });
+
+      proc.on("error", (error) => {
+        const isNotFound = error?.code === "ENOENT" || /ENOENT/i.test(error?.message || "");
+        if (isNotFound && attempt === 0) {
+          debugLogger.warn("FFmpeg path became unavailable; retrying with fresh resolution", {
+            ffmpegPath,
+            error: error.message,
+          });
+          clearCache();
+          runConversion(1).then(resolve).catch(reject);
+          return;
+        }
+        reject(new Error(`FFmpeg process error: ${error.message}`));
+      });
+
+      proc.on("close", (code) => {
+        if (code !== 0) {
+          const stderrPreview = stderr.slice(-500).trim();
+          debugLogger.debug("FFmpeg conversion failed", { code, stderr: stderrPreview });
+          reject(
+            new Error(`FFmpeg exited with code ${code}${stderrPreview ? `: ${stderrPreview}` : ""}`)
+          );
+          return;
+        }
+
+        if (!fs.existsSync(outputPath)) {
+          reject(new Error("FFmpeg conversion produced no output file"));
+          return;
+        }
+
+        const stats = fs.statSync(outputPath);
+        if (stats.size === 0) {
+          reject(new Error("FFmpeg conversion produced empty output file"));
+          return;
+        }
+
+        debugLogger.debug("FFmpeg conversion complete", { outputSize: stats.size });
+        resolve();
+      });
+    });
+
+  return runConversion(0);
 }
 
 function wavToFloat32Samples(wavBuffer) {
