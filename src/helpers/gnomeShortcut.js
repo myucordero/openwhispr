@@ -32,10 +32,10 @@ let dbus = null;
 function getDBus() {
   if (dbus) return dbus;
   try {
-    dbus = require("dbus-next");
+    dbus = require("@deltachat/dbus-next");
     return dbus;
   } catch (err) {
-    debugLogger.log("[GnomeShortcut] Failed to load dbus-next:", err.message);
+    debugLogger.log("[GnomeShortcut] Failed to load @deltachat/dbus-next:", err.message);
     return null;
   }
 }
