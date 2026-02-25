@@ -43,8 +43,7 @@ function extractTextFromContent(content) {
       const candidate =
         asTrimmedString(chunk.text) ||
         asTrimmedString(chunk.value) ||
-        asTrimmedString(chunk.content) ||
-        asTrimmedString(chunk.reasoning_content);
+        asTrimmedString(chunk.content);
       if (candidate) parts.push(candidate);
     }
     return parts.join("\n").trim();
@@ -54,40 +53,22 @@ function extractTextFromContent(content) {
     return (
       asTrimmedString(content.text) ||
       asTrimmedString(content.value) ||
-      asTrimmedString(content.content) ||
-      asTrimmedString(content.reasoning_content)
+      asTrimmedString(content.content)
     );
   }
 
   return "";
 }
 
-function extractReasoningText(reasoning) {
-  if (!reasoning) return "";
+function sanitizeAssistantOutput(text) {
+  const normalized = asTrimmedString(text);
+  if (!normalized) return "";
 
-  if (typeof reasoning === "string") {
-    return reasoning.trim();
-  }
-
-  if (Array.isArray(reasoning)) {
-    const parts = reasoning
-      .map((item) => extractReasoningText(item))
-      .filter((item) => typeof item === "string" && item.length > 0);
-    return parts.join("\n").trim();
-  }
-
-  if (typeof reasoning === "object") {
-    return (
-      asTrimmedString(reasoning.reasoning_content) ||
-      asTrimmedString(reasoning.content) ||
-      extractTextFromContent(reasoning.content) ||
-      extractReasoningText(reasoning.output) ||
-      extractReasoningText(reasoning.summary) ||
-      extractReasoningText(reasoning.text)
-    );
-  }
-
-  return "";
+  // Remove explicit reasoning blocks when a model includes them inline.
+  return normalized
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+    .trim();
 }
 
 function extractLlamaChatCompletionText(response) {
@@ -96,25 +77,20 @@ function extractLlamaChatCompletionText(response) {
   const choices = Array.isArray(response.choices) ? response.choices : [];
   for (const choice of choices) {
     const message = choice?.message || choice?.delta || {};
-    const candidate =
+    const candidate = sanitizeAssistantOutput(
       extractTextFromContent(message?.content) ||
-      asTrimmedString(message?.reasoning_content) ||
-      extractReasoningText(message?.reasoning) ||
       asTrimmedString(choice?.text) ||
-      asTrimmedString(choice?.reasoning_content) ||
-      extractReasoningText(choice?.reasoning);
+      asTrimmedString(response?.output_text) ||
+      asTrimmedString(response?.text)
+    );
 
     if (candidate) return candidate;
   }
 
-  return (
+  return sanitizeAssistantOutput(
     extractTextFromContent(response?.message?.content) ||
-    asTrimmedString(response?.message?.reasoning_content) ||
-    extractReasoningText(response?.message?.reasoning) ||
     asTrimmedString(response?.text) ||
-    asTrimmedString(response?.output_text) ||
-    asTrimmedString(response?.reasoning_content) ||
-    extractReasoningText(response?.reasoning)
+    asTrimmedString(response?.output_text)
   );
 }
 
@@ -542,10 +518,9 @@ class LlamaServerManager {
       stream: false,
     };
 
-    // Without this, Qwen chat templates leave `message.content` empty and
-    // route output into `reasoning_content`. Non-Qwen templates ignore it.
-    if (options.disableThinking !== false) {
+    if (options.disableThinking) {
       requestBody.chat_template_kwargs = { enable_thinking: false };
+      requestBody.thinking_forced_open = false;
     }
 
     const body = JSON.stringify(requestBody);
