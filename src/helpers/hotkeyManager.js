@@ -46,6 +46,10 @@ function normalizeToAccelerator(hotkey) {
   return accelerator;
 }
 
+function isWindowsPushMode() {
+  return process.platform === "win32" && process.env.ACTIVATION_MODE === "push";
+}
+
 // Suggested alternative hotkeys when registration fails
 const SUGGESTED_HOTKEYS = {
   single: ["F8", "F9", "F10", "Pause", "ScrollLock"],
@@ -187,6 +191,16 @@ class HotkeyManager {
         this.currentHotkey = hotkey;
         debugLogger.log(
           `[HotkeyManager] Modifier-only "${hotkey}" set - using Windows native listener`
+        );
+        return { success: true, hotkey };
+      }
+
+      // In Windows Push-to-Talk mode, use the native key listener for all hotkeys.
+      // This avoids globalShortcut registration conflicts for combos like Control+Alt+S.
+      if (isWindowsPushMode()) {
+        this.currentHotkey = hotkey;
+        debugLogger.log(
+          `[HotkeyManager] Windows push mode active - using native listener for "${hotkey}"`
         );
         return { success: true, hotkey };
       }
@@ -389,6 +403,7 @@ class HotkeyManager {
         debugLogger.log(
           `[HotkeyManager] Default hotkey "${defaultHotkey}" registered successfully`
         );
+        await this.saveHotkeyToRenderer(defaultHotkey);
         return;
       }
 

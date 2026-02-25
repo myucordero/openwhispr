@@ -531,6 +531,41 @@ async function startApp() {
   ipcMain.on("activation-mode-changed", (_event, mode) => {
     windowManager.setActivationModeCache(mode);
     environmentManager.saveActivationMode(mode);
+
+    if (process.platform !== "win32" || !hotkeyManager) {
+      return;
+    }
+
+    const currentHotkey = hotkeyManager.getCurrentHotkey?.();
+    if (!currentHotkey || currentHotkey === "GLOBE") {
+      return;
+    }
+
+    const { isModifierOnlyHotkey, isRightSideModifier } = require("./src/helpers/hotkeyManager");
+    const isNativeOnly = isModifierOnlyHotkey(currentHotkey) || isRightSideModifier(currentHotkey);
+
+    if (mode === "push") {
+      // In push mode on Windows, rely on native key listener instead of globalShortcut.
+      if (!isNativeOnly) {
+        const accelerator = currentHotkey.startsWith("Fn+")
+          ? currentHotkey.slice(3)
+          : currentHotkey;
+        try {
+          globalShortcut.unregister(accelerator);
+        } catch (error) {
+          debugLogger?.warn("Failed to unregister hotkey during push-mode switch", {
+            hotkey: currentHotkey,
+            error: error?.message,
+          });
+        }
+      }
+      return;
+    }
+
+    // Switched back to tap mode: ensure non-native hotkeys are registered with globalShortcut.
+    if (!isNativeOnly) {
+      hotkeyManager.setupShortcuts(currentHotkey, windowManager.createHotkeyCallback());
+    }
   });
 
   ipcMain.on("floating-icon-auto-hide-changed", (_event, enabled) => {
