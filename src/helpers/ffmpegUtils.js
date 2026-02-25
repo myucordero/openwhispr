@@ -5,6 +5,31 @@ const debugLogger = require("./debugLogger");
 
 let cachedFFmpegPath = null;
 
+function ensureExecutable(pathToBinary) {
+  if (process.platform === "win32") return true;
+  try {
+    fs.accessSync(pathToBinary, fs.constants.X_OK);
+    return true;
+  } catch {
+    try {
+      fs.chmodSync(pathToBinary, 0o755);
+      return true;
+    } catch (chmodErr) {
+      debugLogger.warn("Failed to chmod FFmpeg", { error: chmodErr.message, path: pathToBinary });
+      return false;
+    }
+  }
+}
+
+function toUnpackedAsarPath(filePath) {
+  if (!filePath || !filePath.includes("app.asar")) return null;
+  return filePath.replace(/app\.asar([/\\])/, "app.asar.unpacked$1");
+}
+
+function isInsideAsar(filePath) {
+  return typeof filePath === "string" && /app\.asar([/\\]|$)/.test(filePath);
+}
+
 function getFFmpegPath() {
   if (cachedFFmpegPath) {
     if (fs.existsSync(cachedFFmpegPath)) {
@@ -15,46 +40,36 @@ function getFFmpegPath() {
   }
 
   try {
-    let ffmpegPath = require("ffmpeg-static");
-    ffmpegPath = path.normalize(ffmpegPath);
+    const binaryName = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
+    const candidates = [];
 
+    // Explicit packaged app location (most reliable in production builds)
+    if (process.resourcesPath) {
+      candidates.push(
+        path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "ffmpeg-static", binaryName)
+      );
+    }
+
+    let ffmpegPath = path.normalize(require("ffmpeg-static"));
     if (process.platform === "win32" && !ffmpegPath.endsWith(".exe")) {
       ffmpegPath += ".exe";
     }
 
-    // Try unpacked ASAR path first (production builds unpack ffmpeg-static)
-    const unpackedPath = ffmpegPath.includes("app.asar")
-      ? ffmpegPath.replace(/app\.asar([/\\])/, "app.asar.unpacked$1")
-      : null;
+    const unpackedPath = toUnpackedAsarPath(ffmpegPath);
+    if (unpackedPath) candidates.push(path.normalize(unpackedPath));
 
-    if (unpackedPath && fs.existsSync(unpackedPath)) {
-      if (process.platform !== "win32") {
-        try {
-          fs.accessSync(unpackedPath, fs.constants.X_OK);
-        } catch {
-          try {
-            fs.chmodSync(unpackedPath, 0o755);
-          } catch (chmodErr) {
-            debugLogger.warn("Failed to chmod FFmpeg", { error: chmodErr.message });
-          }
-        }
-      }
-      cachedFFmpegPath = unpackedPath;
-      return unpackedPath;
+    // Keep original path only if it is not inside app.asar (spawn cannot execute there)
+    if (!isInsideAsar(ffmpegPath)) {
+      candidates.push(ffmpegPath);
+    } else {
+      debugLogger.debug("Ignoring FFmpeg path inside app.asar for spawn()", { ffmpegPath });
     }
 
-    // Try original path (development or if not in ASAR)
-    if (fs.existsSync(ffmpegPath)) {
-      if (process.platform !== "win32") {
-        try {
-          fs.accessSync(ffmpegPath, fs.constants.X_OK);
-        } catch {
-          debugLogger.debug("FFmpeg exists but not executable", { ffmpegPath });
-          throw new Error("Not executable");
-        }
-      }
-      cachedFFmpegPath = ffmpegPath;
-      return ffmpegPath;
+    for (const candidate of candidates) {
+      if (!candidate || !fs.existsSync(candidate)) continue;
+      if (!ensureExecutable(candidate)) continue;
+      cachedFFmpegPath = candidate;
+      return candidate;
     }
   } catch (err) {
     debugLogger.debug("Bundled FFmpeg not available", { error: err.message });

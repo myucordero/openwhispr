@@ -11,6 +11,7 @@ const {
 } = require("./downloadUtils");
 const WhisperServerManager = require("./whisperServer");
 const { getModelsDirForService } = require("./modelDirUtils");
+const { getFFmpegPath: resolveFFmpegPath } = require("./ffmpegUtils");
 
 const modelRegistryData = require("../models/modelRegistryData.json");
 
@@ -545,86 +546,9 @@ class WhisperManager {
 
   // FFmpeg methods (still needed for audio format conversion)
   async getFFmpegPath() {
-    if (this.cachedFFmpegPath) {
-      return this.cachedFFmpegPath;
-    }
-
-    let ffmpegPath;
-
-    try {
-      ffmpegPath = require("ffmpeg-static");
-      ffmpegPath = path.normalize(ffmpegPath);
-
-      if (process.platform === "win32" && !ffmpegPath.endsWith(".exe")) {
-        ffmpegPath += ".exe";
-      }
-
-      debugLogger.debug("FFmpeg static path from module", { ffmpegPath });
-
-      // Try unpacked ASAR path first (production builds unpack ffmpeg-static)
-      // Handle both forward slashes and backslashes for cross-platform compatibility
-      const unpackedPath = ffmpegPath.includes("app.asar")
-        ? ffmpegPath.replace(/app\.asar([/\\])/, "app.asar.unpacked$1")
-        : null;
-
-      if (unpackedPath) {
-        debugLogger.debug("Checking unpacked ASAR path", { unpackedPath });
-        if (fs.existsSync(unpackedPath)) {
-          if (process.platform !== "win32") {
-            try {
-              fs.accessSync(unpackedPath, fs.constants.X_OK);
-            } catch {
-              debugLogger.debug("FFmpeg not executable, attempting chmod", { unpackedPath });
-              try {
-                fs.chmodSync(unpackedPath, 0o755);
-              } catch (chmodErr) {
-                debugLogger.warn("Failed to chmod FFmpeg", { error: chmodErr.message });
-              }
-            }
-          }
-          debugLogger.debug("Found FFmpeg in unpacked ASAR", { path: unpackedPath });
-          this.cachedFFmpegPath = unpackedPath;
-          return unpackedPath;
-        } else {
-          debugLogger.warn("Unpacked ASAR path does not exist", { unpackedPath });
-        }
-      }
-
-      // Try original path (development or if not in ASAR)
-      if (fs.existsSync(ffmpegPath)) {
-        if (process.platform !== "win32") {
-          fs.accessSync(ffmpegPath, fs.constants.X_OK);
-        }
-        debugLogger.debug("Found FFmpeg at bundled path", { path: ffmpegPath });
-        this.cachedFFmpegPath = ffmpegPath;
-        return ffmpegPath;
-      } else {
-        debugLogger.warn("Bundled FFmpeg path does not exist", { ffmpegPath });
-      }
-    } catch (err) {
-      debugLogger.warn("Bundled FFmpeg not available", { error: err.message });
-    }
-
-    // Try system FFmpeg paths
-    const systemCandidates =
-      process.platform === "darwin"
-        ? ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"]
-        : process.platform === "win32"
-          ? ["C:\\ffmpeg\\bin\\ffmpeg.exe"]
-          : ["/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg"];
-
-    debugLogger.debug("Trying system FFmpeg candidates", { candidates: systemCandidates });
-
-    for (const candidate of systemCandidates) {
-      if (fs.existsSync(candidate)) {
-        debugLogger.debug("Found system FFmpeg", { path: candidate });
-        this.cachedFFmpegPath = candidate;
-        return candidate;
-      }
-    }
-
-    debugLogger.error("FFmpeg not found anywhere");
-    return null;
+    const resolvedPath = resolveFFmpegPath();
+    this.cachedFFmpegPath = resolvedPath || null;
+    return resolvedPath;
   }
 
   async checkFFmpegAvailability() {
