@@ -380,22 +380,27 @@ class ModelManager {
       });
     }
 
+    const isQwen3Model = modelInfo.provider.id === "qwen" && /^qwen3-/i.test(modelId);
+    const userPrompt = isQwen3Model ? `/no_think\n${prompt}` : prompt;
+
     // Build messages for chat completion
     const messages = [
       { role: "system", content: options.systemPrompt || "" },
-      { role: "user", content: prompt },
+      { role: "user", content: userPrompt },
     ];
 
     debugLogger.logReasoning("INFERENCE_SENDING_REQUEST", {
       messageCount: messages.length,
       systemPromptLength: (options.systemPrompt || "").length,
-      userPromptLength: prompt.length,
+      userPromptLength: userPrompt.length,
+      disableThinking: isQwen3Model,
     });
 
     try {
       const result = await this.serverManager.inference(messages, {
         temperature: options.temperature ?? 0.7,
         max_tokens: options.maxTokens ?? 512,
+        disableThinking: isQwen3Model,
       });
 
       const totalTime = Date.now() - startTime;
