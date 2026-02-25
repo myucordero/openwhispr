@@ -507,7 +507,10 @@ class ClipboardManager {
           const nircmdPath = this.getNircmdPath();
           method = nircmdPath ? "nircmd" : "powershell";
         }
-        await this.pasteWindows(originalClipboard, { shouldRestoreClipboard });
+        await this.pasteWindows(originalClipboard, {
+          shouldRestoreClipboard,
+          dictatedText: text,
+        });
       } else {
         method =
           (await this.pasteLinux(originalClipboard, { ...options, shouldRestoreClipboard })) ||
@@ -669,6 +672,32 @@ class ClipboardManager {
     return this.pasteWithNircmdOrPowerShell(originalClipboard, options);
   }
 
+  ensureWindowsClipboardText(text) {
+    const intended = typeof text === "string" ? text : "";
+    if (!intended) return;
+
+    const tryWrite = (label) => {
+      try {
+        clipboard.writeText(intended);
+        const readBack = clipboard.readText();
+        const matches = readBack === intended;
+        this.safeLog(`📋 Windows clipboard sync (${label})`, {
+          intendedLength: intended.length,
+          readBackLength: (readBack || "").length,
+          matches,
+        });
+      } catch (error) {
+        this.safeLog(`⚠️ Windows clipboard sync failed (${label})`, {
+          error: error.message,
+        });
+      }
+    };
+
+    // Immediate write + short delayed write to handle races with focused apps/clipboard tools.
+    tryWrite("immediate");
+    setTimeout(() => tryWrite("delayed"), 120);
+  }
+
   async pasteWithFastPaste(fastPastePath, originalClipboard, options = {}) {
     const shouldRestoreClipboard = options.shouldRestoreClipboard !== false;
     return new Promise((resolve, reject) => {
@@ -712,6 +741,7 @@ class ClipboardManager {
                 this.safeLog("🔄 Clipboard restored");
               }, RESTORE_DELAYS.win32_nircmd);
             } else {
+              this.ensureWindowsClipboardText(options.dictatedText);
               this.safeLog("📋 Clipboard kept as dictated text (Windows)");
             }
             resolve();
@@ -792,6 +822,7 @@ class ClipboardManager {
                 this.safeLog("🔄 Clipboard restored");
               }, restoreDelay);
             } else {
+              this.ensureWindowsClipboardText(options.dictatedText);
               this.safeLog("📋 Clipboard kept as dictated text (Windows)");
             }
             resolve();
@@ -873,6 +904,7 @@ class ClipboardManager {
                 this.safeLog("🔄 Clipboard restored");
               }, restoreDelay);
             } else {
+              this.ensureWindowsClipboardText(options.dictatedText);
               this.safeLog("📋 Clipboard kept as dictated text (Windows)");
             }
             resolve();
