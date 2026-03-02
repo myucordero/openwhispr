@@ -307,7 +307,8 @@
       "noAudio": {
         "title": "Nessun audio rilevato",
         "description": "La registrazione non contiene audio rilevabile. Riprova."
-      }
+      },
+      "noTranscription": "Nessuna trascrizione disponibile"
     },
     "clipboard": {
       "pasteFailed": {

@@ -307,7 +307,8 @@
       "noAudio": {
         "title": "Kein Audio erkannt",
         "description": "Die Aufnahme enthielt kein erkennbares Audio. Bitte versuchen Sie es erneut."
-      }
+      },
+      "noTranscription": "Keine Transkription verfügbar"
     },
     "clipboard": {
       "pasteFailed": {

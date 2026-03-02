@@ -307,7 +307,8 @@
       "noAudio": {
         "title": "音声が検出されませんでした",
         "description": "録音に音声が含まれていませんでした。もう一度お試しください。"
-      }
+      },
+      "noTranscription": "文字起こしは利用できません"
     },
     "clipboard": {
       "pasteFailed": {

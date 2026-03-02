@@ -275,6 +275,30 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
         );
       }
 
+      // Silence detection: observe audio energy via AnalyserNode
+      try {
+        this._silenceCtx = new AudioContext();
+        this._silenceAnalyser = this._silenceCtx.createAnalyser();
+        this._silenceAnalyser.fftSize = 2048;
+        const sourceNode = this._silenceCtx.createMediaStreamSource(stream);
+        sourceNode.connect(this._silenceAnalyser);
+        this._peakRms = 0;
+        const dataArray = new Uint8Array(this._silenceAnalyser.fftSize);
+        this._silenceInterval = setInterval(() => {
+          this._silenceAnalyser.getByteTimeDomainData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            const v = (dataArray[i] - 128) / 128;
+            sum += v * v;
+          }
+          const rms = Math.sqrt(sum / dataArray.length);
+          if (rms > this._peakRms) this._peakRms = rms;
+        }, 100);
+      } catch (e) {
+        logger.warn("Silence detection setup failed, skipping", { error: e.message }, "audio");
+        this._peakRms = 1; // assume speech if detection fails
+      }
+
       this.mediaRecorder = new MediaRecorder(stream);
       this.audioChunks = [];
       this.recordingStartTime = Date.now();
@@ -285,6 +309,15 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
       };
 
       this.mediaRecorder.onstop = async () => {
+        // Clean up silence detection
+        if (this._silenceInterval) {
+          clearInterval(this._silenceInterval);
+          this._silenceInterval = null;
+        }
+        this._silenceCtx?.close().catch(() => {});
+        this._silenceCtx = null;
+        this._silenceAnalyser = null;
+
         this.isRecording = false;
         this.isProcessing = true;
         this.onStateChange?.({ isRecording: false, isProcessing: true });
@@ -380,6 +413,22 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
 
   async processAudio(audioBlob, metadata = {}) {
     const pipelineStart = performance.now();
+
+    // Skip transcription if recording was silence
+    const SILENCE_THRESHOLD = 0.01;
+    if (this._peakRms != null && this._peakRms < SILENCE_THRESHOLD) {
+      logger.info(
+        "Silence detected, skipping transcription",
+        { peakRms: this._peakRms.toFixed(4), threshold: SILENCE_THRESHOLD },
+        "audio"
+      );
+      this._peakRms = null;
+      this.isProcessing = false;
+      this.onStateChange?.({ isRecording: false, isProcessing: false });
+      this.onTranscriptionComplete?.({ success: true, text: "" });
+      return;
+    }
+    this._peakRms = null;
 
     try {
       const s = getSettings();
@@ -896,6 +945,14 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
 
   async processTranscription(text, source) {
     const normalizedText = typeof text === "string" ? text.trim() : "";
+
+    if (!normalizedText) {
+      logger.logReasoning("TRANSCRIPTION_EMPTY_SKIPPING_REASONING", {
+        source,
+        reason: "Empty text after normalization",
+      });
+      return normalizedText;
+    }
 
     logger.logReasoning("TRANSCRIPTION_RECEIVED", {
       source,

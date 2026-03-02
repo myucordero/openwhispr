@@ -93,6 +93,14 @@ export const useAudioRecording = (toast, options = {}) => {
       },
       onTranscriptionComplete: async (result) => {
         if (result.success) {
+          const transcribedText = result.text?.trim();
+
+          if (!transcribedText) {
+            const fallback = t("hooks.audioRecording.noTranscription");
+            await audioManagerRef.current.safePaste(fallback);
+            return;
+          }
+
           setTranscript(result.text);
 
           const isStreaming = result.source?.includes("streaming");

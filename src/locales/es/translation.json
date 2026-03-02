@@ -307,7 +307,8 @@
       "noAudio": {
         "title": "No se detectó audio",
         "description": "La grabación no contiene audio detectable. Inténtalo de nuevo."
-      }
+      },
+      "noTranscription": "No hay transcripción disponible"
     },
     "clipboard": {
       "pasteFailed": {

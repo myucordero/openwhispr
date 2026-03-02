@@ -307,7 +307,8 @@
       "noAudio": {
         "title": "No Audio Detected",
         "description": "The recording contained no detectable audio. Please try again."
-      }
+      },
+      "noTranscription": "No transcription available"
     },
     "clipboard": {
       "pasteFailed": {

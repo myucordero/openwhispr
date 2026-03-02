@@ -307,7 +307,8 @@
       "noAudio": {
         "title": "未偵測到音訊",
         "description": "錄音中未偵測到聲音。請再試一次。"
-      }
+      },
+      "noTranscription": "無可用轉錄"
     },
     "clipboard": {
       "pasteFailed": {

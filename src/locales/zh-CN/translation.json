@@ -307,7 +307,8 @@
       "noAudio": {
         "title": "未检测到音频",
         "description": "录音中未检测到音频，请重试。"
-      }
+      },
+      "noTranscription": "无可用转录"
     },
     "clipboard": {
       "pasteFailed": {
