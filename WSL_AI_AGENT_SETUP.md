@@ -18,8 +18,8 @@ Use two separate working copies:
 Hard rules:
 
 - Never share one `node_modules` between WSL and Windows.
-- Never run Linux `npm install` in the Windows clone.
-- Never run Windows `npm.cmd install` in the WSL clone.
+- Never run Linux `npm install` or `npm ci` in the Windows clone.
+- Never run Windows `npm.cmd install` or `npm.cmd ci` in the WSL clone.
 - Sync changes only via `git push` and `git pull`.
 
 ## 2. One-Time Windows Setup
@@ -220,4 +220,3 @@ function owdev {
   - Confirm `.gitattributes` exists and run `git add --renormalize .`.
 - If watcher/HMR is unstable:
   - Run dev server from Windows clone (not WSL).
-
