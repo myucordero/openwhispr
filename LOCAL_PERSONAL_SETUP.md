@@ -161,7 +161,7 @@ git checkout main
 git fetch upstream
 git rebase upstream/main
 git push origin main
-npm install
+npm ci
 npm audit
 npm run lint
 npm run build
