@@ -886,7 +886,6 @@
           "name": "Grátis",
           "price": "$0",
           "period": "para sempre",
-          "trialNote": "Inclui 7 dias grátis de OpenWhispr Pro",
           "features": [
             "2.000 palavras/semana",
             "Modelos de IA locais",
@@ -1250,7 +1249,7 @@
     "updatePayment": "Atualizar forma de pagamento",
     "updatePaymentDescription": "Volte às transcrições ilimitadas do Pro.",
     "upgradeToPro": "Fazer upgrade para Pro",
-    "upgradeDescription": "Transcrições ilimitadas. $9/mês.",
+    "upgradeDescription": "Atualize para um plano pago a partir de apenas $8/mês.",
     "useApiKey": "Use sua própria chave API",
     "useApiKeyDescription": "Traga sua própria chave para uso ilimitado.",
     "switchToLocal": "Mudar para local",
@@ -1401,12 +1400,25 @@
       "errorOccurred": "Ocorreu um erro",
       "noProviderTitle": "Nenhum provedor de transcrição configurado",
       "noProviderDescription": "Adicione uma chave API ou baixe um modelo local para começar a transcrever.",
-      "noProviderAction": "Abrir configurações de transcrição"
+      "noProviderAction": "Abrir configurações de transcrição",
+      "fileTooLarge": "Este arquivo excede o limite de 500 MB.",
+      "largeFileNote": "Arquivos grandes são divididos e transcritos em paralelo.",
+      "chunkProgress": "Transcrevendo parte {{completed}} de {{total}}...",
+      "paidPlanRequired": "A transcrição na nuvem para arquivos acima de 25 MB requer um plano pago. Arquivos grandes são processados com o OpenWhispr Cloud para resultados confiáveis e de alta qualidade.",
+      "byokTooLarge": "Chaves API de terceiros suportam apenas arquivos de até 25 MB.",
+      "byokTooLargeDetail": "Para arquivos acima de 25 MB, o OpenWhispr Cloud cuida da divisão, processamento paralelo e remontagem — para resultados confiáveis sem depender dos limites de provedores de terceiros.",
+      "byokTooLargeNeedsAccount": "Crie uma conta e mude para um plano pago para transcrever arquivos maiores com o OpenWhispr Cloud.",
+      "byokTooLargeNeedsUpgrade": "Mude para um plano pago para transcrever arquivos maiores com o OpenWhispr Cloud.",
+      "switchToCloudForLargeFiles": "Mude para o OpenWhispr Cloud para transcrever este arquivo.",
+      "createAccount": "Criar conta",
+      "upgrade": "Fazer upgrade",
+      "switchToCloud": "OpenWhispr Cloud"
     },
     "meeting": {
       "title": "Notas de reunião",
       "description": "Identificação de falantes e resumos estruturados",
-      "comingSoon": "Em breve"
+      "comingSoon": "Em breve",
+      "back": "Voltar"
     },
     "context": {
       "moveToFolder": "Mover para pasta",
@@ -1511,6 +1523,7 @@
     "upgradeTitle": "Fazer upgrade para Pro",
     "upgradeDescription": "Transcrições ilimitadas e recursos avançados.",
     "learnMore": "Saiba mais",
+    "integrations": "Integrações",
     "defaultUser": "Usuário",
     "notSignedIn": "Não conectado"
   },
@@ -1633,6 +1646,32 @@
       "listening": "Ouvindo...",
       "transcribing": "Transcrevendo...",
       "thinking": "Pensando..."
+    }
+  },
+  "integrations": {
+    "title": "Integrações",
+    "description": "Conecte serviços para turbinar seu fluxo de trabalho",
+    "googleCalendar": {
+      "title": "Google Calendar",
+      "description": "Conecte seu calendário para ativar notas de reunião. O OpenWhispr detecta reuniões e grava com diarização de falantes — automaticamente.",
+      "connect": "Conectar Google Calendar",
+      "connecting": "Conectando...",
+      "connected": "Conectado",
+      "addAnother": "Adicionar outro calendário",
+      "disconnect": "Desconectar",
+      "disconnectConfirm": "Desconectar {{email}}?",
+      "disconnectDescription": "As notas de reunião não serão mais gravadas deste calendário."
+    },
+    "plan": {
+      "title": "Seu Plano",
+      "current": "Atual",
+      "free": "Grátis",
+      "freeLimit": "5 reuniões / mês",
+      "essential": "Essential",
+      "essentialLimit": "20 reuniões / mês",
+      "pro": "Pro",
+      "proLimit": "Ilimitado",
+      "upgrade": "Atualizar"
     }
   }
 }

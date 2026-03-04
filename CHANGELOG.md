@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.5] - 2026-03-01
+
+### Added
+
+- **Mode-Aware File Size Validation**: Upload UI now enforces file size limits per transcription mode — local is unlimited, BYOK and Cloud free are capped at 25 MB, Cloud pro at 500 MB — with contextual messaging and CTA buttons (Create Account, Upgrade, Switch to Cloud)
+- **Large File Chunking**: Files over 25 MB are automatically split via FFmpeg and transcribed in parallel with per-chunk progress reporting
+- **Gemma 3 Local Models**: Added Gemma 3 (1B, 4B, 12B, 27B) to the local model registry with provider icon
+- **Groq Model Updates**: Added new Groq models and removed deprecated ones (Maverick, Kimi K2 Instruct)
+- **Notes Editor Formatting Shortcuts**: Cmd+B (bold), Cmd+I (italic), Cmd+E (code) keyboard shortcuts in the notes editor
+- **Linux Wayland Paste Improvements**: Added ydotool support and improved wl-copy reliability for Wayland paste
+- **Granular Build Scripts**: Added individual build target scripts for more flexible CI/CD
+
+### Fixed
+
+- **Fn/Globe Hotkey**: Fn key now correctly treated as equivalent to Globe key on macOS
+- **GPU Activation**: Fixed GPU activation flow and Vulkan fallback behavior
+- **Groq i18n**: Updated Groq model descriptions and added missing translations across all locales
+
 ## [1.5.4] - 2026-02-25
 
 ### Added

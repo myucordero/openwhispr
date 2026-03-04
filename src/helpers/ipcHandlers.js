@@ -9,6 +9,7 @@ const GnomeShortcutManager = require("./gnomeShortcut");
 const AssemblyAiStreaming = require("./assemblyAiStreaming");
 const { i18nMain, changeLanguage } = require("./i18nMain");
 const DeepgramStreaming = require("./deepgramStreaming");
+const OpenAIRealtimeStreaming = require("./openaiRealtimeStreaming");
 
 const MISTRAL_TRANSCRIPTION_URL = "https://api.mistral.ai/v1/audio/transcriptions";
 
@@ -99,9 +100,12 @@ class IPCHandlers {
     this.textEditMonitor = managers.textEditMonitor;
     this.getTrayManager = managers.getTrayManager;
     this.whisperCudaManager = managers.whisperCudaManager;
+    this.googleCalendarManager = managers.googleCalendarManager;
+    this.meetingDetectionEngine = managers.meetingDetectionEngine;
     this.sessionId = crypto.randomUUID();
     this.assemblyAiStreaming = null;
     this.deepgramStreaming = null;
+    this.openaiRealtimeStreaming = null;
     this._autoLearnEnabled = true; // Default on, synced from renderer
     this._autoLearnDebounceTimer = null;
     this._autoLearnLatestData = null;
@@ -605,6 +609,16 @@ class IPCHandlers {
         return { canceled: true };
       }
       return { canceled: false, filePath: result.filePaths[0] };
+    });
+
+    ipcMain.handle("get-file-size", async (_event, filePath) => {
+      const fs = require("fs");
+      try {
+        const stats = fs.statSync(filePath);
+        return stats.size;
+      } catch {
+        return 0;
+      }
     });
 
     ipcMain.handle("transcribe-audio-file", async (event, filePath, options = {}) => {
@@ -1919,6 +1933,151 @@ class IPCHandlers {
       }
     });
 
+    ipcMain.handle("meeting-transcribe-chain", async (event, blobUrl, opts = {}) => {
+      try {
+        const apiUrl = getApiUrl();
+        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+
+        const cookieHeader = await getSessionCookies(event);
+        if (!cookieHeader) throw new Error("No session cookies available");
+
+        const response = await fetch(`${apiUrl}/api/transcribe-chain`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Cookie: cookieHeader,
+          },
+          body: JSON.stringify({
+            mediaUrl: blobUrl,
+            skipCleanup: opts.skipCleanup ?? false,
+            agentName: opts.agentName,
+            customDictionary: opts.customDictionary,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || `Chain failed: ${response.status}`);
+        }
+
+        fetch(`${apiUrl}/api/delete-audio`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: cookieHeader },
+          body: JSON.stringify({ url: blobUrl }),
+        }).catch((err) => debugLogger.warn("Blob cleanup failed", { error: err.message }));
+
+        return {
+          success: true,
+          text: data.text,
+          rawText: data.rawText,
+          cleanedText: data.cleanedText,
+          processingDurationSec: data.processingDurationSec,
+          speedupFactor: data.speedupFactor,
+        };
+      } catch (error) {
+        debugLogger.error("Meeting chain transcription error", { error: error.message });
+        return { success: false, error: error.message };
+      }
+    });
+
+    let meetingTranscriptionStartInProgress = false;
+
+    ipcMain.handle("meeting-transcription-start", async (event, options = {}) => {
+      if (meetingTranscriptionStartInProgress) {
+        debugLogger.debug("Meeting transcription start already in progress, ignoring");
+        return { success: false, error: "Operation in progress" };
+      }
+
+      meetingTranscriptionStartInProgress = true;
+      try {
+        const win = BrowserWindow.fromWebContents(event.sender);
+
+        if (options.provider !== "openai-realtime") {
+          return { success: false, error: `Unsupported provider: ${options.provider}` };
+        }
+
+        const apiUrl = getApiUrl();
+        if (!apiUrl) return { success: false, error: "OpenWhispr API URL not configured" };
+
+        const cookieHeader = await getSessionCookies(event);
+        if (!cookieHeader) return { success: false, error: "No session cookies available" };
+
+        const tokenResponse = await fetch(`${apiUrl}/api/openai-realtime-token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Cookie: cookieHeader },
+          body: JSON.stringify({ model: options.model, language: options.language }),
+        });
+
+        if (!tokenResponse.ok) {
+          const err = await tokenResponse.json().catch(() => ({}));
+          return {
+            success: false,
+            error: err.error || `Token request failed: ${tokenResponse.status}`,
+          };
+        }
+
+        const { clientSecret } = await tokenResponse.json();
+        if (!clientSecret) return { success: false, error: "No client secret received" };
+
+        if (this.openaiRealtimeStreaming?.isConnected) {
+          await this.openaiRealtimeStreaming.disconnect();
+        }
+
+        this.openaiRealtimeStreaming = new OpenAIRealtimeStreaming();
+
+        this.openaiRealtimeStreaming.onPartialTranscript = (text) => {
+          if (win && !win.isDestroyed()) {
+            win.webContents.send("meeting-transcription-partial", text);
+          }
+        };
+
+        this.openaiRealtimeStreaming.onFinalTranscript = (text) => {
+          if (win && !win.isDestroyed()) {
+            win.webContents.send("meeting-transcription-final", text);
+          }
+        };
+
+        this.openaiRealtimeStreaming.onError = (error) => {
+          if (win && !win.isDestroyed()) {
+            win.webContents.send("meeting-transcription-error", error.message);
+          }
+        };
+
+        await this.openaiRealtimeStreaming.connect({
+          apiKey: clientSecret,
+          model: options.model,
+          language: options.language,
+        });
+
+        return { success: true };
+      } catch (error) {
+        debugLogger.error("Meeting transcription start error", { error: error.message });
+        return { success: false, error: error.message };
+      } finally {
+        meetingTranscriptionStartInProgress = false;
+      }
+    });
+
+    ipcMain.on("meeting-transcription-send", (_event, audioBuffer) => {
+      if (!this.openaiRealtimeStreaming) return;
+      this.openaiRealtimeStreaming.sendAudio(Buffer.from(audioBuffer));
+    });
+
+    ipcMain.handle("meeting-transcription-stop", async () => {
+      try {
+        let result = { text: "" };
+        if (this.openaiRealtimeStreaming) {
+          result = await this.openaiRealtimeStreaming.disconnect();
+          this.openaiRealtimeStreaming = null;
+        }
+        return { success: true, transcript: result?.text || "" };
+      } catch (error) {
+        debugLogger.error("Meeting transcription stop error", { error: error.message });
+        return { success: false, error: error.message };
+      }
+    });
+
     ipcMain.handle("cloud-reason", async (event, text, opts = {}) => {
       try {
         const apiUrl = getApiUrl();
@@ -2209,12 +2368,138 @@ class IPCHandlers {
 
     ipcMain.handle("transcribe-audio-file-cloud", async (event, filePath) => {
       const fs = require("fs");
+      const os = require("os");
+      const { splitAudioFile } = require("./ffmpegUtils");
+      const FILE_SIZE_LIMIT = 25 * 1024 * 1024;
+      const CONCURRENCY_LIMIT = 5;
       try {
         const apiUrl = getApiUrl();
         if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
 
         const cookieHeader = await getSessionCookies(event);
         if (!cookieHeader) throw new Error("No session cookies available");
+
+        const fileSize = fs.statSync(filePath).size;
+
+        if (fileSize > FILE_SIZE_LIMIT) {
+          debugLogger.debug("Large file detected, using client-side chunking", {
+            fileSize,
+            filePath: path.basename(filePath),
+          });
+
+          const chunkDir = path.join(os.tmpdir(), `ow-chunks-${Date.now()}`);
+          fs.mkdirSync(chunkDir, { recursive: true });
+
+          try {
+            event.sender.send("upload-transcription-progress", {
+              stage: "splitting",
+              chunksTotal: 0,
+              chunksCompleted: 0,
+            });
+
+            const chunkPaths = await splitAudioFile(filePath, chunkDir, {
+              segmentDuration: 240, // ~3.75 MB/chunk, under Vercel's 4.5 MB payload limit
+            });
+            const totalChunks = chunkPaths.length;
+
+            debugLogger.debug("Audio split into chunks", { totalChunks });
+
+            event.sender.send("upload-transcription-progress", {
+              stage: "transcribing",
+              chunksTotal: totalChunks,
+              chunksCompleted: 0,
+            });
+
+            const results = new Array(totalChunks).fill(null);
+            let completedCount = 0;
+
+            const transcribeChunk = async (index) => {
+              const chunkBuffer = fs.readFileSync(chunkPaths[index]);
+              const chunkName = path.basename(chunkPaths[index]);
+
+              const { body, boundary } = buildMultipartBody(chunkBuffer, chunkName, "audio/mpeg", {
+                source: "file_upload",
+                clientType: "desktop",
+                appVersion: app.getVersion(),
+                clientVersion: app.getVersion(),
+                sessionId: this.sessionId,
+              });
+
+              const url = new URL(`${apiUrl}/api/transcribe`);
+              const data = await postMultipart(url, body, boundary, { Cookie: cookieHeader });
+
+              if (data.statusCode === 401) {
+                throw Object.assign(new Error("Session expired"), { code: "AUTH_EXPIRED" });
+              }
+              if (data.statusCode === 429) {
+                throw Object.assign(new Error("Daily word limit reached"), {
+                  code: "LIMIT_REACHED",
+                  ...data.data,
+                });
+              }
+              if (data.statusCode !== 200) {
+                throw new Error(data.data?.error || `API error: ${data.statusCode}`);
+              }
+
+              results[index] = data.data;
+              completedCount++;
+
+              event.sender.send("upload-transcription-progress", {
+                stage: "transcribing",
+                chunksTotal: totalChunks,
+                chunksCompleted: completedCount,
+              });
+            };
+
+            const indices = Array.from({ length: totalChunks }, (_, i) => i);
+            const executing = new Set();
+
+            for (const index of indices) {
+              const p = transcribeChunk(index).then(
+                () => executing.delete(p),
+                (err) => {
+                  executing.delete(p);
+                  if (err.code === "AUTH_EXPIRED" || err.code === "LIMIT_REACHED") throw err;
+                  debugLogger.warn(`Chunk ${index} failed`, { error: err.message });
+                }
+              );
+              executing.add(p);
+              if (executing.size >= CONCURRENCY_LIMIT) {
+                await Promise.race(executing);
+              }
+            }
+            await Promise.all(executing);
+
+            const succeeded = results.filter((r) => r !== null);
+            if (succeeded.length === 0) {
+              throw new Error("All chunks failed to transcribe");
+            }
+
+            const fullText = results
+              .filter((r) => r !== null)
+              .map((r) => r.text)
+              .join(" ")
+              .replace(/\s+/g, " ")
+              .trim();
+
+            const failed = results.filter((r) => r === null).length;
+            if (failed > 0) {
+              debugLogger.warn("Some chunks failed", { failed, total: totalChunks });
+            }
+
+            return {
+              success: true,
+              text: fullText,
+              ...(failed > 0 ? { warning: `${failed} of ${totalChunks} chunks failed` } : {}),
+            };
+          } finally {
+            try {
+              fs.rmSync(chunkDir, { recursive: true, force: true });
+            } catch (cleanupErr) {
+              debugLogger.warn("Failed to cleanup chunk dir", { error: cleanupErr.message });
+            }
+          }
+        }
 
         const audioBuffer = fs.readFileSync(filePath);
         const ext = path.extname(filePath).toLowerCase().replace(".", "");
@@ -2250,6 +2535,9 @@ class IPCHandlers {
         return { success: true, text: data.data.text };
       } catch (error) {
         debugLogger.error("Cloud audio file transcription error", { error: error.message });
+        if (error.code === "AUTH_EXPIRED" || error.code === "LIMIT_REACHED") {
+          return { success: false, error: error.message, code: error.code, ...error };
+        }
         return { success: false, error: error.message };
       }
     });
@@ -2258,9 +2546,18 @@ class IPCHandlers {
       "transcribe-audio-file-byok",
       async (event, { filePath, apiKey, baseUrl, model }) => {
         const fs = require("fs");
+        const BYOK_FILE_SIZE_LIMIT = 25 * 1024 * 1024; // 25 MB
         try {
           if (!apiKey) throw new Error("No API key configured. Add your key in Settings.");
           if (!baseUrl) throw new Error("No transcription endpoint configured.");
+
+          const fileSize = fs.statSync(filePath).size;
+          if (fileSize > BYOK_FILE_SIZE_LIMIT) {
+            return {
+              success: false,
+              error: "File too large. Maximum size for bring-your-own-key is 25 MB.",
+            };
+          }
 
           const audioBuffer = fs.readFileSync(filePath);
           const ext = path.extname(filePath).toLowerCase().replace(".", "");
@@ -2836,6 +3133,7 @@ class IPCHandlers {
     });
 
     let deepgramStreamingStartInProgress = false;
+    let sendDropCount = 0;
 
     ipcMain.handle("deepgram-streaming-start", async (event, options = {}) => {
       if (deepgramStreamingStartInProgress) {
@@ -2909,12 +3207,22 @@ class IPCHandlers {
           }
         };
 
+        sendDropCount = 0;
         await this.deepgramStreaming.connect({ ...options, token });
-        debugLogger.debug("Deepgram streaming started", {}, "streaming");
+        debugLogger.debug(
+          "Deepgram streaming started",
+          {
+            isConnected: this.deepgramStreaming.isConnected,
+            hasWs: !!this.deepgramStreaming.ws,
+            wsReadyState: this.deepgramStreaming.ws?.readyState,
+            forceNew: !!options.forceNew,
+          },
+          "streaming"
+        );
 
         return {
           success: true,
-          usedWarmConnection: hasWarm,
+          usedWarmConnection: hasWarm && !options.forceNew,
         };
       } catch (error) {
         debugLogger.error("Deepgram streaming start error", { error: error.message });
@@ -2931,7 +3239,33 @@ class IPCHandlers {
       try {
         if (!this.deepgramStreaming) return;
         const buffer = Buffer.from(audioBuffer);
-        this.deepgramStreaming.sendAudio(buffer);
+        const sent = this.deepgramStreaming.sendAudio(buffer);
+        if (!sent) {
+          sendDropCount++;
+          if (sendDropCount <= 3 || sendDropCount % 50 === 0) {
+            debugLogger.warn(
+              "Deepgram audio send dropped",
+              {
+                dropCount: sendDropCount,
+                hasWs: !!this.deepgramStreaming.ws,
+                isConnected: this.deepgramStreaming.isConnected,
+                wsReadyState: this.deepgramStreaming.ws?.readyState,
+              },
+              "streaming"
+            );
+          }
+        } else {
+          if (sendDropCount > 0) {
+            debugLogger.debug(
+              "Deepgram audio send resumed after drops",
+              {
+                previousDrops: sendDropCount,
+              },
+              "streaming"
+            );
+            sendDropCount = 0;
+          }
+        }
       } catch (error) {
         debugLogger.error("Deepgram streaming send error", { error: error.message });
       }
@@ -3010,6 +3344,125 @@ class IPCHandlers {
         this._activeRecordingPipeline = null;
       }
       return { success: true };
+    });
+
+    // Google Calendar
+    ipcMain.handle("gcal-start-oauth", async () => {
+      try {
+        return await this.googleCalendarManager.startOAuth();
+      } catch (error) {
+        debugLogger.error("Google Calendar OAuth failed", { error: error.message }, "calendar");
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle("gcal-disconnect", async () => {
+      try {
+        this.googleCalendarManager.disconnect();
+        return { success: true };
+      } catch (error) {
+        debugLogger.error(
+          "Google Calendar disconnect failed",
+          { error: error.message },
+          "calendar"
+        );
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle("gcal-get-connection-status", async () => {
+      try {
+        return this.googleCalendarManager.getConnectionStatus();
+      } catch (error) {
+        return { connected: false, email: null };
+      }
+    });
+
+    ipcMain.handle("gcal-get-calendars", async () => {
+      try {
+        return { success: true, calendars: this.googleCalendarManager.getCalendars() };
+      } catch (error) {
+        return { success: false, calendars: [] };
+      }
+    });
+
+    ipcMain.handle("gcal-set-calendar-selection", async (_event, calendarId, isSelected) => {
+      try {
+        await this.googleCalendarManager.setCalendarSelection(calendarId, isSelected);
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle("gcal-sync-events", async () => {
+      try {
+        await this.googleCalendarManager.syncEvents();
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle("gcal-get-upcoming-events", async (_event, windowMinutes) => {
+      try {
+        return {
+          success: true,
+          events: await this.googleCalendarManager.getUpcomingEvents(windowMinutes),
+        };
+      } catch (error) {
+        return { success: false, events: [] };
+      }
+    });
+
+    ipcMain.handle("meeting-detection-get-preferences", async () => {
+      try {
+        return { success: true, preferences: this.meetingDetectionEngine.getPreferences() };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle("meeting-detection-set-preferences", async (_event, prefs) => {
+      try {
+        this.meetingDetectionEngine.setPreferences(prefs);
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle("meeting-detection-respond", async (_event, detectionId, action) => {
+      try {
+        this.meetingDetectionEngine.handleUserResponse(detectionId, action);
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle("meeting-notification-respond", async (_event, detectionId, action) => {
+      try {
+        await this.meetingDetectionEngine.handleNotificationResponse(detectionId, action);
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle("get-meeting-notification-data", async () => {
+      return this.windowManager?._pendingNotificationData ?? null;
+    });
+
+    ipcMain.handle("get-desktop-sources", async (_event, types) => {
+      try {
+        const { desktopCapturer } = require("electron");
+        const sources = await desktopCapturer.getSources({ types: types || ["screen"] });
+        return sources.map((s) => ({ id: s.id, name: s.name }));
+      } catch (error) {
+        debugLogger.error("Failed to get desktop sources", { error: error.message }, "calendar");
+        return [];
+      }
     });
   }
 

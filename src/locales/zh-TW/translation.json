@@ -93,7 +93,7 @@
     "updatePayment": "更新付款方式",
     "updatePaymentDescription": "恢復無限制的 Pro 轉錄。",
     "upgradeToPro": "升級至 Pro",
-    "upgradeDescription": "無限轉錄。每月 $9。",
+    "upgradeDescription": "升級到付費方案，每月最低 $8 起。",
     "useApiKey": "使用你自己的 API Key",
     "useApiKeyDescription": "自備金鑰，無限使用。",
     "switchToLocal": "切換至本機模式",
@@ -914,7 +914,6 @@
           "name": "免費",
           "price": "$0",
           "period": "永久",
-          "trialNote": "含 7 天免費 Pro 試用",
           "features": [
             "每週 2,000 字",
             "本機 AI 模型",
@@ -1397,12 +1396,25 @@
       "errorOccurred": "發生錯誤",
       "noProviderTitle": "尚未設定轉錄服務供應商",
       "noProviderDescription": "新增 API Key 或下載本機模型以開始轉錄。",
-      "noProviderAction": "開啟轉錄設定"
+      "noProviderAction": "開啟轉錄設定",
+      "fileTooLarge": "此檔案超過 500 MB 的大小限制。",
+      "largeFileNote": "大型檔案將被分割並平行轉錄。",
+      "chunkProgress": "正在轉錄第 {{completed}} 部分，共 {{total}} 部分...",
+      "paidPlanRequired": "超過 25 MB 的檔案需要付費方案才能使用雲端轉錄。大型檔案透過 OpenWhispr Cloud 處理，確保可靠、高品質的結果。",
+      "byokTooLarge": "第三方 API 金鑰僅支援 25 MB 以內的檔案。",
+      "byokTooLargeDetail": "超過 25 MB 的檔案由 OpenWhispr Cloud 負責分割、平行處理和重組——無需依賴第三方服務限制，即可獲得可靠的結果。",
+      "byokTooLargeNeedsAccount": "建立帳戶並升級至付費方案，即可使用 OpenWhispr Cloud 轉錄更大的檔案。",
+      "byokTooLargeNeedsUpgrade": "升級至付費方案，即可使用 OpenWhispr Cloud 轉錄更大的檔案。",
+      "switchToCloudForLargeFiles": "切換到 OpenWhispr Cloud 來轉錄此檔案。",
+      "createAccount": "建立帳戶",
+      "upgrade": "升級",
+      "switchToCloud": "OpenWhispr Cloud"
     },
     "meeting": {
       "title": "會議筆記",
       "description": "說話者辨識與結構化摘要",
-      "comingSoon": "即將推出"
+      "comingSoon": "即將推出",
+      "back": "返回"
     },
     "context": {
       "moveToFolder": "移動到資料夾",
@@ -1507,6 +1519,7 @@
     "upgradeTitle": "升級至 Pro",
     "upgradeDescription": "無限轉錄、即時轉錄等更多功能。",
     "learnMore": "瞭解更多",
+    "integrations": "整合",
     "defaultUser": "使用者",
     "notSignedIn": "尚未登入"
   },
@@ -1629,6 +1642,32 @@
       "listening": "正在聆聽...",
       "transcribing": "正在轉錄...",
       "thinking": "正在思考..."
+    }
+  },
+  "integrations": {
+    "title": "整合",
+    "description": "連接服務以增強您的工作流程",
+    "googleCalendar": {
+      "title": "Google 日曆",
+      "description": "連接日曆以啟用會議筆記。OpenWhispr 會自動偵測會議並進行說話者分離錄音。",
+      "connect": "連接 Google 日曆",
+      "connecting": "連接中...",
+      "connected": "已連接",
+      "addAnother": "新增其他日曆",
+      "disconnect": "中斷連接",
+      "disconnectConfirm": "中斷 {{email}} 的連接？",
+      "disconnectDescription": "將不再從此日曆記錄會議筆記。"
+    },
+    "plan": {
+      "title": "您的方案",
+      "current": "目前",
+      "free": "免費",
+      "freeLimit": "每月5次會議",
+      "essential": "Essential",
+      "essentialLimit": "每月20次會議",
+      "pro": "Pro",
+      "proLimit": "無限",
+      "upgrade": "升級"
     }
   }
 }

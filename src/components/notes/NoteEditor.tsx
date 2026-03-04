@@ -53,6 +53,11 @@ interface NoteEditorProps {
   actionPicker?: React.ReactNode;
   actionProcessingState?: ActionProcessingState;
   actionName?: string | null;
+  isMeetingRecording?: boolean;
+  meetingTranscript?: string;
+  meetingPartialTranscript?: string;
+  meetingEvent?: { summary: string };
+  onStopMeetingRecording?: () => void;
 }
 
 interface DictationRange {
@@ -145,6 +150,11 @@ export default function NoteEditor({
   actionPicker,
   actionProcessingState,
   actionName,
+  isMeetingRecording,
+  meetingTranscript,
+  meetingPartialTranscript,
+  meetingEvent,
+  onStopMeetingRecording,
 }: NoteEditorProps) {
   const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<"raw" | "enhanced">("raw");
@@ -753,13 +763,31 @@ export default function NoteEditor({
           style={{ background: "linear-gradient(to bottom, transparent, var(--color-background))" }}
         />
         <DictationWidget
-          isRecording={isRecording}
+          isRecording={isRecording || !!isMeetingRecording}
           isProcessing={isProcessing}
           onStart={handleStartRecording}
-          onStop={onStopRecording}
-          actionPicker={actionPicker}
+          onStop={isMeetingRecording ? onStopMeetingRecording! : onStopRecording}
+          actionPicker={isMeetingRecording ? undefined : actionPicker}
         />
       </div>
+
+      {(isMeetingRecording || meetingTranscript) && (
+        <div className="border-t border-border/50 bg-surface-0/50 dark:bg-surface-1/30">
+          <div className="px-4 py-1.5 flex items-center gap-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+              Transcript
+            </span>
+          </div>
+          <div className="px-4 pb-3 max-h-32 overflow-y-auto">
+            <p className="text-xs text-muted-foreground/70 leading-relaxed whitespace-pre-wrap">
+              {meetingTranscript}
+              {meetingPartialTranscript && (
+                <span className="text-muted-foreground/40">{meetingPartialTranscript}</span>
+              )}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

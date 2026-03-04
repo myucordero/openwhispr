@@ -1,7 +1,7 @@
 import React, { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./ui/button";
-import { Download, RefreshCw, Loader2, AlertTriangle, Zap } from "lucide-react";
+import { Download, RefreshCw, Loader2, AlertTriangle, Zap, ArrowLeft } from "lucide-react";
 import UpgradePrompt from "./UpgradePrompt";
 import { ConfirmDialog, AlertDialog } from "./ui/dialog";
 import { useDialogs } from "../hooks/useDialogs";
@@ -18,6 +18,7 @@ import {
 } from "../stores/transcriptionStore";
 import ControlPanelSidebar, { type ControlPanelView } from "./ControlPanelSidebar";
 import WindowControls from "./WindowControls";
+import { cn } from "./lib/utils";
 import { getCachedPlatform } from "../utils/platform";
 import { setActiveNoteId, setActiveFolderId } from "../stores/noteStore";
 import HistoryView from "./HistoryView";
@@ -29,6 +30,7 @@ const ReferralModal = React.lazy(() => import("./ReferralModal"));
 const PersonalNotesView = React.lazy(() => import("./notes/PersonalNotesView"));
 const DictionaryView = React.lazy(() => import("./DictionaryView"));
 const UploadAudioView = React.lazy(() => import("./notes/UploadAudioView"));
+const IntegrationsView = React.lazy(() => import("./IntegrationsView"));
 
 export default function ControlPanel() {
   const { t } = useTranslation();
@@ -45,6 +47,12 @@ export default function ControlPanel() {
   const [showReferrals, setShowReferrals] = useState(false);
   const [showCloudMigrationBanner, setShowCloudMigrationBanner] = useState(false);
   const [activeView, setActiveView] = useState<ControlPanelView>("home");
+  const [isMeetingMode, setIsMeetingMode] = useState(false);
+  const [meetingRecordingRequest, setMeetingRecordingRequest] = useState<{
+    noteId: number;
+    folderId: number;
+    event: any;
+  } | null>(null);
   const [gpuAccelAvailable, setGpuAccelAvailable] = useState<{ cuda: boolean; vulkan: boolean }>({
     cuda: false,
     vulkan: false,
@@ -178,6 +186,22 @@ export default function ControlPanel() {
     };
     detect();
   }, [useLocalWhisper, localTranscriptionProvider, useReasoningModel, gpuBannerDismissed]);
+
+  useEffect(() => {
+    const cleanup = window.electronAPI?.onNavigateToMeetingNote?.((data) => {
+      setActiveFolderId(data.folderId);
+      setActiveNoteId(data.noteId);
+      setActiveView("personal-notes");
+      setIsMeetingMode(true);
+      setMeetingRecordingRequest(data);
+    });
+    return () => cleanup?.();
+  }, []);
+
+  const handleMeetingRecordingRequestHandled = useCallback(
+    () => setMeetingRecordingRequest(null),
+    []
+  );
 
   const loadTranscriptions = async () => {
     try {
@@ -355,50 +379,71 @@ export default function ControlPanel() {
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        <ControlPanelSidebar
-          activeView={activeView}
-          onViewChange={setActiveView}
-          onOpenSettings={() => {
-            setSettingsSection(undefined);
-            setShowSettings(true);
-          }}
-          onOpenReferrals={() => setShowReferrals(true)}
-          onUpgrade={() => {
-            setSettingsSection("plansBilling");
-            setShowSettings(true);
-          }}
-          onUpgradeCheckout={() => usage?.openCheckout()}
-          isOverLimit={usage?.isOverLimit ?? false}
-          userName={user?.name}
-          userEmail={user?.email}
-          userImage={user?.image}
-          isSignedIn={isSignedIn}
-          authLoaded={authLoaded}
-          isProUser={!!(usage?.isSubscribed || usage?.isTrial)}
-          usageLoaded={usage?.hasLoaded ?? false}
-          updateAction={
-            !updateStatus.isDevelopment &&
-            (updateStatus.updateAvailable ||
-              updateStatus.updateDownloaded ||
-              isDownloading ||
-              isInstalling) ? (
-              <Button
-                variant={updateStatus.updateDownloaded ? "default" : "outline"}
-                size="sm"
-                onClick={handleUpdateClick}
-                disabled={isInstalling || isDownloading}
-                className="gap-1.5 text-xs w-full h-7"
-              >
-                {getUpdateButtonContent()}
-              </Button>
-            ) : undefined
-          }
-        />
+        <div
+          className="shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
+          style={{ width: isMeetingMode ? 0 : undefined }}
+        >
+          <ControlPanelSidebar
+            activeView={activeView}
+            onViewChange={setActiveView}
+            onOpenSettings={() => {
+              setSettingsSection(undefined);
+              setShowSettings(true);
+            }}
+            onOpenReferrals={() => setShowReferrals(true)}
+            onUpgrade={() => {
+              setSettingsSection("plansBilling");
+              setShowSettings(true);
+            }}
+            onUpgradeCheckout={() => usage?.openCheckout()}
+            isOverLimit={usage?.isOverLimit ?? false}
+            userName={user?.name}
+            userEmail={user?.email}
+            userImage={user?.image}
+            isSignedIn={isSignedIn}
+            authLoaded={authLoaded}
+            isProUser={!!(usage?.isSubscribed || usage?.isTrial)}
+            usageLoaded={usage?.hasLoaded ?? false}
+            updateAction={
+              !updateStatus.isDevelopment &&
+              (updateStatus.updateAvailable ||
+                updateStatus.updateDownloaded ||
+                isDownloading ||
+                isInstalling) ? (
+                <Button
+                  variant={updateStatus.updateDownloaded ? "default" : "outline"}
+                  size="sm"
+                  onClick={handleUpdateClick}
+                  disabled={isInstalling || isDownloading}
+                  className="gap-1.5 text-xs w-full h-7"
+                >
+                  {getUpdateButtonContent()}
+                </Button>
+              ) : undefined
+            }
+          />
+        </div>
         <main className="flex-1 flex flex-col overflow-hidden">
           <div
-            className="flex items-center justify-end w-full h-10 shrink-0"
+            className={cn(
+              "flex items-center w-full h-10 shrink-0",
+              isMeetingMode ? "justify-between" : "justify-end"
+            )}
             style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
           >
+            {isMeetingMode && (
+              <button
+                onClick={() => setIsMeetingMode(false)}
+                className={cn(
+                  "flex items-center gap-1 text-xs font-medium text-muted-foreground/70 hover:text-foreground transition-colors",
+                  platform === "darwin" ? "ml-19" : "ml-3"
+                )}
+                style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+              >
+                <ArrowLeft size={13} strokeWidth={2} />
+                {t("notes.meeting.back")}
+              </button>
+            )}
             {platform !== "darwin" && (
               <div className="pr-1" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
                 <WindowControls />
@@ -508,6 +553,9 @@ export default function ControlPanel() {
                     setSettingsSection(section);
                     setShowSettings(true);
                   }}
+                  meetingRecordingRequest={meetingRecordingRequest}
+                  onMeetingRecordingRequestHandled={handleMeetingRecordingRequestHandled}
+                  isMeetingMode={isMeetingMode}
                 />
               </Suspense>
             )}
@@ -529,6 +577,11 @@ export default function ControlPanel() {
                     setShowSettings(true);
                   }}
                 />
+              </Suspense>
+            )}
+            {activeView === "integrations" && (
+              <Suspense fallback={null}>
+                <IntegrationsView />
               </Suspense>
             )}
           </div>

@@ -5,6 +5,7 @@ import { hasStoredByokKey } from "../utils/byokDetection";
 import { ensureAgentNameInDictionary } from "../utils/agentName";
 import logger from "../utils/logger";
 import type { LocalTranscriptionProvider } from "../types/electron";
+import type { GoogleCalendarAccount } from "../types/calendar";
 import type {
   TranscriptionSettings,
   ReasoningSettings,
@@ -56,11 +57,13 @@ const BOOLEAN_SETTINGS = new Set([
   "telemetryEnabled",
   "audioCuesEnabled",
   "floatingIconAutoHide",
+  "meetingProcessDetection",
+  "meetingAudioDetection",
   "isSignedIn",
   "agentEnabled",
 ]);
 
-const ARRAY_SETTINGS = new Set(["customDictionary"]);
+const ARRAY_SETTINGS = new Set(["customDictionary", "gcalAccounts"]);
 
 const LANGUAGE_MIGRATIONS: Record<string, string> = { zh: "zh-CN" };
 
@@ -87,6 +90,11 @@ export interface SettingsState
   isSignedIn: boolean;
   audioCuesEnabled: boolean;
   floatingIconAutoHide: boolean;
+  gcalAccounts: GoogleCalendarAccount[];
+  gcalConnected: boolean;
+  gcalEmail: string;
+  meetingProcessDetection: boolean;
+  meetingAudioDetection: boolean;
 
   setUseLocalWhisper: (value: boolean) => void;
   setWhisperModel: (value: string) => void;
@@ -128,6 +136,9 @@ export interface SettingsState
   setTelemetryEnabled: (value: boolean) => void;
   setAudioCuesEnabled: (value: boolean) => void;
   setFloatingIconAutoHide: (enabled: boolean) => void;
+  setGcalAccounts: (accounts: GoogleCalendarAccount[]) => void;
+  setMeetingProcessDetection: (value: boolean) => void;
+  setMeetingAudioDetection: (value: boolean) => void;
   setIsSignedIn: (value: boolean) => void;
 
   setAgentModel: (value: string) => void;
@@ -247,6 +258,22 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   telemetryEnabled: readBoolean("telemetryEnabled", false),
   audioCuesEnabled: readBoolean("audioCuesEnabled", true),
   floatingIconAutoHide: readBoolean("floatingIconAutoHide", false),
+  ...(() => {
+    let accounts: GoogleCalendarAccount[] = [];
+    try {
+      const parsed = JSON.parse(readString("gcalAccounts", "[]"));
+      if (Array.isArray(parsed)) accounts = parsed;
+    } catch {
+      /* use empty default */
+    }
+    return {
+      gcalAccounts: accounts,
+      gcalConnected: accounts.length > 0,
+      gcalEmail: accounts[0]?.email ?? "",
+    };
+  })(),
+  meetingProcessDetection: readBoolean("meetingProcessDetection", true),
+  meetingAudioDetection: readBoolean("meetingAudioDetection", true),
   isSignedIn: readBoolean("isSignedIn", false),
 
   agentModel: readString("agentModel", "openai/gpt-oss-120b"),
@@ -386,6 +413,17 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       window.electronAPI?.notifyFloatingIconAutoHideChanged?.(enabled);
     }
   },
+
+  setGcalAccounts: (accounts: GoogleCalendarAccount[]) => {
+    if (isBrowser) localStorage.setItem("gcalAccounts", JSON.stringify(accounts));
+    useSettingsStore.setState({
+      gcalAccounts: accounts,
+      gcalConnected: accounts.length > 0,
+      gcalEmail: accounts[0]?.email ?? "",
+    });
+  },
+  setMeetingProcessDetection: createBooleanSetter("meetingProcessDetection"),
+  setMeetingAudioDetection: createBooleanSetter("meetingAudioDetection"),
 
   setIsSignedIn: (value: boolean) => {
     if (isBrowser) localStorage.setItem("isSignedIn", String(value));
@@ -670,6 +708,14 @@ export async function initializeSettings(): Promise<void> {
     }
 
     useSettingsStore.setState({ [key]: value });
+
+    if (key === "gcalAccounts" && Array.isArray(value)) {
+      const accounts = value as GoogleCalendarAccount[];
+      useSettingsStore.setState({
+        gcalConnected: accounts.length > 0,
+        gcalEmail: accounts[0]?.email ?? "",
+      });
+    }
 
     if (key === "uiLanguage" && typeof value === "string") {
       void i18n.changeLanguage(value);

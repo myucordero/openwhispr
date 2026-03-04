@@ -93,7 +93,7 @@
     "updatePayment": "Обновить способ оплаты",
     "updatePaymentDescription": "Вернитесь к безлимитным Pro-транскрипциям.",
     "upgradeToPro": "Перейти на Pro",
-    "upgradeDescription": "Безлимитные транскрипции. $9/мес.",
+    "upgradeDescription": "Перейдите на платный план от $8/мес.",
     "useApiKey": "Использовать свой API-ключ",
     "useApiKeyDescription": "Свой ключ — без ограничений.",
     "switchToLocal": "Перейти на локальный режим",
@@ -914,7 +914,6 @@
           "name": "Бесплатный",
           "price": "$0",
           "period": "навсегда",
-          "trialNote": "Включает 7 дней бесплатного Pro",
           "features": [
             "2 000 слов/неделя",
             "Локальные модели ИИ",
@@ -1401,12 +1400,25 @@
       "errorOccurred": "Произошла ошибка",
       "noProviderTitle": "Провайдер транскрипции не настроен",
       "noProviderDescription": "Добавьте API-ключ или скачайте локальную модель, чтобы начать транскрипцию.",
-      "noProviderAction": "Открыть настройки транскрипции"
+      "noProviderAction": "Открыть настройки транскрипции",
+      "fileTooLarge": "Этот файл превышает ограничение в 500 MB.",
+      "largeFileNote": "Большие файлы разделяются и транскрибируются параллельно.",
+      "chunkProgress": "Транскрибирование части {{completed}} из {{total}}...",
+      "paidPlanRequired": "Облачная транскрипция файлов более 25 МБ требует платного плана. Большие файлы обрабатываются через OpenWhispr Cloud для надёжных и качественных результатов.",
+      "byokTooLarge": "Сторонние API-ключи поддерживают файлы только до 25 МБ.",
+      "byokTooLargeDetail": "Для файлов более 25 МБ OpenWhispr Cloud выполняет разделение, параллельную обработку и сборку — для надёжных результатов без ограничений сторонних провайдеров.",
+      "byokTooLargeNeedsAccount": "Создайте аккаунт и перейдите на платный план, чтобы транскрибировать большие файлы через OpenWhispr Cloud.",
+      "byokTooLargeNeedsUpgrade": "Перейдите на платный план, чтобы транскрибировать большие файлы через OpenWhispr Cloud.",
+      "switchToCloudForLargeFiles": "Переключитесь на OpenWhispr Cloud, чтобы транскрибировать этот файл.",
+      "createAccount": "Создать аккаунт",
+      "upgrade": "Обновить",
+      "switchToCloud": "OpenWhispr Cloud"
     },
     "meeting": {
       "title": "Заметки со встреч",
       "description": "Определение говорящих и структурированные резюме",
-      "comingSoon": "Скоро"
+      "comingSoon": "Скоро",
+      "back": "Назад"
     },
     "context": {
       "moveToFolder": "Переместить в папку",
@@ -1511,6 +1523,7 @@
     "upgradeTitle": "Перейдите на Pro",
     "upgradeDescription": "Безлимитные транскрипции, транскрипция в реальном времени и многое другое.",
     "learnMore": "Узнать больше",
+    "integrations": "Интеграции",
     "defaultUser": "Пользователь",
     "notSignedIn": "Не авторизован"
   },
@@ -1633,6 +1646,32 @@
       "listening": "Слушаю...",
       "transcribing": "Транскрибирую...",
       "thinking": "Думаю..."
+    }
+  },
+  "integrations": {
+    "title": "Интеграции",
+    "description": "Подключите сервисы для улучшения рабочего процесса",
+    "googleCalendar": {
+      "title": "Google Calendar",
+      "description": "Подключите календарь для активации заметок встреч. OpenWhispr определяет встречи и записывает с диаризацией говорящих — автоматически.",
+      "connect": "Подключить Google Calendar",
+      "connecting": "Подключение...",
+      "connected": "Подключено",
+      "addAnother": "Добавить ещё один календарь",
+      "disconnect": "Отключить",
+      "disconnectConfirm": "Отключить {{email}}?",
+      "disconnectDescription": "Заметки встреч больше не будут записываться из этого календаря."
+    },
+    "plan": {
+      "title": "Ваш план",
+      "current": "Текущий",
+      "free": "Бесплатный",
+      "freeLimit": "5 встреч / месяц",
+      "essential": "Essential",
+      "essentialLimit": "20 встреч / месяц",
+      "pro": "Pro",
+      "proLimit": "Безлимитно",
+      "upgrade": "Улучшить"
     }
   }
 }

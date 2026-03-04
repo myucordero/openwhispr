@@ -166,7 +166,12 @@ const DevServerManager = require("./src/helpers/devServerManager");
 const WindowsKeyManager = require("./src/helpers/windowsKeyManager");
 const TextEditMonitor = require("./src/helpers/textEditMonitor");
 const WhisperCudaManager = require("./src/helpers/whisperCudaManager");
+const GoogleCalendarManager = require("./src/helpers/googleCalendarManager");
+const MeetingProcessDetector = require("./src/helpers/meetingProcessDetector");
+const AudioActivityDetector = require("./src/helpers/audioActivityDetector");
+const MeetingDetectionEngine = require("./src/helpers/meetingDetectionEngine");
 const { i18nMain, changeLanguage } = require("./src/helpers/i18nMain");
+const { ensureYdotool } = require("./src/helpers/ensureYdotool");
 
 // Manager instances - initialized after app.whenReady()
 let debugLogger = null;
@@ -183,6 +188,8 @@ let globeKeyManager = null;
 let windowsKeyManager = null;
 let textEditMonitor = null;
 let whisperCudaManager = null;
+let googleCalendarManager = null;
+let meetingDetectionEngine = null;
 let ipcHandlers = null;
 let globeKeyAlertShown = false;
 let authBridgeServer = null;
@@ -246,6 +253,14 @@ function initializeCoreManagers() {
     whisperCudaManager = new WhisperCudaManager();
   }
   parakeetManager = new ParakeetManager();
+  googleCalendarManager = new GoogleCalendarManager(databaseManager, windowManager);
+  meetingDetectionEngine = new MeetingDetectionEngine(
+    googleCalendarManager,
+    new MeetingProcessDetector(),
+    new AudioActivityDetector(),
+    windowManager,
+    databaseManager
+  );
   updateManager = new UpdateManager();
   windowsKeyManager = new WindowsKeyManager();
   textEditMonitor = new TextEditMonitor();
@@ -263,12 +278,17 @@ function initializeCoreManagers() {
     windowsKeyManager,
     textEditMonitor,
     whisperCudaManager,
+    googleCalendarManager,
+    meetingDetectionEngine,
     getTrayManager: () => trayManager,
   });
 }
 
 // Phase 2: Non-critical setup after windows are visible
 function initializeDeferredManagers() {
+  ensureYdotool().catch((err) => {
+    require("./src/helpers/debugLogger").warn("ydotool setup error", { error: err?.message }, "clipboard");
+  });
   clipboardManager.preWarmAccessibility();
   trayManager = new TrayManager();
   globeKeyManager = new GlobeKeyManager();
@@ -299,6 +319,9 @@ function initializeDeferredManagers() {
       });
     });
   }
+
+  googleCalendarManager.start();
+  meetingDetectionEngine.start();
 }
 
 app.on("open-url", (event, url) => {
@@ -462,6 +485,18 @@ async function startApp() {
     }
   );
 
+  // Handle getDisplayMedia() calls from the renderer — auto-select the first
+  // screen source with loopback audio so no system picker dialog is shown.
+  const { desktopCapturer } = require("electron");
+  session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
+    const sources = await desktopCapturer.getSources({ types: ["screen"] });
+    if (!sources.length) {
+      callback({});
+      return;
+    }
+    callback({ video: sources[0], audio: "loopback" });
+  });
+
   windowManager.setActivationModeCache(environmentManager.getActivationMode());
   windowManager.setFloatingIconAutoHide(environmentManager.getFloatingIconAutoHide());
 
@@ -516,6 +551,17 @@ async function startApp() {
 
   // Phase 2: Initialize remaining managers after windows are visible
   initializeDeferredManagers();
+
+  app.on("browser-window-focus", () => {
+    if (googleCalendarManager) googleCalendarManager.syncOnFocus();
+  });
+
+  const { powerMonitor } = require("electron");
+  powerMonitor.on("resume", () => {
+    if (googleCalendarManager) {
+      googleCalendarManager.onWakeFromSleep();
+    }
+  });
 
   // Non-blocking server pre-warming
   const whisperSettings = {
@@ -965,6 +1011,12 @@ if (gotSingleInstanceLock) {
     if (windowsKeyManager) {
       windowsKeyManager.stop();
     }
+    if (meetingDetectionEngine) {
+      meetingDetectionEngine.stop();
+    }
+    if (googleCalendarManager) {
+      googleCalendarManager.stop();
+    }
     if (ipcHandlers) {
       ipcHandlers._cleanupTextEditMonitor();
     }
@@ -973,6 +1025,9 @@ if (gotSingleInstanceLock) {
     }
     if (updateManager) {
       updateManager.cleanup();
+    }
+    if (clipboardManager) {
+      clipboardManager.dispose();
     }
     // Stop whisper server if running
     if (whisperManager) {

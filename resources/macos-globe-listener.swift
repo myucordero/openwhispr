@@ -7,6 +7,27 @@ var fnIsDown = false
 var eventTap: CFMachPort?
 var lastModifierFlags: CGEventFlags = []
 
+let rightModifiers: [(Int64, CGEventFlags, String)] = [
+    (61, .maskAlternate, "RightOption"),
+    (54, .maskCommand, "RightCommand"),
+    (62, .maskControl, "RightControl"),
+    (60, .maskShift, "RightShift"),
+]
+
+let modifierMask: CGEventFlags = [.maskControl, .maskCommand, .maskAlternate, .maskShift]
+
+let releases: [(CGEventFlags, String)] = [
+    (.maskControl, "control"),
+    (.maskCommand, "command"),
+    (.maskAlternate, "option"),
+    (.maskShift, "shift"),
+]
+
+func emit(_ message: String) {
+    FileHandle.standardOutput.write((message + "\n").data(using: .utf8)!)
+    fflush(stdout)
+}
+
 func eventTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent, refcon: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
     if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
         if let tap = eventTap {
@@ -20,61 +41,36 @@ func eventTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent,
 
     if containsFn && !fnIsDown {
         fnIsDown = true
-        FileHandle.standardOutput.write("FN_DOWN\n".data(using: .utf8)!)
-        fflush(stdout)
+        emit("FN_DOWN")
     } else if !containsFn && fnIsDown {
         fnIsDown = false
-        FileHandle.standardOutput.write("FN_UP\n".data(using: .utf8)!)
-        fflush(stdout)
+        emit("FN_UP")
     }
 
-    // Detect right-side modifier key down/up via keycode
     let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-    let rightModifiers: [(Int64, CGEventFlags, String)] = [
-        (61, .maskAlternate, "RightOption"),
-        (54, .maskCommand, "RightCommand"),
-        (62, .maskControl, "RightControl"),
-        (60, .maskShift, "RightShift"),
-    ]
     for (code, flag, name) in rightModifiers {
         if keyCode == code {
-            if flags.contains(flag) {
-                FileHandle.standardOutput.write("RIGHT_MOD_DOWN:\(name)\n".data(using: .utf8)!)
-            } else {
-                FileHandle.standardOutput.write("RIGHT_MOD_UP:\(name)\n".data(using: .utf8)!)
-            }
-            fflush(stdout)
+            emit(flags.contains(flag) ? "RIGHT_MOD_DOWN:\(name)" : "RIGHT_MOD_UP:\(name)")
             break
         }
     }
 
-    let modifierMask: CGEventFlags = [.maskControl, .maskCommand, .maskAlternate, .maskShift]
     let currentModifiers = flags.intersection(modifierMask)
-
     if currentModifiers != lastModifierFlags {
         let released = lastModifierFlags.subtracting(currentModifiers)
-        let releases: [(CGEventFlags, String)] = [
-            (.maskControl, "control"),
-            (.maskCommand, "command"),
-            (.maskAlternate, "option"),
-            (.maskShift, "shift"),
-        ]
-
         for (flag, name) in releases {
             if released.contains(flag) {
-                FileHandle.standardOutput.write("MODIFIER_UP:\(name)\n".data(using: .utf8)!)
-                fflush(stdout)
+                emit("MODIFIER_UP:\(name)")
             }
         }
-
         lastModifierFlags = currentModifiers
     }
 
     return Unmanaged.passUnretained(event)
 }
 
-guard let createdTap = CGEvent.tapCreate(tap: .cgSessionEventTap,
-                                         place: .headInsertEventTap,
+guard let createdTap = CGEvent.tapCreate(tap: .cgAnnotatedSessionEventTap,
+                                         place: .tailAppendEventTap,
                                          options: .listenOnly,
                                          eventsOfInterest: mask,
                                          callback: eventTapCallback,

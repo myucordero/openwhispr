@@ -894,7 +894,6 @@
           "name": "Kostenlos",
           "price": "$0",
           "period": "für immer",
-          "trialNote": "Enthält 7 Tage OpenWhispr Pro gratis",
           "features": [
             "2.000 Wörter/Woche",
             "Lokale KI-Modelle",
@@ -1397,12 +1396,25 @@
       "errorOccurred": "Ein Fehler ist aufgetreten",
       "noProviderTitle": "Kein Transkriptionsanbieter eingerichtet",
       "noProviderDescription": "Fügen Sie einen API-Schlüssel hinzu oder laden Sie ein lokales Modell herunter, um mit der Transkription zu beginnen.",
-      "noProviderAction": "Transkriptionseinstellungen öffnen"
+      "noProviderAction": "Transkriptionseinstellungen öffnen",
+      "fileTooLarge": "Diese Datei überschreitet das Limit von 500 MB.",
+      "largeFileNote": "Große Dateien werden aufgeteilt und parallel transkribiert.",
+      "chunkProgress": "Transkribiere Teil {{completed}} von {{total}}...",
+      "paidPlanRequired": "Cloud-Transkription für Dateien über 25 MB erfordert einen kostenpflichtigen Plan. Große Dateien werden mit OpenWhispr Cloud für zuverlässige, hochwertige Ergebnisse verarbeitet.",
+      "byokTooLarge": "API-Schlüssel von Drittanbietern unterstützen nur Dateien bis 25 MB.",
+      "byokTooLargeDetail": "Für Dateien über 25 MB übernimmt OpenWhispr Cloud das Aufteilen, die parallele Verarbeitung und das Zusammenführen — so erhältst du zuverlässige Ergebnisse ohne die Einschränkungen von Drittanbietern.",
+      "byokTooLargeNeedsAccount": "Erstelle ein Konto und wechsle zu einem kostenpflichtigen Plan, um größere Dateien mit OpenWhispr Cloud zu transkribieren.",
+      "byokTooLargeNeedsUpgrade": "Wechsle zu einem kostenpflichtigen Plan, um größere Dateien mit OpenWhispr Cloud zu transkribieren.",
+      "switchToCloudForLargeFiles": "Wechsle zu OpenWhispr Cloud, um diese Datei zu transkribieren.",
+      "createAccount": "Konto erstellen",
+      "upgrade": "Upgraden",
+      "switchToCloud": "OpenWhispr Cloud"
     },
     "meeting": {
       "title": "Besprechungsnotizen",
       "description": "Sprechererkennung und strukturierte Zusammenfassungen",
-      "comingSoon": "Demnächst verfügbar"
+      "comingSoon": "Demnächst verfügbar",
+      "back": "Zurück"
     },
     "context": {
       "moveToFolder": "In Ordner verschieben",
@@ -1507,6 +1519,7 @@
     "upgradeTitle": "Auf Pro upgraden",
     "upgradeDescription": "Unbegrenzte Transkriptionen und mehr.",
     "learnMore": "Mehr erfahren",
+    "integrations": "Integrationen",
     "defaultUser": "Benutzer",
     "notSignedIn": "Nicht angemeldet"
   },
@@ -1629,6 +1642,32 @@
       "listening": "Hört zu...",
       "transcribing": "Transkribiert...",
       "thinking": "Denkt nach..."
+    }
+  },
+  "integrations": {
+    "title": "Integrationen",
+    "description": "Verbinde Dienste, um deinen Workflow zu verbessern",
+    "googleCalendar": {
+      "title": "Google Calendar",
+      "description": "Verbinde deinen Kalender, um Besprechungsnotizen zu aktivieren. OpenWhispr erkennt Meetings und zeichnet mit Sprechererkennung auf — automatisch.",
+      "connect": "Google Calendar verbinden",
+      "connecting": "Verbinde...",
+      "connected": "Verbunden",
+      "addAnother": "Weiteren Kalender hinzufügen",
+      "disconnect": "Trennen",
+      "disconnectConfirm": "{{email}} trennen?",
+      "disconnectDescription": "Besprechungsnotizen werden von diesem Kalender nicht mehr aufgezeichnet."
+    },
+    "plan": {
+      "title": "Dein Plan",
+      "current": "Aktuell",
+      "free": "Kostenlos",
+      "freeLimit": "5 Meetings / Monat",
+      "essential": "Essential",
+      "essentialLimit": "20 Meetings / Monat",
+      "pro": "Pro",
+      "proLimit": "Unbegrenzt",
+      "upgrade": "Upgrade"
     }
   }
 }

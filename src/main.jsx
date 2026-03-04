@@ -19,6 +19,9 @@ const agentOverlayImport = () => import("./components/AgentOverlay.tsx");
 const ControlPanel = React.lazy(controlPanelImport);
 const OnboardingFlow = React.lazy(onboardingFlowImport);
 const AgentOverlay = React.lazy(agentOverlayImport);
+const MeetingNotificationOverlay = React.lazy(
+  () => import("./components/MeetingNotificationOverlay.tsx")
+);
 
 let root = null;
 
@@ -272,6 +275,20 @@ if (!isOAuthBrowserRedirect()) {
 
 function AppRouter() {
   useTheme();
+  const isMeetingNotification = window.location.search.includes("meeting-notification=true");
+
+  if (isMeetingNotification) {
+    return (
+      <Suspense fallback={<div />}>
+        <MeetingNotificationOverlay />
+      </Suspense>
+    );
+  }
+
+  return <MainApp />;
+}
+
+function MainApp() {
   const { isSignedIn, isLoaded: authLoaded } = useAuth();
 
   const [showOnboarding, setShowOnboarding] = useState(false);

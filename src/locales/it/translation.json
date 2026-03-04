@@ -93,7 +93,7 @@
     "updatePayment": "Aggiorna metodo di pagamento",
     "updatePaymentDescription": "Torna alle trascrizioni Pro illimitate.",
     "upgradeToPro": "Passa a Pro",
-    "upgradeDescription": "Trascrizioni illimitate. $9/mese.",
+    "upgradeDescription": "Passa a un piano a pagamento a partire da soli $8/mese.",
     "useApiKey": "Usa la tua chiave API",
     "useApiKeyDescription": "Porta la tua chiave per un uso illimitato.",
     "switchToLocal": "Passa a locale",
@@ -914,7 +914,6 @@
           "name": "Gratuito",
           "price": "$0",
           "period": "per sempre",
-          "trialNote": "Include 7 giorni gratuiti di OpenWhispr Pro",
           "features": [
             "2.000 parole/settimana",
             "Modelli IA locali",
@@ -1401,12 +1400,25 @@
       "errorOccurred": "Si è verificato un errore",
       "noProviderTitle": "Nessun provider di trascrizione configurato",
       "noProviderDescription": "Aggiungi una chiave API o scarica un modello locale per iniziare a trascrivere.",
-      "noProviderAction": "Apri impostazioni di trascrizione"
+      "noProviderAction": "Apri impostazioni di trascrizione",
+      "fileTooLarge": "Questo file supera il limite di 500 MB.",
+      "largeFileNote": "I file di grandi dimensioni vengono suddivisi e trascritti in parallelo.",
+      "chunkProgress": "Trascrizione parte {{completed}} di {{total}}...",
+      "paidPlanRequired": "La trascrizione cloud per file superiori a 25 MB richiede un piano a pagamento. I file di grandi dimensioni vengono elaborati con OpenWhispr Cloud per risultati affidabili e di alta qualità.",
+      "byokTooLarge": "Le chiavi API di terze parti supportano solo file fino a 25 MB.",
+      "byokTooLargeDetail": "Per file superiori a 25 MB, OpenWhispr Cloud gestisce la suddivisione, l'elaborazione parallela e il riassemblaggio — per risultati affidabili senza dipendere dai limiti dei provider di terze parti.",
+      "byokTooLargeNeedsAccount": "Crea un account e passa a un piano a pagamento per trascrivere file più grandi con OpenWhispr Cloud.",
+      "byokTooLargeNeedsUpgrade": "Passa a un piano a pagamento per trascrivere file più grandi con OpenWhispr Cloud.",
+      "switchToCloudForLargeFiles": "Passa a OpenWhispr Cloud per trascrivere questo file.",
+      "createAccount": "Crea account",
+      "upgrade": "Aggiorna",
+      "switchToCloud": "OpenWhispr Cloud"
     },
     "meeting": {
       "title": "Note delle riunioni",
       "description": "Identificazione degli interlocutori e riassunti strutturati",
-      "comingSoon": "Prossimamente"
+      "comingSoon": "Prossimamente",
+      "back": "Indietro"
     },
     "context": {
       "moveToFolder": "Sposta nella cartella",
@@ -1511,6 +1523,7 @@
     "upgradeTitle": "Passa a Pro",
     "upgradeDescription": "Trascrizioni illimitate e funzionalità avanzate.",
     "learnMore": "Scopri di più",
+    "integrations": "Integrazioni",
     "defaultUser": "Utente",
     "notSignedIn": "Non hai effettuato l'accesso"
   },
@@ -1633,6 +1646,32 @@
       "listening": "Ascolto...",
       "transcribing": "Trascrizione...",
       "thinking": "Pensiero..."
+    }
+  },
+  "integrations": {
+    "title": "Integrazioni",
+    "description": "Collega servizi per potenziare il tuo flusso di lavoro",
+    "googleCalendar": {
+      "title": "Google Calendar",
+      "description": "Collega il tuo calendario per attivare le note delle riunioni. OpenWhispr rileva le riunioni e registra con diarizzazione dei parlanti — automaticamente.",
+      "connect": "Collega Google Calendar",
+      "connecting": "Connessione...",
+      "connected": "Connesso",
+      "addAnother": "Aggiungi un altro calendario",
+      "disconnect": "Disconnetti",
+      "disconnectConfirm": "Disconnettere {{email}}?",
+      "disconnectDescription": "Le note delle riunioni non saranno più registrate da questo calendario."
+    },
+    "plan": {
+      "title": "Il tuo Piano",
+      "current": "Attuale",
+      "free": "Gratis",
+      "freeLimit": "5 riunioni / mese",
+      "essential": "Essential",
+      "essentialLimit": "20 riunioni / mese",
+      "pro": "Pro",
+      "proLimit": "Illimitato",
+      "upgrade": "Aggiorna"
     }
   }
 }

@@ -93,7 +93,7 @@
     "updatePayment": "更新支付方式",
     "updatePaymentDescription": "恢复无限制的 Pro 版转录。",
     "upgradeToPro": "升级到 Pro",
-    "upgradeDescription": "无限转录，每月 $9。",
+    "upgradeDescription": "升级到付费方案，每月最低 $8 起。",
     "useApiKey": "使用自己的 API Key",
     "useApiKeyDescription": "使用你自己的密钥，无限制使用。",
     "switchToLocal": "切换到本地模式",
@@ -914,7 +914,6 @@
           "name": "免费版",
           "price": "$0",
           "period": "永久",
-          "trialNote": "含 7 天免费 Pro 试用",
           "features": [
             "每周 2,000 字",
             "本地 AI 模型",
@@ -1397,12 +1396,25 @@
       "errorOccurred": "发生错误",
       "noProviderTitle": "尚未设置转录服务商",
       "noProviderDescription": "添加 API Key 或下载本地模型以开始转录。",
-      "noProviderAction": "打开转录设置"
+      "noProviderAction": "打开转录设置",
+      "fileTooLarge": "此文件超过了 500 MB 的大小限制。",
+      "largeFileNote": "大文件将被分割并平行转录。",
+      "chunkProgress": "正在转录第 {{completed}} 部分，共 {{total}} 部分...",
+      "paidPlanRequired": "超过 25 MB 的文件需要付费计划才能使用云端转录。大文件通过 OpenWhispr Cloud 处理，确保可靠、高质量的结果。",
+      "byokTooLarge": "第三方 API 密钥仅支持 25 MB 以内的文件。",
+      "byokTooLargeDetail": "超过 25 MB 的文件由 OpenWhispr Cloud 负责分割、并行处理和重组——无需依赖第三方服务限制，即可获得可靠的结果。",
+      "byokTooLargeNeedsAccount": "创建账户并升级到付费计划，即可使用 OpenWhispr Cloud 转录更大的文件。",
+      "byokTooLargeNeedsUpgrade": "升级到付费计划，即可使用 OpenWhispr Cloud 转录更大的文件。",
+      "switchToCloudForLargeFiles": "切换到 OpenWhispr Cloud 来转录此文件。",
+      "createAccount": "创建账户",
+      "upgrade": "升级",
+      "switchToCloud": "OpenWhispr Cloud"
     },
     "meeting": {
       "title": "会议笔记",
       "description": "说话人识别与结构化摘要",
-      "comingSoon": "即将推出"
+      "comingSoon": "即将推出",
+      "back": "返回"
     },
     "context": {
       "moveToFolder": "移动到文件夹",
@@ -1507,6 +1519,7 @@
     "upgradeTitle": "升级到 Pro",
     "upgradeDescription": "无限转录、实时转录等更多功能。",
     "learnMore": "了解更多",
+    "integrations": "集成",
     "defaultUser": "用户",
     "notSignedIn": "未登录"
   },
@@ -1629,6 +1642,32 @@
       "listening": "正在聆听...",
       "transcribing": "正在转录...",
       "thinking": "正在思考..."
+    }
+  },
+  "integrations": {
+    "title": "集成",
+    "description": "连接服务以增强您的工作流程",
+    "googleCalendar": {
+      "title": "Google 日历",
+      "description": "连接日历以启用会议笔记。OpenWhispr 会自动检测会议并进行说话人分离录音。",
+      "connect": "连接 Google 日历",
+      "connecting": "连接中...",
+      "connected": "已连接",
+      "addAnother": "添加其他日历",
+      "disconnect": "断开",
+      "disconnectConfirm": "断开 {{email}}？",
+      "disconnectDescription": "将不再从此日历记录会议笔记。"
+    },
+    "plan": {
+      "title": "您的方案",
+      "current": "当前",
+      "free": "免费",
+      "freeLimit": "每月5次会议",
+      "essential": "Essential",
+      "essentialLimit": "每月20次会议",
+      "pro": "Pro",
+      "proLimit": "无限",
+      "upgrade": "升级"
     }
   }
 }

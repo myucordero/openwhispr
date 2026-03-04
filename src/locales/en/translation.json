@@ -93,7 +93,7 @@
     "updatePayment": "Update payment method",
     "updatePaymentDescription": "Get back to unlimited Pro transcriptions.",
     "upgradeToPro": "Upgrade to Pro",
-    "upgradeDescription": "Unlimited transcriptions. $9/month.",
+    "upgradeDescription": "Upgrade to a paid plan from as little as $8/month.",
     "useApiKey": "Use your own API key",
     "useApiKeyDescription": "Bring your own key for unlimited use.",
     "switchToLocal": "Switch to local",
@@ -493,6 +493,37 @@
     "welcomeSubtitle": "Dictate anywhere using your voice",
     "welcomeTitle": "Welcome to OpenWhispr",
     "sessionExpired": "Session expired. Please restart the sign-up process."
+  },
+  "calendar": {
+    "title": "Google Calendar",
+    "status": "Status",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "notConnectedDescription": "Connect to detect and record meetings",
+    "connectCta": {
+      "title": "Calendar Integration",
+      "description": "Auto-detect meetings and record with speaker diarization"
+    },
+    "connect": "Connect Google Calendar",
+    "connecting": "Connecting...",
+    "disconnect": "Disconnect",
+    "disconnecting": "Disconnecting...",
+    "sync": "Sync",
+    "syncing": "Syncing...",
+    "calendarsTitle": "Calendars",
+    "upcomingTitle": "Upcoming",
+    "noUpcoming": "No upcoming events",
+    "meetingStarting": "Meeting starting now",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "detection": {
+      "title": "Meeting Detection",
+      "description": "Automatically detect unscheduled meetings",
+      "processDetection": "App Detection",
+      "processDescription": "Detect meetings in Zoom, Teams, and FaceTime",
+      "audioDetection": "Audio Detection",
+      "audioDescription": "Prompt when sustained conversation is detected"
+    }
   },
   "cleanupPrompt": "Cleanup",
   "developerSection": {
@@ -894,7 +925,6 @@
           "name": "Free",
           "price": "$0",
           "period": "forever",
-          "trialNote": "Includes 7 days free of OpenWhispr Pro",
           "features": [
             "2,000 words/week",
             "Local AI models",
@@ -1273,6 +1303,7 @@
     "upgradeTitle": "Upgrade to Pro",
     "upgradeDescription": "Unlimited transcriptions and premium features.",
     "learnMore": "Learn more",
+    "integrations": "Integrations",
     "defaultUser": "User",
     "notSignedIn": "Not signed in"
   },
@@ -1433,12 +1464,25 @@
       "errorOccurred": "An error occurred",
       "noProviderTitle": "No transcription provider set up",
       "noProviderDescription": "Add an API key or download a local model to start transcribing.",
-      "noProviderAction": "Open Transcription Settings"
+      "noProviderAction": "Open Transcription Settings",
+      "fileTooLarge": "This file exceeds the 500 MB limit.",
+      "paidPlanRequired": "Cloud transcription for files over 25 MB requires a paid plan. Large files are processed with OpenWhispr Cloud for reliable, high-quality results.",
+      "largeFileNote": "Large files are split and transcribed in parallel.",
+      "chunkProgress": "Transcribing part {{completed}} of {{total}}...",
+      "byokTooLarge": "Third-party API keys only support files up to 25 MB.",
+      "byokTooLargeDetail": "For files over 25 MB, OpenWhispr Cloud handles splitting, parallel processing, and reassembly — so you get reliable results without depending on third-party provider limits.",
+      "byokTooLargeNeedsAccount": "Create an account and upgrade to a paid plan to transcribe larger files with OpenWhispr Cloud.",
+      "byokTooLargeNeedsUpgrade": "Upgrade to a paid plan to transcribe larger files with OpenWhispr Cloud.",
+      "switchToCloudForLargeFiles": "Switch to OpenWhispr Cloud to transcribe this file.",
+      "createAccount": "Create Account",
+      "upgrade": "Upgrade",
+      "switchToCloud": "OpenWhispr Cloud"
     },
     "meeting": {
       "title": "Meeting Notes",
       "description": "Speaker identification & structured summaries",
-      "comingSoon": "Coming Soon"
+      "comingSoon": "Coming Soon",
+      "back": "Back"
     },
     "empty": {
       "title": "No notes here yet",
@@ -1629,6 +1673,32 @@
       "listening": "Listening...",
       "transcribing": "Transcribing...",
       "thinking": "Thinking..."
+    }
+  },
+  "integrations": {
+    "title": "Integrations",
+    "description": "Connect services to supercharge your workflow",
+    "googleCalendar": {
+      "title": "Google Calendar",
+      "description": "Connect your calendar to activate meeting notes. OpenWhispr detects meetings and records with speaker diarization — automatically.",
+      "connect": "Connect Google Calendar",
+      "connecting": "Connecting...",
+      "connected": "Connected",
+      "addAnother": "Add another calendar",
+      "disconnect": "Disconnect",
+      "disconnectConfirm": "Disconnect {{email}}?",
+      "disconnectDescription": "Meeting notes will no longer be recorded from this calendar."
+    },
+    "plan": {
+      "title": "Your Plan",
+      "current": "Current",
+      "free": "Free",
+      "freeLimit": "5 meetings / month",
+      "essential": "Essential",
+      "essentialLimit": "20 meetings / month",
+      "pro": "Pro",
+      "proLimit": "Unlimited",
+      "upgrade": "Upgrade"
     }
   }
 }

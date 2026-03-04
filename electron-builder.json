@@ -87,6 +87,7 @@
     "src/assets/**/*",
     "resources/bin/macos-globe-listener",
     "resources/bin/macos-fast-paste",
+    "resources/bin/macos-mic-check",
     "resources/bin/macos-text-monitor",
     "resources/bin/linux-fast-paste",
     "resources/bin/linux-text-monitor",
@@ -160,6 +161,7 @@
   },
   "deb": {
     "afterRemove": "resources/linux/after-remove.sh",
+    "depends": ["ydotool"],
     "fpm": [
       "--deb-suggests",
       "xdotool",
@@ -171,6 +173,8 @@
   },
   "rpm": {
     "fpm": [
+      "--rpm-tag",
+      "Requires: ydotool",
       "--rpm-tag",
       "Suggests: xdotool",
       "--rpm-tag",
