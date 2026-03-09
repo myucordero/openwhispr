@@ -1,7 +1,7 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import { PROMPTS_BY_LOCALE } from "./locales/prompts";
-import { TRANSLATIONS_BY_LOCALE } from "./locales/translations";
+import enPrompts from "./locales/en/prompts.json";
+import enTranslation from "./locales/en/translation.json";
 
 export const SUPPORTED_UI_LANGUAGES = [
   "en",
@@ -36,46 +36,80 @@ export function normalizeUiLanguage(language: string | null | undefined): UiLang
   return "en";
 }
 
+const LOCALE_LOADERS: Record<
+  UiLanguage,
+  () => Promise<{ translation: unknown; prompts: unknown }>
+> = {
+  en: async () => ({ translation: enTranslation, prompts: enPrompts }),
+  es: async () => {
+    const [{ default: translation }, { default: prompts }] = await Promise.all([
+      import("./locales/es/translation.json"),
+      import("./locales/es/prompts.json"),
+    ]);
+    return { translation, prompts };
+  },
+  fr: async () => {
+    const [{ default: translation }, { default: prompts }] = await Promise.all([
+      import("./locales/fr/translation.json"),
+      import("./locales/fr/prompts.json"),
+    ]);
+    return { translation, prompts };
+  },
+  de: async () => {
+    const [{ default: translation }, { default: prompts }] = await Promise.all([
+      import("./locales/de/translation.json"),
+      import("./locales/de/prompts.json"),
+    ]);
+    return { translation, prompts };
+  },
+  pt: async () => {
+    const [{ default: translation }, { default: prompts }] = await Promise.all([
+      import("./locales/pt/translation.json"),
+      import("./locales/pt/prompts.json"),
+    ]);
+    return { translation, prompts };
+  },
+  it: async () => {
+    const [{ default: translation }, { default: prompts }] = await Promise.all([
+      import("./locales/it/translation.json"),
+      import("./locales/it/prompts.json"),
+    ]);
+    return { translation, prompts };
+  },
+  ru: async () => {
+    const [{ default: translation }, { default: prompts }] = await Promise.all([
+      import("./locales/ru/translation.json"),
+      import("./locales/ru/prompts.json"),
+    ]);
+    return { translation, prompts };
+  },
+  ja: async () => {
+    const [{ default: translation }, { default: prompts }] = await Promise.all([
+      import("./locales/ja/translation.json"),
+      import("./locales/ja/prompts.json"),
+    ]);
+    return { translation, prompts };
+  },
+  "zh-CN": async () => {
+    const [{ default: translation }, { default: prompts }] = await Promise.all([
+      import("./locales/zh-CN/translation.json"),
+      import("./locales/zh-CN/prompts.json"),
+    ]);
+    return { translation, prompts };
+  },
+  "zh-TW": async () => {
+    const [{ default: translation }, { default: prompts }] = await Promise.all([
+      import("./locales/zh-TW/translation.json"),
+      import("./locales/zh-TW/prompts.json"),
+    ]);
+    return { translation, prompts };
+  },
+};
+
 const resources = {
   en: {
-    translation: TRANSLATIONS_BY_LOCALE.en,
-    prompts: PROMPTS_BY_LOCALE.en,
-  },
-  es: {
-    translation: TRANSLATIONS_BY_LOCALE.es,
-    prompts: PROMPTS_BY_LOCALE.es,
-  },
-  fr: {
-    translation: TRANSLATIONS_BY_LOCALE.fr,
-    prompts: PROMPTS_BY_LOCALE.fr,
-  },
-  de: {
-    translation: TRANSLATIONS_BY_LOCALE.de,
-    prompts: PROMPTS_BY_LOCALE.de,
-  },
-  pt: {
-    translation: TRANSLATIONS_BY_LOCALE.pt,
-    prompts: PROMPTS_BY_LOCALE.pt,
-  },
-  it: {
-    translation: TRANSLATIONS_BY_LOCALE.it,
-    prompts: PROMPTS_BY_LOCALE.it,
-  },
-  ru: {
-    translation: TRANSLATIONS_BY_LOCALE.ru,
-    prompts: PROMPTS_BY_LOCALE.ru,
-  },
-  ja: {
-    translation: TRANSLATIONS_BY_LOCALE.ja,
-    prompts: PROMPTS_BY_LOCALE.ja,
-  },
-  "zh-CN": {
-    translation: TRANSLATIONS_BY_LOCALE["zh-CN"],
-    prompts: PROMPTS_BY_LOCALE["zh-CN"],
-  },
-  "zh-TW": {
-    translation: TRANSLATIONS_BY_LOCALE["zh-TW"],
-    prompts: PROMPTS_BY_LOCALE["zh-TW"],
+    translation: enTranslation,
+    prompts: enPrompts,
   },
 } as const;
 
@@ -99,5 +133,37 @@ void i18n.use(initReactI18next).init({
   returnEmptyString: true,
   returnNull: false,
 });
+
+export async function ensureLocaleResources(
+  language: string | null | undefined
+): Promise<UiLanguage> {
+  const normalized = normalizeUiLanguage(language);
+
+  if (
+    i18n.hasResourceBundle(normalized, "translation") &&
+    i18n.hasResourceBundle(normalized, "prompts")
+  ) {
+    return normalized;
+  }
+
+  const loader = LOCALE_LOADERS[normalized];
+  if (!loader) {
+    return "en";
+  }
+
+  const { translation, prompts } = await loader();
+  i18n.addResourceBundle(normalized, "translation", translation, true, true);
+  i18n.addResourceBundle(normalized, "prompts", prompts, true, true);
+
+  return normalized;
+}
+
+if (initialLanguage !== "en") {
+  void ensureLocaleResources(initialLanguage)
+    .then((resolvedLanguage) => i18n.changeLanguage(resolvedLanguage))
+    .catch(() => {
+      // Keep English fallback if the selected locale fails to load.
+    });
+}
 
 export default i18n;
