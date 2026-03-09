@@ -12,7 +12,7 @@
     "compile:winpaste": "node scripts/build-windows-fast-paste.js",
     "compile:linux-paste": "node scripts/build-linux-fast-paste.js",
     "compile:media-remote": "node scripts/build-media-remote.js",
-    "compile:native": "npm run compile:globe && npm run compile:fast-paste && npm run compile:winkeys && npm run compile:winpaste && npm run compile:linux-paste && npm run compile:text-monitor && npm run compile:media-remote",
+    "compile:native": "node scripts/compile-native.js",
     "prestart": "npm run compile:native",
     "start": "electron .",
     "predev": "npm run compile:native",
