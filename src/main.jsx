@@ -8,7 +8,6 @@ import { SettingsProvider } from "./hooks/useSettings";
 
 import i18n from "./i18n";
 import "./index.css";
-
 let root = null;
 
 const VALID_CHANNELS = new Set(["development", "staging", "production"]);
@@ -257,7 +256,6 @@ function isOAuthBrowserRedirect() {
 if (!isOAuthBrowserRedirect()) {
   mountApp();
 }
-
 function mountApp() {
   if (!root) {
     root = ReactDOM.createRoot(document.getElementById("root"));
