@@ -27,6 +27,35 @@ const AUDIO_MIME_TYPES = {
   aac: "audio/aac",
 };
 
+function serializeError(error) {
+  if (!error) {
+    return { message: "Unknown error" };
+  }
+
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      cause:
+        error.cause instanceof Error
+          ? { name: error.cause.name, message: error.cause.message }
+          : error.cause,
+    };
+  }
+
+  if (typeof error === "object") {
+    try {
+      return JSON.parse(JSON.stringify(error));
+    } catch {
+      return { message: String(error) };
+    }
+  }
+
+  return { message: String(error) };
+}
+
 function buildMultipartBody(fileBuffer, fileName, contentType, fields = {}) {
   const boundary = `----OpenWhispr${Date.now()}`;
   const parts = [];
@@ -3082,12 +3111,18 @@ class IPCHandlers {
     });
 
     ipcMain.handle("get-stt-config", async (event) => {
+      const apiUrl = getApiUrl();
       try {
-        const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) {
+          debugLogger.debug("STT config unavailable: API URL not configured", {}, "stt");
+          return null;
+        }
 
         const cookieHeader = await getSessionCookies(event);
-        if (!cookieHeader) throw new Error("No session cookies available");
+        if (!cookieHeader) {
+          debugLogger.debug("STT config unavailable: no session cookies", {}, "stt");
+          return null;
+        }
 
         const response = await fetch(`${apiUrl}/api/stt-config`, {
           headers: { Cookie: cookieHeader },
@@ -3095,7 +3130,8 @@ class IPCHandlers {
 
         if (!response.ok) {
           if (response.status === 401) {
-            return { success: false, error: "Session expired", code: "AUTH_EXPIRED" };
+            debugLogger.info("STT config unavailable: session expired", { status: 401 }, "stt");
+            return null;
           }
           throw new Error(`API error: ${response.status}`);
         }
@@ -3103,7 +3139,14 @@ class IPCHandlers {
         const data = await response.json();
         return { success: true, ...data };
       } catch (error) {
-        debugLogger.error("STT config fetch error:", error);
+        debugLogger.warn(
+          "STT config fetch failed",
+          {
+            apiUrl,
+            ...serializeError(error),
+          },
+          "stt"
+        );
         return null;
       }
     });
