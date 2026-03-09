@@ -10,8 +10,8 @@ function read(relPath) {
 }
 
 test("settings default to local transcription", () => {
-  const content = read("src/hooks/useSettings.ts");
-  assert.match(content, /useLocalStorage\("useLocalWhisper",\s*true,/);
+  const content = read("src/stores/settingsStore.ts");
+  assert.match(content, /useLocalWhisper:\s*readBoolean\("useLocalWhisper",\s*true\)/);
 });
 
 test("signed-in onboarding is not explicitly cloud-first", () => {
