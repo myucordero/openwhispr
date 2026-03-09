@@ -1,8 +1,6 @@
 import React, { Suspense, useState, useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import { I18nextProvider, useTranslation } from "react-i18next";
-import App from "./App.jsx";
-import AuthenticationStep from "./components/AuthenticationStep.tsx";
 import WindowControls from "./components/WindowControls.tsx";
 import { Card, CardContent } from "./components/ui/card.tsx";
 import ErrorBoundary from "./components/ErrorBoundary.tsx";
@@ -18,12 +16,20 @@ const controlPanelImport = () => import("./components/ControlPanel.tsx");
 const onboardingFlowImport = () => import("./components/OnboardingFlow.tsx");
 const agentOverlayImport = () => import("./components/AgentOverlay.tsx");
 const permissionsGateImport = () => import("./components/PermissionsGate.tsx");
+const dictationAppImport = () => import("./App.jsx");
+const authenticationStepImport = () => import("./components/AuthenticationStep.tsx");
 const ControlPanel = React.lazy(controlPanelImport);
 const OnboardingFlow = React.lazy(onboardingFlowImport);
 const AgentOverlay = React.lazy(agentOverlayImport);
 const PermissionsGate = React.lazy(permissionsGateImport);
-import MeetingNotificationOverlay from "./components/MeetingNotificationOverlay.tsx";
-import UpdateNotificationOverlay from "./components/UpdateNotificationOverlay.tsx";
+const DictationApp = React.lazy(dictationAppImport);
+const AuthenticationStep = React.lazy(authenticationStepImport);
+const MeetingNotificationOverlay = React.lazy(
+  () => import("./components/MeetingNotificationOverlay.tsx")
+);
+const UpdateNotificationOverlay = React.lazy(
+  () => import("./components/UpdateNotificationOverlay.tsx")
+);
 
 let root = null;
 
@@ -313,6 +319,9 @@ function MainApp() {
       if (!localStorage.getItem("onboardingCompleted")) {
         onboardingFlowImport().catch(() => {});
       }
+      authenticationStepImport().catch(() => {});
+    } else {
+      dictationAppImport().catch(() => {});
     }
   }, [isControlPanel, isAgentPanel]);
 
@@ -443,7 +452,9 @@ function MainApp() {
       <ControlPanel />
     </Suspense>
   ) : (
-    <App />
+    <Suspense fallback={<LoadingFallback />}>
+      <DictationApp />
+    </Suspense>
   );
 }
 

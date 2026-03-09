@@ -20,6 +20,57 @@ const parseDevServerPort = (rawPort) => {
   return parsedPort;
 };
 
+const chunkNameForId = (id) => {
+  if (!id.includes("node_modules")) return null;
+
+  if (id.includes("node_modules/lucide-react/")) {
+    return "vendor-icons";
+  }
+
+  if (id.includes("node_modules/@radix-ui/")) {
+    return "vendor-radix";
+  }
+
+  if (
+    id.includes("node_modules/react-markdown/") ||
+    id.includes("node_modules/remark-") ||
+    id.includes("node_modules/rehype-") ||
+    id.includes("node_modules/mdast-") ||
+    id.includes("node_modules/micromark") ||
+    id.includes("node_modules/unified/") ||
+    id.includes("node_modules/vfile/") ||
+    id.includes("node_modules/hast-util-") ||
+    id.includes("node_modules/unist-util-")
+  ) {
+    return "vendor-markdown";
+  }
+
+  if (
+    id.includes("node_modules/@neondatabase/auth/") ||
+    id.includes("node_modules/better-auth/") ||
+    id.includes("node_modules/@better-auth/") ||
+    id.includes("node_modules/@tanstack/react-query/") ||
+    id.includes("node_modules/@captchafox/react/") ||
+    id.includes("node_modules/@hcaptcha/react-hcaptcha/") ||
+    id.includes("node_modules/react-google-recaptcha/") ||
+    id.includes("node_modules/react-qr-code/") ||
+    id.includes("node_modules/@instantdb/") ||
+    id.includes("node_modules/@triplit/")
+  ) {
+    return "vendor-auth";
+  }
+
+  if (
+    id.includes("node_modules/react/") ||
+    id.includes("node_modules/react-dom/") ||
+    id.includes("node_modules/scheduler/")
+  ) {
+    return "vendor-react";
+  }
+
+  return null;
+};
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const envDir = path.resolve(__dirname, "..");
@@ -80,14 +131,8 @@ export default defineConfig(({ mode }) => {
           "@aws-sdk/client-s3",
         ],
         output: {
-          manualChunks: {
-            "vendor-radix": [
-              "@radix-ui/react-dialog",
-              "@radix-ui/react-dropdown-menu",
-              "@radix-ui/react-select",
-              "@radix-ui/react-tabs",
-            ],
-            "vendor-icons": ["lucide-react"],
+          manualChunks(id) {
+            return chunkNameForId(id);
           },
         },
       },
