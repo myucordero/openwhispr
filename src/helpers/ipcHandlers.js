@@ -77,6 +77,35 @@ const CLOUD_INLINE_LIMIT = 4 * 1024 * 1024;
 const CLOUD_CHUNK_CONCURRENCY = 5;
 const CLOUD_CHUNK_SEGMENT_SECONDS = 240;
 
+function serializeError(error) {
+  if (!error) {
+    return { message: "Unknown error" };
+  }
+
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      cause:
+        error.cause instanceof Error
+          ? { name: error.cause.name, message: error.cause.message }
+          : error.cause,
+    };
+  }
+
+  if (typeof error === "object") {
+    try {
+      return JSON.parse(JSON.stringify(error));
+    } catch {
+      return { message: String(error) };
+    }
+  }
+
+  return { message: String(error) };
+}
+
 function buildMultipartBody(fileBuffer, fileName, contentType, fields = {}) {
   const boundary = `----OpenWhispr${Date.now()}`;
   const parts = [];
@@ -6010,12 +6039,18 @@ class IPCHandlers {
     });
 
     ipcMain.handle("get-stt-config", async (event) => {
+      const apiUrl = getApiUrl();
       try {
-        const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) {
+          debugLogger.debug("STT config unavailable: API URL not configured", {}, "stt");
+          return null;
+        }
 
         const authHeader = await getAuthHeader(event);
-        if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
+        if (!Object.keys(authHeader).length) {
+          debugLogger.debug("STT config unavailable: not authenticated", {}, "stt");
+          return null;
+        }
 
         const response = await proxyFetch(`${apiUrl}/api/stt-config`, {
           headers: authHeader,
@@ -6023,7 +6058,8 @@ class IPCHandlers {
 
         if (!response.ok) {
           if (response.status === 401) {
-            return { success: false, error: "Session expired", code: "AUTH_EXPIRED" };
+            debugLogger.info("STT config unavailable: session expired", { status: 401 }, "stt");
+            return null;
           }
           if (response.status === 503) {
             return { success: false, error: "Request timed out", code: "SERVER_ERROR" };
@@ -6034,7 +6070,14 @@ class IPCHandlers {
         const data = await response.json();
         return { success: true, ...data };
       } catch (error) {
-        debugLogger.error("STT config fetch error:", error);
+        debugLogger.warn(
+          "STT config fetch failed",
+          {
+            apiUrl,
+            ...serializeError(error),
+          },
+          "stt"
+        );
         return null;
       }
     });
