@@ -59,7 +59,14 @@ For a packaged local Windows app folder (no installer), run:
 npm run build:local:win
 ```
 
-This outputs `dist/win-unpacked/OpenWhispr.exe` so you can run the app directly without dev mode.
+This now stages the Windows native helpers and local speech binaries first:
+
+- `windows-fast-paste.exe` for native auto-paste
+- `windows-key-listener.exe` for Windows push-to-talk
+- `nircmd.exe` as paste fallback
+- local transcription/runtime binaries (`whisper.cpp`, `llama-server`, `sherpa-onnx`)
+
+The output is `dist/win-unpacked/OpenWhispr.exe`, so you can run the app directly without dev mode.
 
 The dev server listens on the odd port `5191` (see `.env`) and is only needed for `npm run dev`. VS Code has an `npm: dev` task in `.vscode/tasks.json` for development workflows. Run `npm run doctor:local` after setup to validate local binaries, model caches, and dev port alignment. The app launches successfully with those local models and transcribes, though the Whisper/Parakeet output stays fairly rough - keep custom dictionary words updated and experiment with higher-quality models if you need better accuracy.
 
@@ -117,6 +124,7 @@ Then do a quick smoke test:
 - Hotkey starts/stops recording
 - One local transcription works end-to-end
 - Auto-paste works in your target app(s)
+- On Windows, test both tap mode and push-to-talk if you rely on compound hotkeys
 
 ## Security and Reliability Practices
 
