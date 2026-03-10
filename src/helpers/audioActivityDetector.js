@@ -1,4 +1,4 @@
-const { exec, execFile, spawn } = require("child_process");
+const { exec, spawn } = require("child_process");
 const { promisify } = require("util");
 const path = require("path");
 const fs = require("fs");
@@ -6,7 +6,6 @@ const EventEmitter = require("events");
 const debugLogger = require("./debugLogger");
 
 const execAsync = promisify(exec);
-const execFileAsync = promisify(execFile);
 
 const CHECK_INTERVAL_MS = process.platform === "win32" ? 15 * 1000 : 5 * 1000;
 const SUSTAINED_THRESHOLD_CHECKS = process.platform === "win32" ? 2 : 3;
@@ -22,7 +21,6 @@ class AudioActivityDetector extends EventEmitter {
     this.audioActiveStart = null;
     this.hasPrompted = false;
     this.lastDismissedAt = null;
-    this._micCheckBinary = null;
     this._userRecording = false;
     this._checking = false;
     this._listenerProcess = null;
@@ -357,18 +355,8 @@ class AudioActivityDetector extends EventEmitter {
   // ---------------------------------------------------------------------------
 
   _startPolling() {
-    if (process.platform === "darwin") this._resolveMicCheckBinary();
     this._check();
     this.checkInterval = setInterval(() => this._check(), CHECK_INTERVAL_MS);
-  }
-
-  _resolveMicCheckBinary() {
-    const resolved = this._resolveBinary("macos-mic-check");
-    if (resolved) {
-      this._micCheckBinary = resolved;
-    } else {
-      debugLogger.warn("macos-mic-check binary not found, falling back to ioreg", {}, "meeting");
-    }
   }
 
   async _check() {
@@ -431,22 +419,6 @@ class AudioActivityDetector extends EventEmitter {
   }
 
   async _checkDarwin() {
-    if (this._micCheckBinary) {
-      try {
-        const { stdout } = await execFileAsync(this._micCheckBinary, [], {
-          timeout: 3000,
-          encoding: "utf8",
-        });
-        return stdout.trim() === "true";
-      } catch (err) {
-        debugLogger.debug(
-          "mic-check binary failed, falling back",
-          { error: err.message },
-          "meeting"
-        );
-      }
-    }
-
     try {
       const { stdout } = await execAsync(
         "ioreg -l -w 0 | grep '\"IOAudioEngineState\" = 1'",

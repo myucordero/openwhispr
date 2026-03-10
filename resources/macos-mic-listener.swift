@@ -4,8 +4,6 @@
  * Long-running process that monitors microphone usage via CoreAudio property listeners.
  * Outputs MIC_ACTIVE / MIC_INACTIVE state transitions to stdout.
  *
- * Replaces the fire-and-forget macos-mic-check.swift with an event-driven approach.
- *
  * Compile: swiftc -O macos-mic-listener.swift -o macos-mic-listener -framework CoreAudio -framework Foundation
  */
 
