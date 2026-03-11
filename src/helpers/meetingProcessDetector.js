@@ -67,11 +67,7 @@ class MeetingProcessDetector extends EventEmitter {
     try {
       systemPreferences = require("electron").systemPreferences;
     } catch {
-      debugLogger.warn(
-        "systemPreferences unavailable, falling back to polling",
-        {},
-        "meeting"
-      );
+      debugLogger.warn("systemPreferences unavailable, falling back to polling", {}, "meeting");
       this._startPollingFallback();
       return;
     }
@@ -93,11 +89,7 @@ class MeetingProcessDetector extends EventEmitter {
         const processKey = bundleId ? BUNDLE_ID_MAP[bundleId] : null;
         if (processKey) {
           const appName = BUNDLE_APP_NAMES[processKey] || processKey;
-          debugLogger.debug(
-            "Workspace app launched",
-            { bundleId, processKey },
-            "meeting"
-          );
+          debugLogger.debug("Workspace app launched", { bundleId, processKey }, "meeting");
           this._updateDetection(processKey, appName, true);
         }
       }
@@ -110,11 +102,7 @@ class MeetingProcessDetector extends EventEmitter {
         const processKey = bundleId ? BUNDLE_ID_MAP[bundleId] : null;
         if (processKey) {
           const appName = BUNDLE_APP_NAMES[processKey] || processKey;
-          debugLogger.debug(
-            "Workspace app terminated",
-            { bundleId, processKey },
-            "meeting"
-          );
+          debugLogger.debug("Workspace app terminated", { bundleId, processKey }, "meeting");
           this._updateDetection(processKey, appName, false);
         }
       }

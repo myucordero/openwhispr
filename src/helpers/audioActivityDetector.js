@@ -208,7 +208,11 @@ class AudioActivityDetector extends EventEmitter {
       });
 
       child.stderr.on("data", (data) => {
-        debugLogger.debug("macos-mic-listener stderr", { output: data.toString().trim() }, "meeting");
+        debugLogger.debug(
+          "macos-mic-listener stderr",
+          { output: data.toString().trim() },
+          "meeting"
+        );
       });
 
       this._attachFallbackHandlers(child, "macos-mic-listener");
@@ -245,7 +249,11 @@ class AudioActivityDetector extends EventEmitter {
       });
 
       child.stderr.on("data", (data) => {
-        debugLogger.debug("windows-mic-listener stderr", { output: data.toString().trim() }, "meeting");
+        debugLogger.debug(
+          "windows-mic-listener stderr",
+          { output: data.toString().trim() },
+          "meeting"
+        );
       });
 
       this._attachFallbackHandlers(child, "windows-mic-listener");

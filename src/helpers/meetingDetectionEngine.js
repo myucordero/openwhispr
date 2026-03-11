@@ -196,7 +196,11 @@ class MeetingDetectionEngine {
   _flushNotificationQueue() {
     if (this._notificationQueue.length === 0) return;
 
-    debugLogger.info("Flushing notification queue", { count: this._notificationQueue.length }, "meeting");
+    debugLogger.info(
+      "Flushing notification queue",
+      { count: this._notificationQueue.length },
+      "meeting"
+    );
 
     const prioritized = this._notificationQueue.sort((a, b) => {
       const priority = { process: 1, audio: 2 };

@@ -307,9 +307,7 @@ class GoogleCalendarManager {
         this._consecutiveFailures = 0;
         this._restartSyncInterval();
       })
-      .catch((err) =>
-        debugLogger.error("Post-wake sync failed", { error: err.message }, "gcal")
-      );
+      .catch((err) => debugLogger.error("Post-wake sync failed", { error: err.message }, "gcal"));
   }
 
   syncOnFocus() {
@@ -379,7 +377,11 @@ class GoogleCalendarManager {
     if (this.syncInterval) clearInterval(this.syncInterval);
 
     const interval = this._getSyncInterval();
-    debugLogger.info("Calendar sync scheduled", { intervalMs: interval, consecutiveFailures: this._consecutiveFailures }, "gcal");
+    debugLogger.info(
+      "Calendar sync scheduled",
+      { intervalMs: interval, consecutiveFailures: this._consecutiveFailures },
+      "gcal"
+    );
 
     this.syncInterval = setInterval(() => {
       this.syncEvents()
@@ -392,11 +394,15 @@ class GoogleCalendarManager {
         })
         .catch((err) => {
           this._consecutiveFailures++;
-          debugLogger.error("Calendar sync failed", {
-            error: err.message,
-            consecutiveFailures: this._consecutiveFailures,
-            nextIntervalMs: this._getSyncInterval()
-          }, "gcal");
+          debugLogger.error(
+            "Calendar sync failed",
+            {
+              error: err.message,
+              consecutiveFailures: this._consecutiveFailures,
+              nextIntervalMs: this._getSyncInterval(),
+            },
+            "gcal"
+          );
           this._restartSyncInterval();
         });
     }, interval);
@@ -404,10 +410,7 @@ class GoogleCalendarManager {
 
   _getSyncInterval() {
     if (this._consecutiveFailures === 0) return this.SYNC_INTERVAL_MS;
-    return Math.min(
-      this.SYNC_INTERVAL_MS * Math.pow(2, this._consecutiveFailures),
-      30 * 60 * 1000
-    );
+    return Math.min(this.SYNC_INTERVAL_MS * Math.pow(2, this._consecutiveFailures), 30 * 60 * 1000);
   }
 
   _restartSyncInterval() {
