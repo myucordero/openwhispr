@@ -77,6 +77,7 @@ import { useUsage } from "../hooks/useUsage";
 import { cn } from "./lib/utils";
 import { startMigration, useMigration } from "../stores/noteStore.js";
 import { formatBytes } from "../utils/formatBytes";
+import { useSettingsStore } from "../stores/settingsStore";
 
 const formatAmount = (cents: number, currency: string) =>
   (cents / 100).toLocaleString(undefined, { style: "currency", currency });
@@ -710,6 +711,9 @@ export default function SettingsPage({ activeSection = "general" }: SettingsPage
     customDictionary,
     setCustomDictionary,
   } = useSettings();
+
+  const meetingAudioDetection = useSettingsStore((s) => s.meetingAudioDetection);
+  const setMeetingAudioDetection = useSettingsStore((s) => s.setMeetingAudioDetection);
 
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
@@ -1985,6 +1989,32 @@ export default function SettingsPage({ activeSection = "general" }: SettingsPage
                     description={t("settingsPage.general.soundEffects.pauseMediaDescription")}
                   >
                     <Toggle checked={pauseMediaOnDictation} onChange={setPauseMediaOnDictation} />
+                  </SettingsRow>
+                </SettingsPanelRow>
+              </SettingsPanel>
+            </div>
+
+            {/* Meeting Detection */}
+            <div>
+              <SectionHeader
+                title={t("calendar.detection.title")}
+                description={t("calendar.detection.description")}
+              />
+              <SettingsPanel>
+                <SettingsPanelRow>
+                  <SettingsRow
+                    label={t("calendar.detection.audioDetection")}
+                    description={t("calendar.detection.audioDescription")}
+                  >
+                    <Toggle
+                      checked={meetingAudioDetection}
+                      onChange={(value) => {
+                        setMeetingAudioDetection(value);
+                        window.electronAPI?.meetingDetectionSetPreferences?.({
+                          audioDetection: value,
+                        });
+                      }}
+                    />
                   </SettingsRow>
                 </SettingsPanelRow>
               </SettingsPanel>

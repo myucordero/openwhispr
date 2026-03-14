@@ -25,8 +25,14 @@ class MeetingDetectionEngine {
   }
 
   _bindListeners() {
+    // Process detection is context-only — track running apps but don't trigger notifications.
+    // This avoids false positives from apps like FaceTime running in the background.
     this.meetingProcessDetector.on("meeting-process-detected", (data) => {
-      this._handleDetection("process", data.processKey, data);
+      debugLogger.info(
+        "Meeting app running (context only)",
+        { processKey: data.processKey, appName: data.appName },
+        "meeting"
+      );
     });
 
     this.meetingProcessDetector.on("meeting-process-ended", (data) => {
@@ -41,11 +47,7 @@ class MeetingDetectionEngine {
   _handleDetection(source, key, data) {
     const detectionId = `${source}:${key}`;
 
-    if (source === "process" && !this.preferences.processDetection) {
-      debugLogger.debug("Process detection disabled, ignoring", { detectionId }, "meeting");
-      return;
-    }
-    if (source === "audio" && !this.preferences.audioDetection) {
+    if (!this.preferences.audioDetection) {
       debugLogger.debug("Audio detection disabled, ignoring", { detectionId }, "meeting");
       return;
     }
@@ -98,9 +100,6 @@ class MeetingDetectionEngine {
     if (imminentEvent) {
       title = imminentEvent.summary || "Upcoming Meeting";
       body = "Your meeting is starting. Want to take notes?";
-    } else if (source === "process") {
-      title = `${data.appName} Meeting Detected`;
-      body = "It looks like you're in a meeting. Want to take notes?";
     } else {
       title = "Meeting Detected";
       body = "It sounds like you're in a meeting. Want to take notes?";
@@ -115,7 +114,7 @@ class MeetingDetectionEngine {
       event = {
         id: `detected-${Date.now()}`,
         calendar_id: "__detected__",
-        summary: data.appName ? `${data.appName} Meeting` : "New note",
+        summary: "New note",
         start_time: new Date().toISOString(),
         end_time: new Date(Date.now() + 3600000).toISOString(),
         is_all_day: 0,
@@ -154,7 +153,7 @@ class MeetingDetectionEngine {
     if (action === "dismiss") {
       const detection = this.activeDetections.get(detectionId);
       if (detection) {
-        this._dismiss(detection.source, detection.key);
+        this._dismiss();
         detection.dismissed = true;
       }
     }
@@ -181,16 +180,12 @@ class MeetingDetectionEngine {
           });
         }
 
-        if (detection.source === "audio") {
-          this.audioActivityDetector.resetPrompt();
-        } else if (detection.source === "process") {
-          this.meetingProcessDetector.dismiss(detection.key);
-        }
+        this.audioActivityDetector.resetPrompt();
 
         this.activeDetections.delete(detectionId);
       } else if (action === "dismiss") {
         if (detection) {
-          this._dismiss(detection.source, detection.key);
+          this._dismiss();
           detection.dismissed = true;
         }
       }
@@ -202,7 +197,7 @@ class MeetingDetectionEngine {
   handleNotificationTimeout() {
     for (const [detectionId, detection] of this.activeDetections) {
       if (!detection.dismissed) {
-        this._dismiss(detection.source, detection.key);
+        this._dismiss();
         detection.dismissed = true;
       }
     }
@@ -219,12 +214,7 @@ class MeetingDetectionEngine {
       "meeting"
     );
 
-    const prioritized = this._notificationQueue.sort((a, b) => {
-      const priority = { process: 1, audio: 2 };
-      return (priority[a.source] || 0) - (priority[b.source] || 0);
-    });
-
-    const best = prioritized[0];
+    const best = this._notificationQueue[0];
     const detectionId = `${best.source}:${best.key}`;
 
     const detection = this.activeDetections.get(detectionId);
@@ -235,26 +225,18 @@ class MeetingDetectionEngine {
         const now = Date.now();
         imminentEvent = calendarState.upcomingEvents.find((evt) => {
           const start = new Date(evt.start_time).getTime();
-          return start - now <= 5 * 60 * 1000 && start > now;
+          return start - now <= IMMINENT_THRESHOLD_MS && start > now;
         });
       }
 
-      if (imminentEvent) {
-        this._showPrompt(detectionId, best.source, best.key, best.data, imminentEvent);
-      } else {
-        this._showPrompt(detectionId, best.source, best.key, best.data, null);
-      }
+      this._showPrompt(detectionId, best.source, best.key, best.data, imminentEvent);
     }
 
     this._notificationQueue = [];
   }
 
-  _dismiss(source, key) {
-    if (source === "process") {
-      this.meetingProcessDetector.dismiss(key);
-    } else if (source === "audio") {
-      this.audioActivityDetector.dismiss();
-    }
+  _dismiss() {
+    this.audioActivityDetector.dismiss();
   }
 
   setUserRecording(active) {

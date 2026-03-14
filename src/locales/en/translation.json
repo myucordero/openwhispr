@@ -550,11 +550,11 @@
     "tomorrow": "Tomorrow",
     "detection": {
       "title": "Meeting Detection",
-      "description": "Automatically detect unscheduled meetings",
+      "description": "Automatically detect when you're in a meeting",
       "processDetection": "App Detection",
-      "processDescription": "Detect meetings in Zoom, Teams, and FaceTime",
+      "processDescription": "Identify which app you're using when a meeting is detected",
       "audioDetection": "Audio Detection",
-      "audioDescription": "Prompt when sustained conversation is detected"
+      "audioDescription": "Prompt when sustained microphone activity is detected"
     }
   },
   "upcoming": {
@@ -1799,7 +1799,7 @@
       }
     },
     "mic": {
-      "hotkeyToSpeak": "Press {{hotkey}} to speak",
+      "hotkeyToSpeak": "{{hotkey}} to talk",
       "recording": "Recording...",
       "processing": "Processing...",
       "clickToSpeak": "Click to speak"

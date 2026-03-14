@@ -1729,7 +1729,7 @@
       }
     },
     "mic": {
-      "hotkeyToSpeak": "Pressione {{hotkey}} para falar",
+      "hotkeyToSpeak": "{{hotkey}} para falar",
       "recording": "Gravando...",
       "processing": "Processando...",
       "clickToSpeak": "Clique para falar"
@@ -1828,6 +1828,37 @@
     "notABot": {
       "title": "O OpenWhispr é um gravador de reuniões, não um bot",
       "description": "O OpenWhispr captura áudio diretamente do seu sistema — ele nunca entra nas suas reuniões como participante. Basta conectar seu calendário e fazer anotações normalmente."
+    }
+  },
+  "calendar": {
+    "title": "Google Agenda",
+    "status": "Status",
+    "connected": "Conectado",
+    "disconnected": "Desconectado",
+    "notConnectedDescription": "Conectar para detectar e gravar reuniões",
+    "connectCta": {
+      "title": "Integração de Calendário",
+      "description": "Detectar reuniões automaticamente e gravar transcrições"
+    },
+    "connect": "Conectar Google Agenda",
+    "connecting": "Conectando...",
+    "disconnect": "Desconectar",
+    "disconnecting": "Desconectando...",
+    "sync": "Sincronizar",
+    "syncing": "Sincronizando...",
+    "calendarsTitle": "Calendários",
+    "upcomingTitle": "Próximos",
+    "noUpcoming": "Nenhum evento próximo",
+    "meetingStarting": "A reunião começa agora",
+    "today": "Hoje",
+    "tomorrow": "Amanhã",
+    "detection": {
+      "title": "Detecção de Reuniões",
+      "description": "Detectar automaticamente quando você está em uma reunião",
+      "processDetection": "Detecção de Aplicativos",
+      "processDescription": "Identificar qual aplicativo você está usando quando uma reunião é detectada",
+      "audioDetection": "Detecção de Áudio",
+      "audioDescription": "Notificar quando atividade prolongada do microfone for detectada"
     }
   },
   "upcoming": {

@@ -737,6 +737,21 @@ export async function initializeSettings(): Promise<void> {
       );
     }
 
+    // Sync meeting detection preferences to main process
+    try {
+      const currentState = useSettingsStore.getState();
+      await window.electronAPI.meetingDetectionSetPreferences?.({
+        processDetection: currentState.meetingProcessDetection,
+        audioDetection: currentState.meetingAudioDetection,
+      });
+    } catch (err) {
+      logger.warn(
+        "Failed to sync meeting detection preferences on startup",
+        { error: (err as Error).message },
+        "settings"
+      );
+    }
+
     ensureAgentNameInDictionary();
   }
 

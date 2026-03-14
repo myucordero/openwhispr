@@ -1729,7 +1729,7 @@
       }
     },
     "mic": {
-      "hotkeyToSpeak": "{{hotkey}} drücken zum Sprechen",
+      "hotkeyToSpeak": "{{hotkey}} zum Sprechen",
       "recording": "Aufnahme...",
       "processing": "Verarbeitung...",
       "clickToSpeak": "Klicken zum Sprechen"
@@ -1828,6 +1828,37 @@
     "notABot": {
       "title": "OpenWhispr ist ein Meeting-Rekorder, kein Bot",
       "description": "OpenWhispr erfasst Audio direkt von deinem System — es nimmt niemals als Teilnehmer an deinen Meetings teil. Verbinde einfach deinen Kalender und mach Notizen wie gewohnt."
+    }
+  },
+  "calendar": {
+    "title": "Google Kalender",
+    "status": "Status",
+    "connected": "Verbunden",
+    "disconnected": "Getrennt",
+    "notConnectedDescription": "Verbinden, um Meetings zu erkennen und aufzuzeichnen",
+    "connectCta": {
+      "title": "Kalender-Integration",
+      "description": "Meetings automatisch erkennen und Transkriptionen aufzeichnen"
+    },
+    "connect": "Google Kalender verbinden",
+    "connecting": "Verbinde...",
+    "disconnect": "Trennen",
+    "disconnecting": "Trennen...",
+    "sync": "Synchronisieren",
+    "syncing": "Synchronisiere...",
+    "calendarsTitle": "Kalender",
+    "upcomingTitle": "Anstehend",
+    "noUpcoming": "Keine anstehenden Ereignisse",
+    "meetingStarting": "Meeting beginnt jetzt",
+    "today": "Heute",
+    "tomorrow": "Morgen",
+    "detection": {
+      "title": "Meeting-Erkennung",
+      "description": "Automatisch erkennen, wenn du in einem Meeting bist",
+      "processDetection": "App-Erkennung",
+      "processDescription": "Erkennen, welche App du verwendest, wenn ein Meeting erkannt wird",
+      "audioDetection": "Audio-Erkennung",
+      "audioDescription": "Benachrichtigung bei anhaltender Mikrofonaktivität"
     }
   },
   "upcoming": {

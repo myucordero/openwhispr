@@ -1729,7 +1729,7 @@
       }
     },
     "mic": {
-      "hotkeyToSpeak": "Premi {{hotkey}} per parlare",
+      "hotkeyToSpeak": "{{hotkey}} per parlare",
       "recording": "Registrazione...",
       "processing": "Elaborazione...",
       "clickToSpeak": "Clicca per parlare"
@@ -1828,6 +1828,37 @@
     "notABot": {
       "title": "OpenWhispr è un registratore di riunioni, non un bot",
       "description": "OpenWhispr cattura l'audio direttamente dal tuo sistema — non entra mai nelle tue riunioni come partecipante. Basta collegare il calendario e prendere appunti normalmente."
+    }
+  },
+  "calendar": {
+    "title": "Google Calendar",
+    "status": "Stato",
+    "connected": "Connesso",
+    "disconnected": "Disconnesso",
+    "notConnectedDescription": "Connetti per rilevare e registrare le riunioni",
+    "connectCta": {
+      "title": "Integrazione Calendario",
+      "description": "Rileva automaticamente le riunioni e registra le trascrizioni"
+    },
+    "connect": "Connetti Google Calendar",
+    "connecting": "Connessione...",
+    "disconnect": "Disconnetti",
+    "disconnecting": "Disconnessione...",
+    "sync": "Sincronizza",
+    "syncing": "Sincronizzazione...",
+    "calendarsTitle": "Calendari",
+    "upcomingTitle": "In programma",
+    "noUpcoming": "Nessun evento in programma",
+    "meetingStarting": "La riunione inizia ora",
+    "today": "Oggi",
+    "tomorrow": "Domani",
+    "detection": {
+      "title": "Rilevamento Riunioni",
+      "description": "Rileva automaticamente quando sei in una riunione",
+      "processDetection": "Rilevamento Applicazioni",
+      "processDescription": "Identifica quale app stai usando quando viene rilevata una riunione",
+      "audioDetection": "Rilevamento Audio",
+      "audioDescription": "Notifica quando viene rilevata un'attività microfono prolungata"
     }
   },
   "upcoming": {

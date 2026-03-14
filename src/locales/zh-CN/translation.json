@@ -1729,7 +1729,7 @@
       }
     },
     "mic": {
-      "hotkeyToSpeak": "按 {{hotkey}} 开始说话",
+      "hotkeyToSpeak": "{{hotkey}} 说话",
       "recording": "录音中...",
       "processing": "处理中...",
       "clickToSpeak": "点击开始说话"
@@ -1828,6 +1828,37 @@
     "notABot": {
       "title": "OpenWhispr 是会议录制工具，不是机器人",
       "description": "OpenWhispr 直接从您的系统捕获音频 — 它不会以参与者身份加入您的会议。只需连接日历，正常记录笔记即可。"
+    }
+  },
+  "calendar": {
+    "title": "Google 日历",
+    "status": "状态",
+    "connected": "已连接",
+    "disconnected": "未连接",
+    "notConnectedDescription": "连接以检测和录制会议",
+    "connectCta": {
+      "title": "日历集成",
+      "description": "自动检测会议并录制转录"
+    },
+    "connect": "连接 Google 日历",
+    "connecting": "连接中...",
+    "disconnect": "断开连接",
+    "disconnecting": "断开中...",
+    "sync": "同步",
+    "syncing": "同步中...",
+    "calendarsTitle": "日历",
+    "upcomingTitle": "即将到来",
+    "noUpcoming": "没有即将到来的事件",
+    "meetingStarting": "会议即将开始",
+    "today": "今天",
+    "tomorrow": "明天",
+    "detection": {
+      "title": "会议检测",
+      "description": "自动检测您是否在会议中",
+      "processDetection": "应用检测",
+      "processDescription": "检测到会议时识别您正在使用的应用",
+      "audioDetection": "音频检测",
+      "audioDescription": "检测到持续麦克风活动时提示"
     }
   },
   "upcoming": {
