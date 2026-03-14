@@ -1168,27 +1168,22 @@ export default function SettingsPage({ activeSection = "general" }: SettingsPage
       onConfirm: async () => {
         setIsDeletingAccount(true);
         try {
-          // 1. Delete all cloud notes (best-effort, needs session cookies)
+          // Best-effort cloud cleanup (needs session cookies before sign-out)
           try {
             const { NotesService } = await import("../services/NotesService");
             await NotesService.deleteAll();
           } catch {}
 
-          // 2. Delete server account (best-effort)
           const result = await deleteAccount();
           if (result.error) {
             logger.error("Server account deletion failed", result.error, "auth");
           }
 
-          // 3. Sign out (clear auth state)
           try {
             await signOut();
           } catch {}
-
-          // 4. Wipe all local data
           await window.electronAPI?.cleanupApp();
 
-          // 5. Reload app
           showAlertDialog({
             title: t("settingsPage.account.deleteAccount.successTitle"),
             description: t("settingsPage.account.deleteAccount.successDescription"),

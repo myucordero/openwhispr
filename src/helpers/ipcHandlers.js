@@ -1149,7 +1149,7 @@ class IPCHandlers {
       const errors = [];
       const mainWindow = this.windowManager.mainWindow;
 
-      // 1. Stop running services (before deleting files they may hold open)
+      // Stop services before deleting files they hold open
       try {
         await this.parakeetManager?.stopServer();
       } catch (e) {
@@ -1166,41 +1166,39 @@ class IPCHandlers {
         errors.push(`GCal stop: ${e.message}`);
       }
 
-      // 2. Revoke Google Calendar OAuth tokens (best-effort, before DB is closed)
+      // Revoke Google OAuth tokens before DB is closed
       try {
         await this.googleCalendarManager?.revokeAllTokens();
       } catch (e) {
         errors.push(`GCal revoke: ${e.message}`);
       }
 
-      // 3. Close the database connection (before deleting the file)
+      // Close DB connection before deleting the file
       try {
         this.databaseManager?.db?.close();
       } catch (e) {
         errors.push(`DB close: ${e.message}`);
       }
 
-      // 4. Delete audio files
+      // Delete audio files
       try {
         this.audioStorageManager.deleteAllAudio();
       } catch (e) {
         errors.push(`Audio delete: ${e.message}`);
       }
 
-      // 5. Delete all downloaded models
+      // Delete downloaded models
       try {
         const whisperDir = path.join(os.homedir(), ".cache", "openwhispr", "whisper-models");
         if (fs.existsSync(whisperDir)) fs.rmSync(whisperDir, { recursive: true, force: true });
       } catch (e) {
         errors.push(`Whisper models: ${e.message}`);
       }
-
       try {
         await this.parakeetManager?.deleteAllParakeetModels();
       } catch (e) {
         errors.push(`Parakeet models: ${e.message}`);
       }
-
       try {
         const modelManager = require("./modelManagerBridge").default;
         await modelManager.deleteAllModels();
@@ -1208,21 +1206,20 @@ class IPCHandlers {
         errors.push(`LLM models: ${e.message}`);
       }
 
-      // 6. Delete the database file
+      // Delete database file + WAL/SHM
       try {
         const dbPath = path.join(
           app.getPath("userData"),
           process.env.NODE_ENV === "development" ? "transcriptions-dev.db" : "transcriptions.db"
         );
         if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
-        // Also delete WAL and SHM files if they exist
         if (fs.existsSync(dbPath + "-wal")) fs.unlinkSync(dbPath + "-wal");
         if (fs.existsSync(dbPath + "-shm")) fs.unlinkSync(dbPath + "-shm");
       } catch (e) {
         errors.push(`DB file: ${e.message}`);
       }
 
-      // 7. Delete .env file
+      // Delete .env file
       try {
         const envPath = path.join(app.getPath("userData"), ".env");
         if (fs.existsSync(envPath)) fs.unlinkSync(envPath);
@@ -1230,7 +1227,7 @@ class IPCHandlers {
         errors.push(`Env file: ${e.message}`);
       }
 
-      // 8. Clear session cookies
+      // Clear session cookies
       try {
         const win = BrowserWindow.fromWebContents(event.sender);
         if (win) await win.webContents.session.clearStorageData({ storages: ["cookies"] });
@@ -1238,7 +1235,7 @@ class IPCHandlers {
         errors.push(`Cookies: ${e.message}`);
       }
 
-      // 9. Clear localStorage
+      // Clear localStorage
       if (mainWindow?.webContents) {
         try {
           await mainWindow.webContents.executeJavaScript("localStorage.clear()");
