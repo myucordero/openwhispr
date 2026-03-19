@@ -74,6 +74,39 @@ export class SimpleI18n {
       this.t(key, { ...options, ns: ns || options.ns, lng: language });
   }
 
+  hasResourceBundle(language: string, ns: string): boolean {
+    return this.resources[language]?.[ns] !== undefined;
+  }
+
+  addResourceBundle(
+    language: string,
+    ns: string,
+    resources: unknown,
+    deep = true,
+    overwrite = true
+  ): void {
+    const currentLanguage = this.resources[language] || {};
+    const currentBundle = currentLanguage[ns];
+
+    if (
+      deep &&
+      overwrite &&
+      currentBundle &&
+      typeof currentBundle === "object" &&
+      resources &&
+      typeof resources === "object"
+    ) {
+      currentLanguage[ns] = {
+        ...(currentBundle as Record<string, unknown>),
+        ...(resources as Record<string, unknown>),
+      };
+    } else if (overwrite || currentBundle === undefined) {
+      currentLanguage[ns] = resources as Record<string, unknown>;
+    }
+
+    this.resources[language] = currentLanguage;
+  }
+
   changeLanguage(nextLanguage: string): Promise<string> {
     this.language = nextLanguage || this.fallbackLng;
     this.emit("languageChanged", this.language);
