@@ -1426,7 +1426,7 @@ export default function SettingsPage({ activeSection = "general" }: SettingsPage
                       {(
                         t("settingsPage.account.pricing.free.features", {
                           returnObjects: true,
-                        }) as string[]
+                        }) as unknown as string[]
                       ).map((feature, i) =>
                         feature.startsWith("## ") ? (
                           <li
@@ -1519,7 +1519,7 @@ export default function SettingsPage({ activeSection = "general" }: SettingsPage
                       {(
                         t("settingsPage.account.pricing.pro.features", {
                           returnObjects: true,
-                        }) as string[]
+                        }) as unknown as string[]
                       ).map((feature, i) => (
                         <li
                           key={i}
@@ -1611,7 +1611,7 @@ export default function SettingsPage({ activeSection = "general" }: SettingsPage
                       {(
                         t("settingsPage.account.pricing.business.features", {
                           returnObjects: true,
-                        }) as string[]
+                        }) as unknown as string[]
                       ).map((feature, i) => (
                         <li
                           key={i}
@@ -1677,7 +1677,7 @@ export default function SettingsPage({ activeSection = "general" }: SettingsPage
                       {(
                         t("settingsPage.account.pricing.enterprise.features", {
                           returnObjects: true,
-                        }) as string[]
+                        }) as unknown as string[]
                       ).map((feature, i) => (
                         <li
                           key={i}
