@@ -147,17 +147,13 @@ export default function NoteEditor({
     [onContentChange]
   );
 
-  const replaceContentRange = useCallback(
-    (replaceStart: number, replaceEnd: number, insertText: string) => {
-      const currentContent = contentRef.current;
-      const before = currentContent.slice(0, replaceStart);
-      const after = currentContent.slice(replaceEnd);
-      const newContent = before + insertText + after;
-      commitContentChange(newContent);
-      return newContent;
-    },
-    [commitContentChange]
-  );
+  // Insert text directly into TipTap at ProseMirror positions (fast, no full-doc replace).
+  // TipTap's onUpdate callback handles syncing markdown back to the parent.
+  const editorInsertText = useCallback((from: number, to: number, text: string) => {
+    const ed = editorRef.current;
+    if (!ed || ed.isDestroyed) return;
+    ed.chain().deleteRange({ from, to }).insertContentAt(from, text).run();
+  }, []);
 
   const segmentContainerRef = useRef<HTMLDivElement>(null);
   const [indicatorStyle, setIndicatorStyle] = useState<React.CSSProperties>({ opacity: 0 });
@@ -266,8 +262,7 @@ export default function NoteEditor({
   const handleStartRecording = useCallback(() => {
     const ed = editorRef.current;
     if (ed) {
-      const { from } = ed.state.selection;
-      cursorPosRef.current = ed.state.doc.textBetween(0, from, "\n").length;
+      cursorPosRef.current = ed.state.selection.from;
     }
     onStartRecording();
   }, [onStartRecording]);
@@ -322,9 +317,9 @@ export default function NoteEditor({
     const textToInsert = (hasCommitted ? " " : "") + partialTranscript;
     const newEnd = partialStart + textToInsert.length;
 
-    replaceContentRange(partialStart, end, textToInsert);
+    editorInsertText(partialStart, end, textToInsert);
     dictationRef.current.end = newEnd;
-  }, [partialTranscript, replaceContentRange]); // note.content intentionally excluded
+  }, [partialTranscript, editorInsertText]); // note.content intentionally excluded
 
   // Streaming commit: a Deepgram segment was finalized. Replace the partial zone
   // with the committed text and advance partialStart for the next utterance.
@@ -334,13 +329,13 @@ export default function NoteEditor({
     const { partialStart, end } = dictationRef.current;
     const newPartialStart = partialStart + streamingCommit.length;
 
-    replaceContentRange(partialStart, end, streamingCommit);
+    editorInsertText(partialStart, end, streamingCommit);
     dictationRef.current.partialStart = newPartialStart;
     dictationRef.current.end = newPartialStart;
     dictationRef.current.committedChars += streamingCommit.length;
 
     onStreamingCommitConsumed();
-  }, [streamingCommit, onStreamingCommitConsumed, replaceContentRange]); // note.content intentionally excluded
+  }, [streamingCommit, onStreamingCommitConsumed, editorInsertText]); // note.content intentionally excluded
 
   // Final transcript (on recording stop).
   useEffect(() => {
@@ -348,13 +343,14 @@ export default function NoteEditor({
 
     const range = dictationRef.current;
     if (!range) {
-      // Non-streaming: insert at cursor with separator
-      const pos = cursorPosRef.current;
-      const before = contentRef.current.slice(0, pos);
-      const after = contentRef.current.slice(pos);
-      const separator = before && !before.endsWith("\n") ? "\n" : "";
-      const newContent = before + separator + finalTranscript + after;
-      commitContentChange(newContent);
+      // Non-streaming: insert at cursor position
+      const ed = editorRef.current;
+      if (ed && !ed.isDestroyed) {
+        const pos = cursorPosRef.current;
+        ed.chain().insertContentAt(pos, finalTranscript).run();
+      } else {
+        commitContentChange(contentRef.current + finalTranscript);
+      }
       onFinalTranscriptConsumed();
       return;
     }
@@ -371,10 +367,10 @@ export default function NoteEditor({
       return;
     }
 
-    replaceContentRange(partialStart, end, remainingFinal);
+    editorInsertText(partialStart, end, remainingFinal);
     dictationRef.current = null;
     onFinalTranscriptConsumed();
-  }, [finalTranscript, commitContentChange, onFinalTranscriptConsumed, replaceContentRange]); // note.content intentionally excluded
+  }, [finalTranscript, commitContentChange, onFinalTranscriptConsumed, editorInsertText]); // note.content intentionally excluded
 
   // Safety: clear dictation range when processing ends without a final transcript
   // (e.g. cancelled recording with no captured text). Declared after the final
@@ -390,8 +386,7 @@ export default function NoteEditor({
   const handleSelect = useCallback(() => {
     const ed = editorRef.current;
     if (ed) {
-      const { from } = ed.state.selection;
-      cursorPosRef.current = ed.state.doc.textBetween(0, from, "\n").length;
+      cursorPosRef.current = ed.state.selection.from;
     }
   }, []);
 
