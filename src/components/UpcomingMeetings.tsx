@@ -104,7 +104,7 @@ export default function UpcomingMeetings({ events, isLoading }: UpcomingMeetings
       {/* Empty state */}
       {!isLoading && events.length === 0 && (
         <div className="flex flex-col items-center justify-center py-8 px-3">
-          {systemAudio.isMacOS && systemAudio.status === "denied" ? (
+          {systemAudio.mode === "native" && !systemAudio.granted ? (
             <>
               <Monitor size={24} className="text-muted-foreground/30 mb-2.5" />
               <p className="text-xs text-muted-foreground/60 text-center mb-3">
@@ -113,7 +113,7 @@ export default function UpcomingMeetings({ events, isLoading }: UpcomingMeetings
               <Button
                 size="sm"
                 variant="outline"
-                onClick={systemAudio.openSettings}
+                onClick={() => systemAudio.request()}
                 className="text-xs h-7"
               >
                 {t("upcoming.openSettings")}

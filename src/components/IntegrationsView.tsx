@@ -36,12 +36,15 @@ export default function IntegrationsView() {
   }, [setGcalAccounts]);
 
   const handleConnect = useCallback(async () => {
-    if (systemAudio.isMacOS && systemAudio.status === "denied") {
-      setShowPermissionDialog(true);
-      return;
+    if (systemAudio.mode === "native" && !systemAudio.granted) {
+      const granted = await systemAudio.request();
+      if (!granted) {
+        setShowPermissionDialog(true);
+        return;
+      }
     }
     await startOAuth();
-  }, [systemAudio.isMacOS, systemAudio.status, startOAuth]);
+  }, [systemAudio.mode, systemAudio.granted, systemAudio.request, startOAuth]);
 
   const handleDisconnect = useCallback(
     async (email: string) => {
