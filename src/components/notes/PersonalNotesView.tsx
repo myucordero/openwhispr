@@ -475,9 +475,6 @@ export default function PersonalNotesView({
                       "bg-emerald-500/10 dark:bg-emerald-400/10 ring-1 ring-emerald-500/20"
                   )}
                 >
-                  {isActive && !isDragOver && !isDropSuccess && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-3 rounded-r-full bg-primary" />
-                  )}
                   <FolderOpen
                     size={13}
                     className={cn(

@@ -138,9 +138,6 @@ export default function ControlPanelSidebar({
                   : "hover:bg-foreground/4 dark:hover:bg-white/4 active:bg-foreground/6"
               )}
             >
-              {isActive && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-3.5 rounded-r-full bg-primary" />
-              )}
               <Icon
                 size={15}
                 className={cn(

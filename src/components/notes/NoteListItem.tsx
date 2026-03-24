@@ -108,9 +108,6 @@ export default function NoteListItem({
         isDragging && "opacity-40 scale-[0.97]"
       )}
     >
-      {isActive && (
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-r-full bg-primary" />
-      )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
           <p

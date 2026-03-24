@@ -127,10 +127,6 @@ export default function SidebarModal<T extends string>({
                                   : "text-muted-foreground dark:text-foreground/75 hover:text-foreground hover:bg-muted/50 dark:hover:bg-surface-2"
                               }`}
                             >
-                              {/* Active indicator bar */}
-                              {isActive && (
-                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full bg-primary" />
-                              )}
                               <div
                                 className={`flex items-center justify-center h-6 w-6 rounded-md shrink-0 transition-colors duration-100 ${
                                   isActive ? "bg-primary/10 dark:bg-primary/15" : "bg-transparent"
