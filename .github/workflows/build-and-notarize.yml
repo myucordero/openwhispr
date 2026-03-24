@@ -54,6 +54,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
 
+      - name: Download Qdrant binary
+        run: node scripts/download-qdrant.js --current
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
+
       - name: Cache Electron
         uses: actions/cache@v4
         with:
@@ -121,6 +126,11 @@ jobs:
 
       - name: Download sherpa-onnx binaries
         run: node scripts/download-sherpa-onnx.js --current
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
+
+      - name: Download Qdrant binary
+        run: node scripts/download-qdrant.js --current
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
 
@@ -209,6 +219,11 @@ jobs:
 
       - name: Download sherpa-onnx binaries
         run: node scripts/download-sherpa-onnx.js --current --platform darwin --arch ${{ matrix.arch }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
+
+      - name: Download Qdrant binary
+        run: node scripts/download-qdrant.js --current --platform darwin --arch ${{ matrix.arch }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
 
