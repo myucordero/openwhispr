@@ -155,5 +155,10 @@
     "ws": "^8.19.0",
     "zod": "^4.3.6",
     "zustand": "^5.0.11"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.56.0",
+    "@tailwindcss/oxide-win32-x64-msvc": "^4.1.18",
+    "lightningcss-win32-x64-msvc": "^1.30.2"
   }
 }
