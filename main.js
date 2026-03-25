@@ -1,3 +1,21 @@
+// KDE/GNOME Wayland: self-relaunch with --ozone-platform=x11 to force XWayland.
+// Chromium picks the display backend before JS runs, so appendSwitch is too late.
+if (
+  process.platform === "linux" &&
+  process.env.XDG_SESSION_TYPE === "wayland" &&
+  !process.argv.includes("--ozone-platform=x11")
+) {
+  const desktop = (process.env.XDG_CURRENT_DESKTOP || "").toLowerCase();
+  if (desktop.includes("kde") || /gnome|ubuntu|unity/.test(desktop)) {
+    const { spawn } = require("child_process");
+    spawn(process.execPath, [...process.argv.slice(1), "--ozone-platform=x11"], {
+      stdio: "inherit",
+      detached: true,
+    }).unref();
+    process.exit(0);
+  }
+}
+
 const {
   app,
   globalShortcut,
@@ -62,6 +80,13 @@ function configureChannelUserDataPath() {
 
 configureChannelUserDataPath();
 
+// Load userData .env (contains DICTATION_KEY, API keys, etc.) early — before
+// hotkey registration, which needs DICTATION_KEY before the renderer loads.
+require("dotenv").config({
+  path: path.join(app.getPath("userData"), ".env"),
+  override: false,
+});
+
 // Fix transparent window flickering on Linux: --enable-transparent-visuals requires
 // the compositor to set up an ARGB visual before any windows are created.
 // --disable-gpu-compositing prevents GPU compositing conflicts with the compositor.
@@ -75,17 +100,10 @@ if (process.platform === "win32") {
   app.commandLine.appendSwitch("disable-gpu-compositing");
 }
 
-// Wayland backend: KDE and GNOME use XWayland (KDE for clipboard, GNOME
-// because Wayland forbids app-initiated window positioning). wlroots
-// compositors (Hyprland, Sway) run native. D-Bus shortcuts work either way.
+// Wayland window decorations for native Wayland sessions (wlroots compositors).
+// KDE/GNOME use XWayland via the self-relaunch guard at the top of this file.
 if (process.platform === "linux" && process.env.XDG_SESSION_TYPE === "wayland") {
-  const desktop = (process.env.XDG_CURRENT_DESKTOP || "").toLowerCase();
-  if (desktop.includes("kde") || /gnome|ubuntu|unity/.test(desktop)) {
-    app.commandLine.appendSwitch("ozone-platform-hint", "x11");
-  } else {
-    app.commandLine.appendSwitch("ozone-platform-hint", "auto");
-  }
-  app.commandLine.appendSwitch("enable-features", "UseOzonePlatform,WaylandWindowDecorations");
+  app.commandLine.appendSwitch("enable-features", "WaylandWindowDecorations");
 }
 
 // Set desktop filename so Wayland compositors can match windows to the .desktop entry.

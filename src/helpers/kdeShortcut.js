@@ -220,9 +220,10 @@ class KDEShortcutManager {
     const actionId = [COMPONENT_NAME, "OpenWhispr", slotName, `OpenWhispr ${slotName}`];
 
     try {
-      // Register action then set shortcut
+      // Flag 0: always overwrite. 0x02 keeps stale saved values that
+      // silently prevent the hotkey from firing on startup.
       await this.kglobalaccel.doRegister(actionId);
-      const result = await this.kglobalaccel.setShortcut(actionId, [qtKey], 0x02);
+      const result = await this.kglobalaccel.setShortcut(actionId, [qtKey], 0);
 
       if (callback) this.callbacks.set(slotName, callback);
       this.registeredSlots.add(slotName);

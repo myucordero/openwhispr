@@ -25,8 +25,24 @@ console.log("[run-electron] Electron path:", electronPath);
 console.log("[run-electron] App dir:", appDir);
 console.log("[run-electron] Args:", args);
 
-// Spawn electron with the cleaned environment
-const child = spawn(electronPath, [appDir, ...args], {
+// On KDE/GNOME Wayland, force XWayland so globalShortcut and window positioning work.
+// Adding it here avoids the self-relaunch in main.js which kills concurrently in dev mode.
+if (
+  process.platform === "linux" &&
+  process.env.XDG_SESSION_TYPE === "wayland" &&
+  !args.includes("--ozone-platform=x11")
+) {
+  const desktop = (process.env.XDG_CURRENT_DESKTOP || "").toLowerCase();
+  if (desktop.includes("kde") || /gnome|ubuntu|unity/.test(desktop)) {
+    args.push("--ozone-platform=x11");
+    console.log("[run-electron] KDE/GNOME Wayland detected, forcing XWayland");
+  }
+}
+
+// Chromium flags must come before the app path, app args after.
+const chromiumFlags = args.filter((a) => a.startsWith("--ozone-platform="));
+const appArgs = args.filter((a) => !a.startsWith("--ozone-platform="));
+const child = spawn(electronPath, [...chromiumFlags, appDir, ...appArgs], {
   stdio: "inherit",
   env: process.env,
   cwd: appDir,
