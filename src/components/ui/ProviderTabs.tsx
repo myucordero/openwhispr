@@ -61,7 +61,8 @@ export function ProviderTabs({
   }, [providers, selectedId]);
 
   useEffect(() => {
-    updateIndicator();
+    const frameId = requestAnimationFrame(() => updateIndicator());
+    return () => cancelAnimationFrame(frameId);
   }, [updateIndicator]);
 
   useEffect(() => {

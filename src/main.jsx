@@ -297,11 +297,7 @@ function AppRouter() {
 
 function MainApp() {
   const { isSignedIn, isGracePeriodOnly, isLoaded: authLoaded } = useAuth();
-
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [needsReauth, setNeedsReauth] = useState(false);
-  const [needsPermissions, setNeedsPermissions] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setUiVersion] = useState(0);
 
   const isAgentPanel = window.location.search.includes("agent=true");
   const isControlPanel =
@@ -325,39 +321,31 @@ function MainApp() {
     }
   }, [isControlPanel, isAgentPanel]);
 
+  const onboardingCompleted = localStorage.getItem("onboardingCompleted") === "true";
+  const authSkipped =
+    localStorage.getItem("authenticationSkipped") === "true" ||
+    localStorage.getItem("skipAuth") === "true";
+  const onboardingInProgress = localStorage.getItem("onboardingCurrentStep") !== null;
+  const isReturningUser =
+    !onboardingCompleted && isSignedIn && !isGracePeriodOnly && !onboardingInProgress;
+
+  if (authLoaded && isReturningUser) {
+    localStorage.setItem("onboardingCompleted", "true");
+  }
+
+  const resolved = localStorage.getItem("onboardingCompleted") === "true";
+  const micOk = localStorage.getItem("micPermissionGranted") === "true";
+  const showOnboarding = isControlPanel && authLoaded && !resolved;
+  const needsReauth = isControlPanel && authLoaded && resolved && !isSignedIn && !authSkipped;
+  const needsPermissions =
+    isControlPanel &&
+    authLoaded &&
+    resolved &&
+    !needsReauth &&
+    !areRequiredPermissionsMet(micOk);
+  const isLoading = !authLoaded;
+
   useEffect(() => {
-    if (!authLoaded) return;
-
-    const onboardingCompleted = localStorage.getItem("onboardingCompleted") === "true";
-    const authSkipped =
-      localStorage.getItem("authenticationSkipped") === "true" ||
-      localStorage.getItem("skipAuth") === "true";
-
-    // Actual session (not OAuth grace period) proves prior onboarding — restore flag if localStorage was wiped.
-    // Guard with onboardingInProgress so first-time users mid-onboarding don't get auto-completed.
-    const onboardingInProgress = localStorage.getItem("onboardingCurrentStep") !== null;
-    const isReturningUser =
-      !onboardingCompleted && isSignedIn && !isGracePeriodOnly && !onboardingInProgress;
-    if (isReturningUser) {
-      localStorage.setItem("onboardingCompleted", "true");
-    }
-
-    const resolved = localStorage.getItem("onboardingCompleted") === "true";
-
-    if (isControlPanel) {
-      if (!resolved) {
-        setShowOnboarding(true);
-      } else if (!isSignedIn && !authSkipped) {
-        setNeedsReauth(true);
-      } else {
-        // Check permissions from localStorage — PermissionsGate does the real async checks
-        const micOk = localStorage.getItem("micPermissionGranted") === "true";
-        if (!areRequiredPermissionsMet(micOk)) {
-          setNeedsPermissions(true);
-        }
-      }
-    }
-
     if (isDictationPanel && !resolved) {
       const rawStep = parseInt(localStorage.getItem("onboardingCurrentStep") || "0");
       const currentStep = Math.max(0, Math.min(rawStep, 5));
@@ -365,18 +353,15 @@ function MainApp() {
         window.electronAPI?.hideWindow?.();
       }
     }
-
-    setIsLoading(false);
-  }, [isControlPanel, isDictationPanel, isSignedIn, isGracePeriodOnly, authLoaded]);
+  }, [isDictationPanel, resolved]);
 
   const handleOnboardingComplete = () => {
-    setShowOnboarding(false);
-    setNeedsPermissions(false); // onboarding already handled permissions
     localStorage.setItem("onboardingCompleted", "true");
+    setUiVersion((version) => version + 1);
   };
 
   const handlePermissionsComplete = () => {
-    setNeedsPermissions(false);
+    setUiVersion((version) => version + 1);
   };
 
   if (isAgentPanel) {
@@ -425,9 +410,9 @@ function MainApp() {
                   onContinueWithoutAccount={() => {
                     localStorage.setItem("authenticationSkipped", "true");
                     localStorage.setItem("skipAuth", "true");
-                    setNeedsReauth(false);
+                    setUiVersion((version) => version + 1);
                   }}
-                  onAuthComplete={() => setNeedsReauth(false)}
+                  onAuthComplete={() => setUiVersion((version) => version + 1)}
                   onNeedsVerification={() => {}}
                 />
               </CardContent>

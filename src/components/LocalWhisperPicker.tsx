@@ -76,10 +76,13 @@ export default function LocalWhisperPicker({
   }, [validateAndSelectModel]);
 
   useEffect(() => {
-    if (!hasLoadedRef.current) {
-      hasLoadedRef.current = true;
-      loadModels();
-    }
+    const frameId = requestAnimationFrame(() => {
+      if (!hasLoadedRef.current) {
+        hasLoadedRef.current = true;
+        void loadModels();
+      }
+    });
+    return () => cancelAnimationFrame(frameId);
   }, [loadModels]);
 
   const {

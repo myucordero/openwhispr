@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Sliders,
@@ -104,15 +104,11 @@ export default function SettingsModal({ open, onOpenChange, initialSection }: Se
     [t]
   );
 
-  const [activeSection, setActiveSection] = React.useState<SettingsSectionType>("account");
-
-  // Navigate to initial section when modal opens, resolving legacy aliases
-  useEffect(() => {
-    if (open && initialSection) {
-      const resolved = (SECTION_ALIASES[initialSection] ?? initialSection) as SettingsSectionType;
-      setActiveSection(resolved);
-    }
-  }, [open, initialSection]);
+  const [selectedSection, setSelectedSection] = React.useState<SettingsSectionType>("account");
+  const activeSection =
+    open && initialSection
+      ? ((SECTION_ALIASES[initialSection] ?? initialSection) as SettingsSectionType)
+      : selectedSection;
 
   return (
     <SidebarModal<SettingsSectionType>
@@ -121,7 +117,7 @@ export default function SettingsModal({ open, onOpenChange, initialSection }: Se
       title={t("settingsModal.title")}
       sidebarItems={sidebarItems}
       activeSection={activeSection}
-      onSectionChange={setActiveSection}
+      onSectionChange={setSelectedSection}
     >
       <SettingsPage activeSection={activeSection} />
     </SidebarModal>

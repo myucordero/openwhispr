@@ -22,7 +22,7 @@ export function RichTextEditor({
   placeholder,
   className,
   disabled,
-  editorRef,
+  editorRef: editorInstanceRef,
 }: RichTextEditorProps) {
   const internalValueRef = useRef(value);
   const suppressUpdateRef = useRef(false);
@@ -64,15 +64,15 @@ export function RichTextEditor({
 
   // Expose editor to parent via ref
   useEffect(() => {
-    if (editorRef && "current" in editorRef) {
-      (editorRef as React.MutableRefObject<Editor | null>).current = editor;
+    if (editorInstanceRef && "current" in editorInstanceRef) {
+      editorInstanceRef.current = editor;
     }
     return () => {
-      if (editorRef && "current" in editorRef) {
-        (editorRef as React.MutableRefObject<Editor | null>).current = null;
+      if (editorInstanceRef && "current" in editorInstanceRef) {
+        editorInstanceRef.current = null;
       }
     };
-  }, [editor, editorRef]);
+  }, [editor, editorInstanceRef]);
 
   // Sync external value changes (e.g. dictation, programmatic updates)
   useEffect(() => {

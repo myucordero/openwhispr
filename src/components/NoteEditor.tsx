@@ -33,9 +33,12 @@ export default function NoteEditor({ note, cloudEnabled, onDelete, onUpdate }: N
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    setTitle(note.title);
-    setContent(note.content);
-    setSaveState("idle");
+    const resetId = requestAnimationFrame(() => {
+      setTitle(note.title);
+      setContent(note.content);
+      setSaveState("idle");
+    });
+    return () => cancelAnimationFrame(resetId);
   }, [note.id]);
 
   const autoResize = useCallback(() => {

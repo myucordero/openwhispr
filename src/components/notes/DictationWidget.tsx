@@ -25,8 +25,8 @@ export default function DictationWidget({
 
   useEffect(() => {
     if (!isRecording) {
-      setElapsed(0);
-      return;
+      const resetId = setTimeout(() => setElapsed(0), 0);
+      return () => clearTimeout(resetId);
     }
     const id = setInterval(() => setElapsed((s) => s + 1), 1000);
     return () => clearInterval(id);

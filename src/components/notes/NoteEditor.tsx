@@ -134,7 +134,9 @@ export default function NoteEditor({
   const prevProcessingStateRef = useRef(actionProcessingState);
   useEffect(() => {
     if (prevProcessingStateRef.current === "processing" && actionProcessingState === "success") {
-      setViewMode("enhanced");
+      const frameId = requestAnimationFrame(() => setViewMode("enhanced"));
+      prevProcessingStateRef.current = actionProcessingState;
+      return () => cancelAnimationFrame(frameId);
     }
     prevProcessingStateRef.current = actionProcessingState;
   }, [actionProcessingState]);
@@ -143,7 +145,7 @@ export default function NoteEditor({
     if (note.id !== prevNoteIdRef.current) {
       prevNoteIdRef.current = note.id;
       if (!isMeetingRecording) {
-        setViewMode("raw");
+        requestAnimationFrame(() => setViewMode("raw"));
       }
       if (titleRef.current && titleRef.current.textContent !== note.title) {
         titleRef.current.textContent = note.title || "";
@@ -192,7 +194,8 @@ export default function NoteEditor({
   useEffect(() => {
     if (!isRecording && !isProcessing && pendingTranscriptSwitchRef.current && liveTranscript) {
       pendingTranscriptSwitchRef.current = false;
-      setViewMode("transcript");
+      const frameId = requestAnimationFrame(() => setViewMode("transcript"));
+      return () => cancelAnimationFrame(frameId);
     }
   }, [isRecording, isProcessing, liveTranscript]);
 

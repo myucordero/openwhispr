@@ -14,12 +14,15 @@ export default function ActionProcessingOverlay({
   actionName,
 }: ActionProcessingOverlayProps) {
   const { t } = useTranslation();
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(state !== "idle");
 
   useEffect(() => {
     if (state === "processing" || state === "success") {
-      setVisible(true);
-    } else if (state === "idle") {
+      const frameId = requestAnimationFrame(() => setVisible(true));
+      return () => cancelAnimationFrame(frameId);
+    }
+
+    if (state === "idle") {
       const id = setTimeout(() => setVisible(false), 300);
       return () => clearTimeout(id);
     }

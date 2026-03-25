@@ -633,13 +633,6 @@ declare global {
       onUpdateDownloaded: (callback: (event: any, info: any) => void) => () => void;
       onUpdateDownloadProgress: (callback: (event: any, progressObj: any) => void) => () => void;
       onUpdateError: (callback: (event: any, error: any) => void) => () => void;
-      onUpdateNotificationData?: (
-        callback: (data: { version: string; releaseDate?: string }) => void
-      ) => () => void;
-      getUpdateNotificationData?: () => Promise<{ version: string; releaseDate?: string } | null>;
-      updateNotificationReady?: () => Promise<void>;
-      updateNotificationRespond?: (action: string) => Promise<void>;
-
       openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
 
       // Hotkey management

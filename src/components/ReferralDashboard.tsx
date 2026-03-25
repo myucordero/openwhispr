@@ -63,14 +63,14 @@ function AnimatedCounter({ value, delay = 0 }: { value: number; delay?: number }
 
   useEffect(() => {
     if (value === 0) {
-      setDisplay(0);
-      return;
+      const frameId = requestAnimationFrame(() => setDisplay(0));
+      return () => cancelAnimationFrame(frameId);
     }
 
     const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (prefersReduced) {
-      setDisplay(value);
-      return;
+      const frameId = requestAnimationFrame(() => setDisplay(value));
+      return () => cancelAnimationFrame(frameId);
     }
 
     const duration = 800;

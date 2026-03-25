@@ -69,12 +69,15 @@ export default function CommandSearch({
 
   useEffect(() => {
     if (!open) return;
-    setQuery("");
-    setSelectedIndex(0);
+    const resetId = requestAnimationFrame(() => {
+      setQuery("");
+      setSelectedIndex(0);
+    });
     window.electronAPI
       .getNotes()
       .then(setNotes)
       .catch(() => {});
+    return () => cancelAnimationFrame(resetId);
   }, [open]);
 
   useEffect(() => {
@@ -103,7 +106,8 @@ export default function CommandSearch({
   }, [query]);
 
   useEffect(() => {
-    setSelectedIndex(0);
+    const resetId = requestAnimationFrame(() => setSelectedIndex(0));
+    return () => cancelAnimationFrame(resetId);
   }, [notes, query]);
 
   const folderMap = useMemo(() => new Map(folders.map((f) => [f.id, f])), [folders]);

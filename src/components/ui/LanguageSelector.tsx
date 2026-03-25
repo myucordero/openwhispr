@@ -52,24 +52,9 @@ export default function LanguageSelector({
     : items;
 
   useEffect(() => {
-    setHighlightedIndex(0);
-  }, [searchQuery]);
-
-  // Determine the portal container: use the closest dialog if inside one (to stay
-  // within Radix's focus trap), otherwise fall back to document.body.
-  const portalTarget = useRef<HTMLElement>(document.body);
-
-  useEffect(() => {
-    if (containerRef.current) {
-      const dialog = containerRef.current.closest('[role="dialog"]');
-      portalTarget.current = (dialog as HTMLElement) ?? document.body;
-    }
-  }, []);
-
-  useEffect(() => {
     if (isOpen && triggerRef.current) {
       const triggerRect = triggerRef.current.getBoundingClientRect();
-      const target = portalTarget.current;
+      const target = document.body;
       // When portaled into a transformed ancestor (e.g. Radix Dialog),
       // fixed positioning is relative to that ancestor, not the viewport.
       const offsetX = target === document.body ? 0 : target.getBoundingClientRect().left;
@@ -94,6 +79,7 @@ export default function LanguageSelector({
       ) {
         setIsOpen(false);
         setSearchQuery("");
+        setHighlightedIndex(0);
       }
     };
 
@@ -105,6 +91,7 @@ export default function LanguageSelector({
       if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
         e.preventDefault();
         setIsOpen(true);
+        setHighlightedIndex(0);
       }
       return;
     }
@@ -128,6 +115,7 @@ export default function LanguageSelector({
         e.preventDefault();
         setIsOpen(false);
         setSearchQuery("");
+        setHighlightedIndex(0);
         break;
     }
   };
@@ -136,10 +124,12 @@ export default function LanguageSelector({
     onChange(languageValue);
     setIsOpen(false);
     setSearchQuery("");
+    setHighlightedIndex(0);
   };
 
   const clearSearch = () => {
     setSearchQuery("");
+    setHighlightedIndex(0);
     if (searchInputRef.current) {
       searchInputRef.current.focus();
     }
@@ -151,7 +141,10 @@ export default function LanguageSelector({
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen((open) => !open);
+          setHighlightedIndex(0);
+        }}
         onKeyDown={handleKeyDown}
         className={`
           group relative w-full flex items-center justify-between gap-2
@@ -203,7 +196,10 @@ export default function LanguageSelector({
                     ref={searchInputRef}
                     type="text"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setHighlightedIndex(0);
+                    }}
                     onKeyDown={handleKeyDown}
                     placeholder={t("languageSelector.searchPlaceholder")}
                     className="w-full h-7 pl-7 pr-6 text-xs bg-transparent text-foreground border-0 focus:outline-none placeholder:text-muted-foreground/50"
@@ -265,7 +261,7 @@ export default function LanguageSelector({
               )}
             </div>
           </div>,
-          portalTarget.current
+          document.body
         )}
     </div>
   );
