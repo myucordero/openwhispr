@@ -1249,9 +1249,7 @@ declare global {
       }>;
 
       // Contacts
-      searchContacts: (
-        query: string
-      ) => Promise<{
+      searchContacts: (query: string) => Promise<{
         success: boolean;
         contacts: Array<{ email: string; display_name: string | null }>;
       }>;
@@ -1345,6 +1343,7 @@ declare global {
         detectionId: string,
         action: string
       ) => Promise<{ success: boolean }>;
+      joinCalendarMeeting?: (eventId: string) => Promise<{ success: boolean }>;
       onNavigateToMeetingNote?: (
         callback: (data: { noteId: number; folderId: number; event: any }) => void
       ) => () => void;

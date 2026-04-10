@@ -4864,6 +4864,15 @@ class IPCHandlers {
       }
     });
 
+    ipcMain.handle("join-calendar-meeting", async (_event, eventId) => {
+      try {
+        await this.meetingDetectionEngine.joinCalendarMeeting(eventId);
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
     ipcMain.handle("get-meeting-notification-data", async () => {
       return this.windowManager?._pendingNotificationData ?? null;
     });
