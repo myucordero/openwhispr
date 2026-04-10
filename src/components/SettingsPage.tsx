@@ -80,6 +80,7 @@ import { cn } from "./lib/utils";
 import { startMigration, useMigration } from "../stores/noteStore.js";
 import { formatBytes } from "../utils/formatBytes";
 import { useSettingsStore } from "../stores/settingsStore";
+import { canManageSystemAudioInApp } from "../utils/systemAudioAccess";
 
 const formatAmount = (cents: number, currency: string) =>
   (cents / 100).toLocaleString(undefined, { style: "currency", currency });
@@ -2963,17 +2964,19 @@ EOF`,
                     disabled={isHotkeyRegistering}
                     validate={validateDictationHotkey}
                   />
-                  {effectiveDefaultHotkey && dictationKey && dictationKey !== effectiveDefaultHotkey && (
-                    <button
-                      onClick={() => registerHotkey(effectiveDefaultHotkey)}
-                      disabled={isHotkeyRegistering}
-                      className="mt-2 text-xs text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50"
-                    >
-                      {t("settingsPage.general.hotkey.resetToDefault", {
-                        hotkey: formatHotkeyLabel(effectiveDefaultHotkey),
-                      })}
-                    </button>
-                  )}
+                  {effectiveDefaultHotkey &&
+                    dictationKey &&
+                    dictationKey !== effectiveDefaultHotkey && (
+                      <button
+                        onClick={() => registerHotkey(effectiveDefaultHotkey)}
+                        disabled={isHotkeyRegistering}
+                        className="mt-2 text-xs text-muted-foreground/70 hover:text-foreground transition-colors disabled:opacity-50"
+                      >
+                        {t("settingsPage.general.hotkey.resetToDefault", {
+                          hotkey: formatHotkeyLabel(effectiveDefaultHotkey),
+                        })}
+                      </button>
+                    )}
                 </SettingsPanelRow>
 
                 {!isUsingNativeShortcut && (
@@ -3498,8 +3501,7 @@ EOF`,
                   buttonText={t("settingsPage.permissions.grantAccess")}
                 />
 
-                {(platform === "darwin" ||
-                  (platform === "linux" && systemAudio.supportsOnboardingGrant)) && (
+                {(platform === "darwin" || canManageSystemAudioInApp(systemAudio)) && (
                   <>
                     {platform === "darwin" && (
                       <PermissionCard
@@ -3511,8 +3513,7 @@ EOF`,
                         buttonText={t("settingsPage.permissions.grantAccess")}
                       />
                     )}
-                    {(systemAudio.mode === "native" ||
-                      (systemAudio.mode === "portal" && systemAudio.supportsOnboardingGrant)) && (
+                    {canManageSystemAudioInApp(systemAudio) && (
                       <PermissionCard
                         icon={Monitor}
                         title={t("settingsPage.permissions.systemAudioTitle")}

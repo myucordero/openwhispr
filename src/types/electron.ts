@@ -135,6 +135,8 @@ export interface SystemAudioAccessResult {
   status: "granted" | "denied" | "not-determined" | "restricted" | "unknown" | "unsupported";
   mode: SystemAudioMode;
   supportsPersistentGrant?: boolean;
+  supportsPersistentPortalGrant?: boolean;
+  supportsNativeCapture?: boolean;
   supportsOnboardingGrant?: boolean;
   requiresRuntimeSharePrompt?: boolean;
   strategy?: SystemAudioStrategy;

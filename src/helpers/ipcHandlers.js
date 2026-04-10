@@ -1600,9 +1600,13 @@ class IPCHandlers {
           if (!info?.hotkey) continue;
 
           if (!usesNativeListener(info.hotkey)) {
-            debugLogger.log(`[IPC] Unregistering globalShortcut "${info.hotkey}" (slot "${slot}") for capture mode`);
+            debugLogger.log(
+              `[IPC] Unregistering globalShortcut "${info.hotkey}" (slot "${slot}") for capture mode`
+            );
             const { globalShortcut } = require("electron");
-            try { globalShortcut.unregister(info.hotkey); } catch {}
+            try {
+              globalShortcut.unregister(info.hotkey);
+            } catch {}
           }
         }
 
@@ -1615,7 +1619,9 @@ class IPCHandlers {
         // On GNOME, unregister all native keybindings during capture
         if (hotkeyManager.isUsingGnome() && hotkeyManager.gnomeManager) {
           for (const slot of [...hotkeyManager.gnomeManager.registeredSlots]) {
-            debugLogger.log(`[IPC] Unregistering GNOME keybinding (slot "${slot}") for capture mode`);
+            debugLogger.log(
+              `[IPC] Unregistering GNOME keybinding (slot "${slot}") for capture mode`
+            );
             await hotkeyManager.gnomeManager.unregisterKeybinding(slot).catch((err) => {
               debugLogger.warn(`[IPC] Failed to unregister GNOME slot "${slot}":`, err.message);
             });
@@ -1642,7 +1648,10 @@ class IPCHandlers {
       } else {
         // Exiting capture mode - re-register globalShortcut if not already registered
         // Skip for KDE/GNOME/Hyprland — updateHotkey handles re-registration via native path
-        const usesNativePath = hotkeyManager.isUsingKDE() || hotkeyManager.isUsingGnome() || hotkeyManager.isUsingHyprland();
+        const usesNativePath =
+          hotkeyManager.isUsingKDE() ||
+          hotkeyManager.isUsingGnome() ||
+          hotkeyManager.isUsingHyprland();
         if (effectiveHotkey && !usesNativeListener(effectiveHotkey) && !usesNativePath) {
           const { globalShortcut } = require("electron");
           const accelerator = effectiveHotkey.startsWith("Fn+")
@@ -1710,18 +1719,28 @@ class IPCHandlers {
             `[IPC] Re-registering KDE keybinding "${effectiveHotkey}" after capture mode`
           );
           const callback = this.windowManager.createHotkeyCallback();
-          const result = await hotkeyManager.kdeManager.registerKeybinding(effectiveHotkey, "dictation", callback);
+          const result = await hotkeyManager.kdeManager.registerKeybinding(
+            effectiveHotkey,
+            "dictation",
+            callback
+          );
           if (result === true) {
             hotkeyManager.currentHotkey = effectiveHotkey;
           } else {
-            debugLogger.warn(`[IPC] Failed to re-register KDE keybinding "${effectiveHotkey}" after capture mode`, { result });
+            debugLogger.warn(
+              `[IPC] Failed to re-register KDE keybinding "${effectiveHotkey}" after capture mode`,
+              { result }
+            );
           }
         }
 
         // Re-register non-dictation slots (meeting, agent) that were unregistered on capture enter
         for (const [slot, info] of hotkeyManager.slots) {
-          if (slot === "dictation" || slot === "cancel" || !info?.hotkey || !info?.callback) continue;
-          debugLogger.log(`[IPC] Re-registering slot "${slot}" ("${info.hotkey}") after capture mode`);
+          if (slot === "dictation" || slot === "cancel" || !info?.hotkey || !info?.callback)
+            continue;
+          debugLogger.log(
+            `[IPC] Re-registering slot "${slot}" ("${info.hotkey}") after capture mode`
+          );
           await hotkeyManager.registerSlot(slot, info.hotkey, info.callback).catch((err) => {
             debugLogger.warn(`[IPC] Failed to re-register slot "${slot}":`, err.message);
           });
@@ -2437,6 +2456,8 @@ class IPCHandlers {
       status: "unsupported",
       mode: "unsupported",
       supportsPersistentGrant: false,
+      supportsPersistentPortalGrant: false,
+      supportsNativeCapture: false,
       supportsOnboardingGrant: false,
       requiresRuntimeSharePrompt: false,
       strategy: "unsupported",
@@ -2449,10 +2470,14 @@ class IPCHandlers {
       const capability = await this.linuxPortalAudioManager?.getCapability().catch((error) => ({
         available: false,
         supportsPersistentGrant: false,
+        supportsPersistentPortalGrant: false,
+        supportsNativeCapture: false,
         portalVersion: null,
         error: error.message,
       }));
       const supportsPersistentGrant = !!capability?.supportsPersistentGrant;
+      const supportsPersistentPortalGrant = !!capability?.supportsPersistentPortalGrant;
+      const supportsNativeCapture = !!capability?.supportsNativeCapture;
       const restoreTokenAvailable =
         supportsPersistentGrant && !!this.linuxPortalAudioManager?.hasStoredRestoreToken();
       const helperError =
@@ -2470,8 +2495,10 @@ class IPCHandlers {
           : "unknown",
         mode: "portal",
         supportsPersistentGrant,
+        supportsPersistentPortalGrant,
+        supportsNativeCapture,
         supportsOnboardingGrant: supportsPersistentGrant,
-        requiresRuntimeSharePrompt: !restoreTokenAvailable,
+        requiresRuntimeSharePrompt: !supportsPersistentGrant || !restoreTokenAvailable,
         strategy: supportsPersistentGrant ? "portal-helper" : "browser-portal",
         restoreTokenAvailable,
         portalVersion: capability?.portalVersion ?? null,
@@ -3315,22 +3342,15 @@ class IPCHandlers {
           debugLogger.debug("Meeting transcription start: reusing warm connections");
           const win = BrowserWindow.fromWebContents(event.sender);
           attachMeetingStreamingHandlers(this._meetingMicStreaming, win, "mic");
-          if (systemAudioMode === "native") {
+          if (systemAudioMode !== "unsupported") {
             attachMeetingStreamingHandlers(this._meetingSystemStreaming, win, "system");
-            await startNativeMeetingSystemAudio(event);
-          } else if (systemAudioStrategy === "portal-helper") {
-            attachMeetingStreamingHandlers(this._meetingSystemStreaming, win, "system");
-            try {
-              await startLinuxMeetingSystemAudio(event);
-            } catch (error) {
-              debugLogger.warn(
-                "Linux portal helper failed during warm-start reuse, falling back to browser portal",
-                { error: error.message },
-                "meeting"
-              );
-              systemAudioStrategy = "browser-portal";
-            }
           }
+          systemAudioStrategy = await startMeetingSystemAudio(
+            event,
+            systemAudioMode,
+            systemAudioStrategy,
+            "during warm-start reuse"
+          );
           return { success: true, systemAudioMode, systemAudioStrategy };
         }
 
@@ -3346,20 +3366,12 @@ class IPCHandlers {
             transcribeAllLocalBuffers();
           }, 5000);
 
-          if (systemAudioMode === "native") {
-            await startNativeMeetingSystemAudio(event);
-          } else if (systemAudioStrategy === "portal-helper") {
-            try {
-              await startLinuxMeetingSystemAudio(event);
-            } catch (error) {
-              debugLogger.warn(
-                "Linux portal helper failed in local meeting mode, falling back to browser portal",
-                { error: error.message },
-                "meeting"
-              );
-              systemAudioStrategy = "browser-portal";
-            }
-          }
+          systemAudioStrategy = await startMeetingSystemAudio(
+            event,
+            systemAudioMode,
+            systemAudioStrategy,
+            "in local meeting mode"
+          );
 
           debugLogger.debug("Meeting transcription started in local mode", {
             provider: meetingLocalProvider,
@@ -3375,20 +3387,12 @@ class IPCHandlers {
         }
 
         await connectRealtimeStreaming(event, options);
-        if (systemAudioMode === "native") {
-          await startNativeMeetingSystemAudio(event);
-        } else if (systemAudioStrategy === "portal-helper") {
-          try {
-            await startLinuxMeetingSystemAudio(event);
-          } catch (error) {
-            debugLogger.warn(
-              "Linux portal helper failed in realtime mode, falling back to browser portal",
-              { error: error.message },
-              "meeting"
-            );
-            systemAudioStrategy = "browser-portal";
-          }
-        }
+        systemAudioStrategy = await startMeetingSystemAudio(
+          event,
+          systemAudioMode,
+          systemAudioStrategy,
+          "in realtime mode"
+        );
         return { success: true, systemAudioMode, systemAudioStrategy };
       } catch (error) {
         await rollbackMeetingTranscriptionStart();
@@ -3461,6 +3465,34 @@ class IPCHandlers {
           );
         },
       });
+    };
+
+    const startMeetingSystemAudio = async (
+      event,
+      systemAudioMode,
+      systemAudioStrategy,
+      context
+    ) => {
+      if (systemAudioMode === "native") {
+        await startNativeMeetingSystemAudio(event);
+        return systemAudioStrategy;
+      }
+
+      if (systemAudioStrategy !== "portal-helper") {
+        return systemAudioStrategy;
+      }
+
+      try {
+        await startLinuxMeetingSystemAudio(event);
+        return systemAudioStrategy;
+      } catch (error) {
+        debugLogger.warn(
+          `Linux portal helper failed ${context}, falling back to browser portal`,
+          { error: error.message },
+          "meeting"
+        );
+        return "browser-portal";
+      }
     };
 
     ipcMain.on("meeting-transcription-send", (_event, audioBuffer, source) => {

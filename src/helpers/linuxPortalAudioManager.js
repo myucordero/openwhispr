@@ -38,7 +38,9 @@ class LinuxPortalAudioManager {
     if (process.resourcesPath) {
       candidates.add(path.join(process.resourcesPath, "linux-system-audio-helper"));
       candidates.add(path.join(process.resourcesPath, "bin", "linux-system-audio-helper"));
-      candidates.add(path.join(process.resourcesPath, "resources", "bin", "linux-system-audio-helper"));
+      candidates.add(
+        path.join(process.resourcesPath, "resources", "bin", "linux-system-audio-helper")
+      );
       candidates.add(
         path.join(
           process.resourcesPath,
@@ -174,11 +176,7 @@ class LinuxPortalAudioManager {
     await new Promise((resolve, reject) => {
       let settled = false;
       const timeout = setTimeout(() => {
-        finish(
-          reject,
-          new Error("Timed out starting Linux portal system audio capture."),
-          true
-        );
+        finish(reject, new Error("Timed out starting Linux portal system audio capture."), true);
       }, START_TIMEOUT_MS);
 
       const finish = (callback, value, shouldStop = false) => {
@@ -351,18 +349,16 @@ class LinuxPortalAudioManager {
     const supportsSystemAudio = !!result?.supportsSystemAudio;
     const supportsNativeCapture = !!result?.supportsNativeCapture;
     const available = !!result?.ok;
-    const supportsPersistentGrant =
-      available &&
-      supportsPersistMode &&
-      supportsRestoreToken &&
-      supportsSystemAudio &&
-      supportsNativeCapture;
+    const supportsPersistentPortalGrant =
+      available && supportsPersistMode && supportsRestoreToken && supportsSystemAudio;
+    const supportsPersistentGrant = supportsPersistentPortalGrant && supportsNativeCapture;
 
     return {
       available,
       portalVersion,
       supportsPersistMode,
       supportsRestoreToken,
+      supportsPersistentPortalGrant,
       supportsNativeCapture,
       supportsPersistentGrant,
       supportsSystemAudio,

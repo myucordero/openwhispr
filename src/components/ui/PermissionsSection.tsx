@@ -5,6 +5,7 @@ import MicPermissionWarning from "./MicPermissionWarning";
 import PasteToolsInfo from "./PasteToolsInfo";
 import type { UsePermissionsReturn } from "../../hooks/usePermissions";
 import type { SystemAudioAccessResult } from "../../types/electron";
+import { canManageSystemAudioInApp } from "../../utils/systemAudioAccess";
 
 interface PermissionsSectionProps {
   permissions: UsePermissionsReturn;
@@ -17,9 +18,7 @@ export default function PermissionsSection({ permissions, systemAudio }: Permiss
   const { t } = useTranslation();
   const platform = permissions.pasteToolsInfo?.platform;
   const isMacOS = platform === "darwin";
-  const shouldShowSystemAudioPermission =
-    systemAudio.mode === "native" ||
-    (systemAudio.mode === "portal" && systemAudio.supportsOnboardingGrant);
+  const shouldShowSystemAudioPermission = canManageSystemAudioInApp(systemAudio);
 
   return (
     <>

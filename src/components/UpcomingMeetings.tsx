@@ -7,6 +7,7 @@ import type { CalendarEvent } from "../types/calendar";
 import { formatUpcomingDateGroup } from "../utils/dateFormatting";
 import { useSystemAudioPermission } from "../hooks/useSystemAudioPermission";
 import { useSettingsStore } from "../stores/settingsStore";
+import { canManageSystemAudioInApp } from "../utils/systemAudioAccess";
 
 interface UpcomingMeetingsProps {
   events: CalendarEvent[];
@@ -41,10 +42,7 @@ export default function UpcomingMeetings({ events, isLoading }: UpcomingMeetings
   const [hoveredEventId, setHoveredEventId] = useState<string | null>(null);
   const systemAudio = useSystemAudioPermission();
   const isSignedIn = useSettingsStore((s) => s.isSignedIn);
-  const needsSystemAudioGrant =
-    !systemAudio.granted &&
-    (systemAudio.mode === "native" ||
-      (systemAudio.mode === "portal" && systemAudio.supportsOnboardingGrant));
+  const needsSystemAudioGrant = !systemAudio.granted && canManageSystemAudioInApp(systemAudio);
 
   const now = useMemo(() => new Date(), []);
 

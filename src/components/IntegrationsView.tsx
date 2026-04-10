@@ -7,6 +7,7 @@ import { SettingsPanel, SettingsPanelRow } from "./ui/SettingsSection";
 import { ConfirmDialog } from "./ui/dialog";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useSystemAudioPermission } from "../hooks/useSystemAudioPermission";
+import { canManageSystemAudioInApp } from "../utils/systemAudioAccess";
 import googleCalendarIcon from "../assets/icons/google-calendar.svg";
 
 export default function IntegrationsView() {
@@ -18,10 +19,7 @@ export default function IntegrationsView() {
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const systemAudio = useSystemAudioPermission();
   const hasAccounts = gcalAccounts.length > 0;
-  const needsSystemAudioGrant =
-    !systemAudio.granted &&
-    (systemAudio.mode === "native" ||
-      (systemAudio.mode === "portal" && systemAudio.supportsOnboardingGrant));
+  const needsSystemAudioGrant = !systemAudio.granted && canManageSystemAudioInApp(systemAudio);
 
   const startOAuth = useCallback(async () => {
     setIsConnecting(true);

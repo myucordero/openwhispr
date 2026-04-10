@@ -16,6 +16,7 @@ import { useDialogs } from "../../hooks/useDialogs";
 import { AlertDialog } from "../ui/dialog";
 import ReasoningModelSelector from "../ReasoningModelSelector";
 import { useSystemAudioPermission } from "../../hooks/useSystemAudioPermission";
+import { canManageSystemAudioInApp } from "../../utils/systemAudioAccess";
 
 interface NotesOnboardingProps {
   onComplete: () => void;
@@ -58,9 +59,10 @@ export default function NotesOnboarding({ onComplete }: NotesOnboardingProps) {
     request: requestSystemAudio,
   } = useSystemAudioPermission();
   const [isRequestingSystemAudio, setIsRequestingSystemAudio] = useState(false);
-  const shouldShowSystemAudioPermission =
-    systemAudioMode === "native" ||
-    (systemAudioMode === "portal" && systemAudioSupportsOnboardingGrant);
+  const shouldShowSystemAudioPermission = canManageSystemAudioInApp({
+    mode: systemAudioMode,
+    supportsOnboardingGrant: systemAudioSupportsOnboardingGrant,
+  });
 
   const handleGrantSystemAudio = useCallback(async () => {
     setIsRequestingSystemAudio(true);

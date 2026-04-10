@@ -1,18 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { getCachedPlatform } from "../utils/platform";
 import type { SystemAudioAccessResult } from "../types/electron";
-
-const DEFAULT_ACCESS: SystemAudioAccessResult = {
-  granted: false,
-  status: "unsupported",
-  mode: "unsupported",
-  supportsPersistentGrant: false,
-  supportsOnboardingGrant: false,
-  requiresRuntimeSharePrompt: false,
-  strategy: "unsupported",
-  restoreTokenAvailable: false,
-  portalVersion: null,
-};
+import { DEFAULT_SYSTEM_AUDIO_ACCESS } from "../utils/systemAudioAccess";
 
 export function useSystemAudioPermission() {
   const isMacOS = getCachedPlatform() === "darwin";
@@ -26,7 +15,7 @@ export function useSystemAudioPermission() {
     setIsChecking(true);
     try {
       const result = await window.electronAPI?.checkSystemAudioAccess?.();
-      setAccess(result ?? DEFAULT_ACCESS);
+      setAccess(result ?? DEFAULT_SYSTEM_AUDIO_ACCESS);
     } finally {
       checkingRef.current = false;
       setIsChecking(false);
@@ -50,7 +39,9 @@ export function useSystemAudioPermission() {
 
   const request = useCallback(async (): Promise<boolean> => {
     const currentAccess =
-      access ?? (await window.electronAPI?.checkSystemAudioAccess?.()) ?? DEFAULT_ACCESS;
+      access ??
+      (await window.electronAPI?.checkSystemAudioAccess?.()) ??
+      DEFAULT_SYSTEM_AUDIO_ACCESS;
 
     if (currentAccess.mode === "loopback") {
       setAccess(currentAccess);
@@ -84,6 +75,8 @@ export function useSystemAudioPermission() {
   const status = access?.status ?? "unknown";
   const mode = access?.mode ?? "unsupported";
   const supportsPersistentGrant = access?.supportsPersistentGrant ?? false;
+  const supportsPersistentPortalGrant = access?.supportsPersistentPortalGrant ?? false;
+  const supportsNativeCapture = access?.supportsNativeCapture ?? false;
   const supportsOnboardingGrant = access?.supportsOnboardingGrant ?? false;
   const requiresRuntimeSharePrompt = access?.requiresRuntimeSharePrompt ?? false;
   const strategy = access?.strategy ?? "unsupported";
@@ -95,6 +88,8 @@ export function useSystemAudioPermission() {
     status,
     mode,
     supportsPersistentGrant,
+    supportsPersistentPortalGrant,
+    supportsNativeCapture,
     supportsOnboardingGrant,
     requiresRuntimeSharePrompt,
     strategy,
