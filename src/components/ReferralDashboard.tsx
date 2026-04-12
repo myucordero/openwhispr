@@ -74,20 +74,23 @@ function AnimatedCounter({ value, delay = 0 }: { value: number; delay?: number }
     const duration = 800;
     let start: number | null = null;
 
-    const timeout = setTimeout(() => {
-      if (prefersReduced) {
-        setDisplay(value);
-        return;
-      }
-      const animate = (timestamp: number) => {
-        if (!start) start = timestamp;
-        const progress = Math.min((timestamp - start) / duration, 1);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        setDisplay(Math.round(eased * value));
-        if (progress < 1) rafRef.current = requestAnimationFrame(animate);
-      };
-      rafRef.current = requestAnimationFrame(animate);
-    }, prefersReduced ? 0 : delay);
+    const timeout = setTimeout(
+      () => {
+        if (prefersReduced) {
+          setDisplay(value);
+          return;
+        }
+        const animate = (timestamp: number) => {
+          if (!start) start = timestamp;
+          const progress = Math.min((timestamp - start) / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          setDisplay(Math.round(eased * value));
+          if (progress < 1) rafRef.current = requestAnimationFrame(animate);
+        };
+        rafRef.current = requestAnimationFrame(animate);
+      },
+      prefersReduced ? 0 : delay
+    );
 
     return () => {
       clearTimeout(timeout);

@@ -211,11 +211,7 @@ export default function NoteEditor({
     }
   }
 
-  if (
-    !autoShowDone &&
-    embeddedChat.activeConversationId &&
-    embeddedChat.messages.length > 0
-  ) {
+  if (!autoShowDone && embeddedChat.activeConversationId && embeddedChat.messages.length > 0) {
     setAutoShowDone(true);
     setChatMode("floating");
   }
