@@ -160,7 +160,7 @@ export default function ModelCardList({
                   onClick={createExternalLinkHandler(model.specUrl)}
                   className="inline-flex items-center gap-0.5 text-xs text-primary/60 hover:text-primary transition-colors shrink-0"
                 >
-                  Specs
+                  Model info
                   <ExternalLink size={9} />
                 </a>
               )}
