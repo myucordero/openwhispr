@@ -1463,17 +1463,17 @@
         "description": "ローカル音声認識に使用するGPU"
       },
       "diarization": {
-        "title": "Speaker Identification",
-        "description": "Identify individual speakers in meeting recordings",
-        "modelsReady": "Models Ready",
-        "deleteModels": "Delete Models"
+        "title": "話者識別",
+        "description": "会議録音で個々の話者を識別",
+        "modelsReady": "モデル準備完了",
+        "deleteModels": "モデルを削除"
       },
       "transcriptionPreview": "リアルタイム文字起こしプレビュー",
       "transcriptionPreviewDescription": "クリーンアップ前にフローティングウィンドウで文字起こしを表示"
     },
     "intelligence": {
       "gpuDevice": {
-        "title": "Intelligence GPU",
+        "title": "インテリジェンスGPU",
         "description": "ローカルAI処理に使用するGPU"
       }
     },
@@ -1559,8 +1559,8 @@
         "gemma_gemma_3_1b_it_q4_k_m": "超高速 Google モデル、短い口述のクリーンアップに最適"
       },
       "diarization": {
-        "segmentation": "Speech boundary detection for speaker diarization",
-        "embedding_en": "Speaker voice fingerprinting for identification"
+        "segmentation": "話者分離のための発話区間検出",
+        "embedding_en": "話者識別のための声紋認識"
       }
     }
   },

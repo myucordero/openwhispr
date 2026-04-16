@@ -1458,17 +1458,17 @@
         "description": "用于本地语音识别的 GPU"
       },
       "diarization": {
-        "title": "Speaker Identification",
-        "description": "Identify individual speakers in meeting recordings",
-        "modelsReady": "Models Ready",
-        "deleteModels": "Delete Models"
+        "title": "说话人识别",
+        "description": "识别会议录音中的各个说话人",
+        "modelsReady": "模型已就绪",
+        "deleteModels": "删除模型"
       },
       "transcriptionPreview": "实时转录预览",
       "transcriptionPreviewDescription": "在浮动窗口中显示转录结果，然后再进行文本整理"
     },
     "intelligence": {
       "gpuDevice": {
-        "title": "Intelligence GPU",
+        "title": "智能处理 GPU",
         "description": "用于本地 AI 处理的 GPU"
       }
     },
@@ -1554,8 +1554,8 @@
         "gemma_gemma_3_1b_it_q4_k_m": "超快谷歌模型，最适合短听写清理"
       },
       "diarization": {
-        "segmentation": "Speech boundary detection for speaker diarization",
-        "embedding_en": "Speaker voice fingerprinting for identification"
+        "segmentation": "用于说话人分离的语音边界检测",
+        "embedding_en": "用于说话人识别的声纹提取"
       }
     }
   },

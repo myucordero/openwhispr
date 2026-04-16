@@ -1463,17 +1463,17 @@
         "description": "GPU для локального распознавания речи"
       },
       "diarization": {
-        "title": "Speaker Identification",
-        "description": "Identify individual speakers in meeting recordings",
-        "modelsReady": "Models Ready",
-        "deleteModels": "Delete Models"
+        "title": "Идентификация говорящих",
+        "description": "Определение отдельных говорящих в записях совещаний",
+        "modelsReady": "Модели готовы",
+        "deleteModels": "Удалить модели"
       },
       "transcriptionPreview": "Предпросмотр транскрипции",
       "transcriptionPreviewDescription": "Показывать транскрипцию в плавающем окне перед очисткой"
     },
     "intelligence": {
       "gpuDevice": {
-        "title": "Intelligence GPU",
+        "title": "GPU для интеллекта",
         "description": "GPU для локальной обработки ИИ"
       }
     },
@@ -1559,8 +1559,8 @@
         "gemma_gemma_3_1b_it_q4_k_m": "Сверхбыстрая модель Google, лучшая для очистки коротких диктовок"
       },
       "diarization": {
-        "segmentation": "Speech boundary detection for speaker diarization",
-        "embedding_en": "Speaker voice fingerprinting for identification"
+        "segmentation": "Обнаружение границ речи для идентификации говорящих",
+        "embedding_en": "Голосовой отпечаток для идентификации говорящих"
       }
     }
   },

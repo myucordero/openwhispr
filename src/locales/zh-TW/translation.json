@@ -1458,17 +1458,17 @@
         "description": "用於本機語音辨識的 GPU"
       },
       "diarization": {
-        "title": "Speaker Identification",
-        "description": "Identify individual speakers in meeting recordings",
-        "modelsReady": "Models Ready",
-        "deleteModels": "Delete Models"
+        "title": "說話者辨識",
+        "description": "辨識會議錄音中的各個說話者",
+        "modelsReady": "模型已就緒",
+        "deleteModels": "刪除模型"
       },
       "transcriptionPreview": "即時轉錄預覽",
       "transcriptionPreviewDescription": "在浮動視窗中顯示轉錄結果，再進行文字整理"
     },
     "intelligence": {
       "gpuDevice": {
-        "title": "Intelligence GPU",
+        "title": "智慧處理 GPU",
         "description": "用於本機 AI 處理的 GPU"
       }
     },
@@ -1554,8 +1554,8 @@
         "gemma_gemma_3_1b_it_q4_k_m": "超快 Google 模型，最適合短語音清理"
       },
       "diarization": {
-        "segmentation": "Speech boundary detection for speaker diarization",
-        "embedding_en": "Speaker voice fingerprinting for identification"
+        "segmentation": "用於說話者分離的語音邊界偵測",
+        "embedding_en": "用於說話者辨識的聲紋提取"
       }
     }
   },

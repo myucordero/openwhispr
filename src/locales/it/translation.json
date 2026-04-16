@@ -1463,17 +1463,17 @@
         "description": "GPU usata per la trascrizione locale"
       },
       "diarization": {
-        "title": "Speaker Identification",
-        "description": "Identify individual speakers in meeting recordings",
-        "modelsReady": "Models Ready",
-        "deleteModels": "Delete Models"
+        "title": "Identificazione dei parlanti",
+        "description": "Identificare i singoli parlanti nelle registrazioni delle riunioni",
+        "modelsReady": "Modelli pronti",
+        "deleteModels": "Elimina modelli"
       },
       "transcriptionPreview": "Anteprima dal vivo",
       "transcriptionPreviewDescription": "Mostra la trascrizione in una finestra flottante prima della correzione"
     },
     "intelligence": {
       "gpuDevice": {
-        "title": "Intelligence GPU",
+        "title": "GPU di intelligenza",
         "description": "GPU usata per l'elaborazione IA locale"
       }
     },
@@ -1559,8 +1559,8 @@
         "gemma_gemma_3_1b_it_q4_k_m": "Modello Google ultraveloce, ideale per la pulizia di brevi dettature"
       },
       "diarization": {
-        "segmentation": "Speech boundary detection for speaker diarization",
-        "embedding_en": "Speaker voice fingerprinting for identification"
+        "segmentation": "Rilevamento dei confini del parlato per l'identificazione dei parlanti",
+        "embedding_en": "Impronta vocale per l'identificazione dei parlanti"
       }
     }
   },

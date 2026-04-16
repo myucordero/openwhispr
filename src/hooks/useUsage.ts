@@ -96,6 +96,7 @@ export function useUsage(): UseUsageResult | null {
             resetAt: result.resetAt ?? "rolling",
           });
           lastFetchRef.current = Date.now();
+          localStorage.setItem("isSubscribed", String(result.isSubscribed ?? false));
         } else {
           const error: any = new Error(result.error || "Failed to fetch usage");
           error.code = result.code;
