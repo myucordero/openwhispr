@@ -24,6 +24,7 @@ import {
   API_SCOPE_I18N_KEY,
   API_KEY_EXPIRY_OPTIONS,
   MAX_API_KEYS,
+  buildFullScopes,
   type ApiScope,
 } from "../constants/apiKeys";
 
@@ -142,13 +143,13 @@ export default function ApiKeysSection() {
                     </code>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    {apiKey.scopes.map((scope) => (
-                      <Badge key={scope} variant="outline" className="text-[10px] px-1.5 py-0">
-                        {t(
-                          `apiKeysSection.scopes.${API_SCOPE_I18N_KEY[scope as ApiScope] ?? scope}`
-                        )}
-                      </Badge>
-                    ))}
+                    {apiKey.scopes
+                      .filter((scope) => scope in API_SCOPE_I18N_KEY)
+                      .map((scope) => (
+                        <Badge key={scope} variant="outline" className="text-[10px] px-1.5 py-0">
+                          {t(`apiKeysSection.scopes.${API_SCOPE_I18N_KEY[scope as ApiScope]}`)}
+                        </Badge>
+                      ))}
                     <span className="text-[10px] text-muted-foreground/50 ml-1">
                       {apiKey.last_used_at
                         ? t("apiKeysSection.lastUsed", {
@@ -246,7 +247,7 @@ function CreateKeyDialog({
       const expiresInDays = API_KEY_EXPIRY_OPTIONS.find((o) => o.value === expiry)?.days ?? null;
       const result = await ApiKeysService.create({
         name: name.trim(),
-        scopes: Array.from(scopes),
+        scopes: buildFullScopes(Array.from(scopes)),
         expiresInDays,
       });
       setRawKey(result.key);

@@ -2238,8 +2238,7 @@
     "scopes": {
       "notesRead": "ノートの読み取り",
       "notesWrite": "ノートの作成と編集",
-      "transcriptionsRead": "文字起こしの読み取り",
-      "usageRead": "使用状況の表示"
+      "transcriptionsRead": "文字起こしの読み取り"
     },
     "revoke": {
       "button": "取り消し",

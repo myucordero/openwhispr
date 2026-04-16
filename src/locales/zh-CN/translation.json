@@ -2233,8 +2233,7 @@
     "scopes": {
       "notesRead": "读取笔记",
       "notesWrite": "创建和编辑笔记",
-      "transcriptionsRead": "读取转录",
-      "usageRead": "查看使用情况"
+      "transcriptionsRead": "读取转录"
     },
     "revoke": {
       "button": "撤销",

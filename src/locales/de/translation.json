@@ -2238,8 +2238,7 @@
     "scopes": {
       "notesRead": "Notizen lesen",
       "notesWrite": "Notizen erstellen und bearbeiten",
-      "transcriptionsRead": "Transkriptionen lesen",
-      "usageRead": "Nutzung anzeigen"
+      "transcriptionsRead": "Transkriptionen lesen"
     },
     "revoke": {
       "button": "Widerrufen",

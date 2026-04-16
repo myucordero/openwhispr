@@ -642,8 +642,7 @@
     "scopes": {
       "notesRead": "Leer notas",
       "notesWrite": "Crear y editar notas",
-      "transcriptionsRead": "Leer transcripciones",
-      "usageRead": "Ver uso"
+      "transcriptionsRead": "Leer transcripciones"
     },
     "revoke": {
       "button": "Revocar",

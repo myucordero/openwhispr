@@ -2238,8 +2238,7 @@
     "scopes": {
       "notesRead": "Чтение заметок",
       "notesWrite": "Создание и редактирование заметок",
-      "transcriptionsRead": "Чтение транскрипций",
-      "usageRead": "Просмотр использования"
+      "transcriptionsRead": "Чтение транскрипций"
     },
     "revoke": {
       "button": "Отозвать",
