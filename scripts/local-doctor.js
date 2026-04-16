@@ -14,7 +14,7 @@ const FILES = {
   envExample: path.join(ROOT, ".env.example"),
   viteConfig: path.join(ROOT, "src", "vite.config.mjs"),
   devServerManager: path.join(ROOT, "src", "helpers", "devServerManager.js"),
-  neonAuth: path.join(ROOT, "src", "lib", "neonAuth.ts"),
+  auth: path.join(ROOT, "src", "lib", "auth.ts"),
   whisperDownload: path.join(ROOT, "scripts", "download-whisper-cpp.js"),
   sherpaDownload: path.join(ROOT, "scripts", "download-sherpa-onnx.js"),
   llamaDownload: path.join(ROOT, "scripts", "download-llama-server.js"),
@@ -178,14 +178,11 @@ function main() {
 
   const viteConfig = readText(FILES.viteConfig);
   const managerConfig = readText(FILES.devServerManager);
-  const neonAuth = readText(FILES.neonAuth);
+  const auth = readText(FILES.auth);
 
   const viteDefaultPort = findFirstMatch(viteConfig, /DEFAULT_DEV_SERVER_PORT\s*=\s*(\d+)/);
   const managerDefaultPort = findFirstMatch(managerConfig, /DEFAULT_DEV_SERVER_PORT\s*=\s*(\d+)/);
-  const neonDefaultPort = findFirstMatch(
-    neonAuth,
-    /VITE_DEV_SERVER_PORT\s*\|\|\s*import\.meta\.env\.OPENWHISPR_DEV_SERVER_PORT\s*\|\|\s*"(\d+)"/
-  );
+  const hasOAuthCallbackOverride = /VITE_OPENWHISPR_OAUTH_CALLBACK_URL/.test(auth);
 
   printStatus(Boolean(viteDefaultPort), "vite default dev port", viteDefaultPort || "not found");
   printStatus(
@@ -194,9 +191,9 @@ function main() {
     managerDefaultPort || "not found"
   );
   printStatus(
-    Boolean(neonDefaultPort),
-    "neon callback fallback port",
-    neonDefaultPort || "not found"
+    hasOAuthCallbackOverride,
+    "desktop OAuth callback override",
+    hasOAuthCallbackOverride ? "VITE_OPENWHISPR_OAUTH_CALLBACK_URL" : "not found"
   );
 
   printStatus(exists(FILES.envExample), ".env.example exists", FILES.envExample);
