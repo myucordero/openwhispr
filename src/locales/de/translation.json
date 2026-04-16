@@ -391,7 +391,8 @@
         "rateLimited": "Download-Server begrenzt Anfragen. Bitte warten Sie einige Minuten und versuchen Sie es erneut.",
         "server": "Serverfehler ({{error}}). Bitte versuchen Sie es später erneut.",
         "generic": "Download fehlgeschlagen: {{error}}",
-        "extractionFailed": "Modell heruntergeladen, aber Installation fehlgeschlagen. Klicken Sie auf „Herunterladen“, um die Installation ohne erneuten Download zu wiederholen.",
+        "extractionFailed": "Modell heruntergeladen, aber Installation fehlgeschlagen. Klicken Sie auf \u201EHerunterladen\u201C, um die Installation ohne erneuten Download zu wiederholen.",
+        "tlsError": "Zertifikatsfehler \u2014 Ihr Netzwerk verwendet m\u00F6glicherweise SSL-Inspektion, die Downloads blockiert. Versuchen Sie es \u00FCber ein anderes Netzwerk.",
         "unknown": "Unbekannter Fehler"
       },
       "downloadFailed": {
@@ -859,6 +860,10 @@
         "description": "Tarife, Nutzung & Abrechnung",
         "label": "Tarife & Abrechnung"
       },
+      "apiKeys": {
+        "label": "API-Schlüssel",
+        "description": "API-Zugriff verwalten"
+      },
       "general": {
         "description": "Darstellung, Töne & Start",
         "label": "Einstellungen"
@@ -1088,6 +1093,11 @@
         "bulletPoints": "Hey {{agentName}}, wandle das in Stichpunkte um"
       }
     },
+    "apiKeys": {
+      "title": "API-Schlüssel",
+      "signInRequired": "Anmeldung erforderlich",
+      "signInRequiredDescription": "Melden Sie sich an, um Ihre API-Schlüssel zu verwalten."
+    },
     "aiModels": {
       "customSetup": "Benutzerdefinierte Einrichtung",
       "customSetupDescription": "Verwenden Sie Ihren eigenen Anbieter und API-Schlüssel.",
@@ -1231,6 +1241,8 @@
       },
       "clipboard": {
         "title": "Zwischenablage",
+        "autoPaste": "Automatisches Einfügen",
+        "autoPasteDescription": "Transkribierten Text nach dem Diktieren automatisch in die aktive App einfügen",
         "keepInClipboard": "Transkription in der Zwischenablage behalten",
         "keepInClipboardDescription": "Diktierten Text in der Zwischenablage behalten, damit Sie ihn bei Bedarf manuell einfügen können"
       },
@@ -1474,6 +1486,7 @@
     }
   },
   "models": {
+    "learnMore": "Mehr erfahren",
     "descriptions": {
       "parakeet": {
         "parakeet_tdt_0_6b_v3": "Schnelle mehrsprachige ASR mit automatischer Spracherkennung (25 Sprachen)"
@@ -1922,6 +1935,7 @@
     "upgradeUnlimited": "Auf Pro upgraden – unbegrenzte Transkriptionen"
   },
   "support": {
+    "documentation": "Dokumentation",
     "joinDiscord": "Discord beitreten",
     "contactSupport": "Support kontaktieren",
     "submitBug": "Fehler melden"
@@ -2193,6 +2207,54 @@
     "title": "Berechtigungen erforderlich",
     "description": "OpenWhispr benötigt einige Berechtigungen, um auf diesem Computer zu funktionieren.",
     "continue": "Weiter"
+  },
+  "apiKeysSection": {
+    "title": "API-Schlüssel",
+    "description": "Erstellen Sie Schlüssel für den programmatischen Zugriff auf die OpenWhispr-API.",
+    "empty": "Noch keine API-Schlüssel",
+    "createButton": "API-Schlüssel erstellen",
+    "create": {
+      "title": "API-Schlüssel erstellen",
+      "nameLabel": "Schlüsselname",
+      "namePlaceholder": "z. B. Meine Integration",
+      "scopesLabel": "Berechtigungen",
+      "expiryLabel": "Ablauf",
+      "expiryOptions": {
+        "never": "Läuft nicht ab",
+        "30days": "30 Tage",
+        "60days": "60 Tage",
+        "90days": "90 Tage",
+        "1year": "1 Jahr"
+      },
+      "submit": "Erstellen",
+      "cancel": "Abbrechen"
+    },
+    "created": {
+      "title": "API-Schlüssel erstellt",
+      "warning": "Kopieren Sie diesen Schlüssel jetzt. Er wird nicht erneut angezeigt.",
+      "copied": "Kopiert!",
+      "copyButton": "In die Zwischenablage kopieren",
+      "done": "Fertig"
+    },
+    "scopes": {
+      "notesRead": "Notizen lesen",
+      "notesWrite": "Notizen erstellen und bearbeiten",
+      "transcriptionsRead": "Transkriptionen lesen",
+      "usageRead": "Nutzung anzeigen"
+    },
+    "revoke": {
+      "button": "Widerrufen",
+      "confirm": "Diesen Schlüssel widerrufen? Alle Integrationen, die ihn verwenden, funktionieren dann nicht mehr.",
+      "success": "API-Schlüssel widerrufen"
+    },
+    "neverUsed": "Nie verwendet",
+    "lastUsed": "Zuletzt verwendet {{time}}",
+    "maxKeysReached": "Maximal {{max}} Schlüssel erlaubt",
+    "errors": {
+      "loadFailed": "API-Schlüssel konnten nicht geladen werden",
+      "createFailed": "API-Schlüssel konnte nicht erstellt werden",
+      "revokeFailed": "API-Schlüssel konnte nicht widerrufen werden"
+    }
   },
   "embeddedChat": {
     "askPlaceholder": "Frag etwas...",

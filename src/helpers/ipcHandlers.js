@@ -936,6 +936,36 @@ class IPCHandlers {
       return this.databaseManager.searchAgentConversations(query, limit);
     });
 
+    // Notes sync
+    ipcMain.handle("db-get-pending-notes", () => this.databaseManager.getPendingNotes());
+    ipcMain.handle("db-get-pending-note-deletes", () => this.databaseManager.getPendingNoteDeletes());
+    ipcMain.handle("db-get-note-by-client-id", (_, clientNoteId) => this.databaseManager.getNoteByClientId(clientNoteId));
+    ipcMain.handle("db-upsert-note-from-cloud", (_, cloudNote, localFolderId) => this.databaseManager.upsertNoteFromCloud(cloudNote, localFolderId));
+    ipcMain.handle("db-mark-note-synced", (_, id, cloudId) => this.databaseManager.markNoteSynced(id, cloudId));
+    ipcMain.handle("db-mark-note-sync-error", (_, id) => this.databaseManager.markNoteSyncError(id));
+    ipcMain.handle("db-hard-delete-note", (_, id) => this.databaseManager.hardDeleteNote(id));
+
+    // Folders sync
+    ipcMain.handle("db-get-pending-folders", () => this.databaseManager.getPendingFolders());
+    ipcMain.handle("db-get-folder-by-client-id", (_, clientFolderId) => this.databaseManager.getFolderByClientId(clientFolderId));
+    ipcMain.handle("db-upsert-folder-from-cloud", (_, cloudFolder) => this.databaseManager.upsertFolderFromCloud(cloudFolder));
+    ipcMain.handle("db-mark-folder-synced", (_, id, cloudId) => this.databaseManager.markFolderSynced(id, cloudId));
+    ipcMain.handle("db-get-folder-id-map", () => this.databaseManager.getFolderIdMap());
+
+    // Conversations sync
+    ipcMain.handle("db-get-pending-conversations", () => this.databaseManager.getPendingConversations());
+    ipcMain.handle("db-get-pending-conversation-deletes", () => this.databaseManager.getPendingConversationDeletes());
+    ipcMain.handle("db-get-conversation-by-client-id", (_, clientId) => this.databaseManager.getConversationByClientId(clientId));
+    ipcMain.handle("db-upsert-conversation-from-cloud", (_, cloudConv, messages) => this.databaseManager.upsertConversationFromCloud(cloudConv, messages));
+    ipcMain.handle("db-mark-conversation-synced", (_, id, cloudId) => this.databaseManager.markConversationSynced(id, cloudId));
+    ipcMain.handle("db-hard-delete-conversation", (_, id) => this.databaseManager.hardDeleteConversation(id));
+
+    // Transcriptions sync
+    ipcMain.handle("db-get-pending-transcriptions", () => this.databaseManager.getPendingTranscriptions());
+    ipcMain.handle("db-get-transcription-by-client-id", (_, clientId) => this.databaseManager.getTranscriptionByClientId(clientId));
+    ipcMain.handle("db-upsert-transcription-from-cloud", (_, cloudTranscription) => this.databaseManager.upsertTranscriptionFromCloud(cloudTranscription));
+    ipcMain.handle("db-mark-transcription-synced", (_, id, cloudId) => this.databaseManager.markTranscriptionSynced(id, cloudId));
+
     ipcMain.handle("export-note", async (event, noteId, format) => {
       try {
         const note = this.databaseManager.getNote(noteId);

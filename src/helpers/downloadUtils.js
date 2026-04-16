@@ -27,8 +27,25 @@ const RETRYABLE_CODES = new Set([
   "ERR_DOWNLOAD_INCOMPLETE",
 ]);
 
+const TLS_ERROR_CODES = new Set([
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "CERT_HAS_EXPIRED",
+  "ERR_TLS_CERT_ALTNAME_INVALID",
+  "CERT_UNTRUSTED",
+]);
+
+function isTlsError(error) {
+  return (
+    TLS_ERROR_CODES.has(error.code) ||
+    (error.message &&
+      error.message.includes("unable to get local issuer certificate"))
+  );
+}
+
 function isRetryable(error) {
-  if (error.isAbort || error.isHttpError) return false;
+  if (error.isAbort || error.isHttpError || isTlsError(error)) return false;
   return RETRYABLE_CODES.has(error.code);
 }
 
@@ -219,6 +236,13 @@ function downloadAttempt(url, tempPath, options) {
       cleanup();
       if (signal?.aborted) {
         reject(Object.assign(new Error("Download cancelled"), { isAbort: true }));
+      } else if (isTlsError(err)) {
+        reject(
+          Object.assign(
+            new Error(`Certificate error: ${err.message}`),
+            { code: "TLS_ERROR", isTlsError: true },
+          ),
+        );
       } else {
         reject(err);
       }
@@ -321,6 +345,11 @@ async function downloadFile(url, destPath, options = {}) {
       }
 
       if (!isRetryable(error) || attempt >= maxRetries) {
+        debugLogger.error("Download failed", {
+          url,
+          error: error.message,
+          code: error.code,
+        });
         await fsPromises.unlink(tempPath).catch(() => {});
         throw error;
       }

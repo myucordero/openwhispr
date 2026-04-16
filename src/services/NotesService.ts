@@ -10,6 +10,9 @@ interface NoteInput {
   source_file?: string | null;
   audio_duration_seconds?: number | null;
   participants?: string | null;
+  transcript?: string | null;
+  enhanced_at_content_hash?: string | null;
+  folder_id?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -21,6 +24,13 @@ interface CloudNote {
   content: string;
   enhanced_content: string | null;
   note_type: string;
+  enhancement_prompt: string | null;
+  source_file: string | null;
+  audio_duration_seconds: number | null;
+  folder_id: string | null;
+  transcript: string | null;
+  enhanced_at_content_hash: string | null;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 }

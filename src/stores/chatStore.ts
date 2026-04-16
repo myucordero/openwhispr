@@ -4,6 +4,7 @@ interface ConversationItem {
   id: number;
   title: string;
   cloud_id?: string | null;
+  client_conversation_id?: string | null;
   archived_at?: string | null;
   note_id?: number | null;
   created_at: string;
@@ -85,56 +86,6 @@ export function useChatMigration(): { total: number; done: number } | null {
   return useChatStore((state) => state.migration);
 }
 
-export async function syncConversationToCloud(conversation: ConversationItem): Promise<void> {
-  const { ConversationsService } = await import("../services/ConversationsService.js");
-
-  const messages = (await window.electronAPI?.getAgentMessages?.(conversation.id)) ?? [];
-
-  const cloudConv = await ConversationsService.create({
-    client_conversation_id: String(conversation.id),
-    title: conversation.title,
-    created_at: conversation.created_at,
-    updated_at: conversation.updated_at,
-    messages: messages.map((m) => ({
-      role: m.role,
-      content: m.content,
-    })),
-  });
-
-  updateConversation({ ...conversation, cloud_id: cloudConv.id });
-}
-
-export async function syncMessageToCloud(
-  conversation: ConversationItem,
-  role: "user" | "assistant" | "system",
-  content: string,
-  metadata?: Record<string, unknown> | null
-): Promise<void> {
-  const { ConversationsService } = await import("../services/ConversationsService.js");
-  if (conversation.cloud_id) {
-    await ConversationsService.addMessage(conversation.cloud_id, role, content, metadata);
-  } else {
-    await syncConversationToCloud(conversation);
-  }
-}
-
-export async function syncConversationUpdateToCloud(
-  conversation: ConversationItem,
-  updates: { title?: string; archived_at?: string }
-): Promise<void> {
-  const { ConversationsService } = await import("../services/ConversationsService.js");
-  if (conversation.cloud_id) {
-    await ConversationsService.update(conversation.cloud_id, updates);
-  } else {
-    await syncConversationToCloud(conversation);
-  }
-}
-
-export async function syncConversationDeleteToCloud(cloudId: string): Promise<void> {
-  const { ConversationsService } = await import("../services/ConversationsService.js");
-  await ConversationsService.delete(cloudId);
-}
-
 export async function startConversationMigration(): Promise<void> {
   const allConversations = (await window.electronAPI?.getAgentConversations?.(9999)) ?? [];
   const unsynced = allConversations.filter((c) => !c.cloud_id);
@@ -142,9 +93,22 @@ export async function startConversationMigration(): Promise<void> {
 
   useChatStore.setState({ migration: { total: unsynced.length, done: 0 } });
 
+  const { ConversationsService } = await import("../services/ConversationsService.js");
+
   for (const conv of unsynced) {
     try {
-      await syncConversationToCloud(conv);
+      const messages = (await window.electronAPI?.getAgentMessages?.(conv.id)) ?? [];
+      const cloudConv = await ConversationsService.create({
+        client_conversation_id: conv.client_conversation_id ?? String(conv.id),
+        title: conv.title,
+        created_at: conv.created_at,
+        updated_at: conv.updated_at,
+        messages: messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+      });
+      updateConversation({ ...conv, cloud_id: cloudConv.id });
       useChatStore.setState((s) => ({
         migration: s.migration
           ? {

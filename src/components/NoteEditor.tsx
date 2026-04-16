@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 import { ConfirmDialog } from "./ui/dialog.js";
 import { cn } from "./lib/utils";
 import type { NoteItem } from "../types/electron.js";
-import { syncNoteUpdateToCloud, syncNoteDeleteToCloud } from "../stores/noteStore.js";
+import { syncService } from "../services/SyncService.js";
 
 const NOTE_TYPE_COLORS: Record<NoteItem["note_type"], string> = {
   personal: "bg-foreground/5 text-foreground/50",
@@ -63,9 +63,7 @@ export default function NoteEditor({ note, cloudEnabled, onDelete, onUpdate }: N
           await window.electronAPI.updateNote(note.id, updates);
           const updated = { ...note, ...updates };
           onUpdate(updated);
-          if (cloudEnabled) {
-            syncNoteUpdateToCloud(updated, updates).catch(() => {});
-          }
+          syncService.debouncedPush('note', note.id);
           setSaveState("saved");
           fadeTimerRef.current = setTimeout(() => setSaveState("idle"), 2000);
         } catch {
@@ -73,7 +71,7 @@ export default function NoteEditor({ note, cloudEnabled, onDelete, onUpdate }: N
         }
       }, 800);
     },
-    [note, cloudEnabled, onUpdate]
+    [note, onUpdate]
   );
 
   useEffect(() => {
@@ -104,11 +102,8 @@ export default function NoteEditor({ note, cloudEnabled, onDelete, onUpdate }: N
 
   const handleConfirmDelete = useCallback(async () => {
     await window.electronAPI.deleteNote(note.id);
-    if (cloudEnabled && note.cloud_id) {
-      syncNoteDeleteToCloud(note.cloud_id).catch(() => {});
-    }
     onDelete(note.id);
-  }, [note, cloudEnabled, onDelete]);
+  }, [note, onDelete]);
 
   return (
     <div className="flex flex-col h-full min-h-0">

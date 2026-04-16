@@ -1,6 +1,7 @@
 const Database = require("better-sqlite3");
 const path = require("path");
 const fs = require("fs");
+const { randomUUID } = require("crypto");
 const debugLogger = require("./debugLogger");
 const { app } = require("electron");
 
@@ -422,6 +423,94 @@ class DatabaseManager {
         )
       `);
 
+      // Sync columns for notes
+      try {
+        this.db.exec("ALTER TABLE notes ADD COLUMN client_note_id TEXT");
+      } catch (err) {
+        if (!err.message.includes("duplicate column")) throw err;
+      }
+      try {
+        this.db.exec("ALTER TABLE notes ADD COLUMN sync_status TEXT DEFAULT 'pending'");
+      } catch (err) {
+        if (!err.message.includes("duplicate column")) throw err;
+      }
+      try {
+        this.db.exec("ALTER TABLE notes ADD COLUMN deleted_at TEXT");
+      } catch (err) {
+        if (!err.message.includes("duplicate column")) throw err;
+      }
+
+      // Sync columns for folders
+      try {
+        this.db.exec("ALTER TABLE folders ADD COLUMN client_folder_id TEXT");
+      } catch (err) {
+        if (!err.message.includes("duplicate column")) throw err;
+      }
+      try {
+        this.db.exec("ALTER TABLE folders ADD COLUMN cloud_id TEXT");
+      } catch (err) {
+        if (!err.message.includes("duplicate column")) throw err;
+      }
+      try {
+        this.db.exec("ALTER TABLE folders ADD COLUMN sync_status TEXT DEFAULT 'pending'");
+      } catch (err) {
+        if (!err.message.includes("duplicate column")) throw err;
+      }
+
+      // Sync columns for agent_conversations
+      try {
+        this.db.exec("ALTER TABLE agent_conversations ADD COLUMN client_conversation_id TEXT");
+      } catch (err) {
+        if (!err.message.includes("duplicate column")) throw err;
+      }
+      try {
+        this.db.exec("ALTER TABLE agent_conversations ADD COLUMN sync_status TEXT DEFAULT 'pending'");
+      } catch (err) {
+        if (!err.message.includes("duplicate column")) throw err;
+      }
+      try {
+        this.db.exec("ALTER TABLE agent_conversations ADD COLUMN deleted_at TEXT");
+      } catch (err) {
+        if (!err.message.includes("duplicate column")) throw err;
+      }
+
+      // Sync columns for transcriptions
+      try {
+        this.db.exec("ALTER TABLE transcriptions ADD COLUMN client_transcription_id TEXT");
+      } catch (err) {
+        if (!err.message.includes("duplicate column")) throw err;
+      }
+      try {
+        this.db.exec("ALTER TABLE transcriptions ADD COLUMN cloud_id TEXT");
+      } catch (err) {
+        if (!err.message.includes("duplicate column")) throw err;
+      }
+      try {
+        this.db.exec("ALTER TABLE transcriptions ADD COLUMN sync_status TEXT DEFAULT 'pending'");
+      } catch (err) {
+        if (!err.message.includes("duplicate column")) throw err;
+      }
+
+      // Backfill client IDs for existing rows
+      const syncTables = [
+        { table: "notes", col: "client_note_id" },
+        { table: "folders", col: "client_folder_id" },
+        { table: "agent_conversations", col: "client_conversation_id" },
+        { table: "transcriptions", col: "client_transcription_id" },
+      ];
+      for (const { table, col } of syncTables) {
+        const rows = this.db.prepare(`SELECT id FROM ${table} WHERE ${col} IS NULL`).all();
+        const stmt = this.db.prepare(`UPDATE ${table} SET ${col} = ? WHERE id = ?`);
+        for (const row of rows) {
+          stmt.run(randomUUID(), row.id);
+        }
+      }
+
+      this.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_client_note_id ON notes(client_note_id)");
+      this.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_folders_client_folder_id ON folders(client_folder_id)");
+      this.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_conversations_client_id ON agent_conversations(client_conversation_id)");
+      this.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_transcriptions_client_id ON transcriptions(client_transcription_id)");
+
       return true;
     } catch (error) {
       debugLogger.error("Database initialization failed", { error: error.message }, "database");
@@ -438,10 +527,11 @@ class DatabaseManager {
       if (!this.db) {
         throw new Error("Database not initialized");
       }
+      const clientTranscriptionId = randomUUID();
       const stmt = this.db.prepare(
-        "INSERT INTO transcriptions (text, raw_text, status, error_message, error_code) VALUES (?, ?, ?, ?, ?)"
+        "INSERT INTO transcriptions (text, raw_text, status, error_message, error_code, client_transcription_id) VALUES (?, ?, ?, ?, ?, ?)"
       );
-      const result = stmt.run(text, rawText, status, errorMessage, errorCode);
+      const result = stmt.run(text, rawText, status, errorMessage, errorCode, clientTranscriptionId);
 
       const fetchStmt = this.db.prepare("SELECT * FROM transcriptions WHERE id = ?");
       const transcription = fetchStmt.get(result.lastInsertRowid);
@@ -624,10 +714,11 @@ class DatabaseManager {
           .get(defaultFolderName);
         folderId = defaultFolder?.id || null;
       }
+      const clientNoteId = randomUUID();
       const stmt = this.db.prepare(
-        "INSERT INTO notes (title, content, note_type, source_file, audio_duration_seconds, folder_id) VALUES (?, ?, ?, ?, ?, ?)"
+        "INSERT INTO notes (title, content, note_type, source_file, audio_duration_seconds, folder_id, client_note_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
       );
-      const result = stmt.run(title, content, noteType, sourceFile, audioDuration, folderId);
+      const result = stmt.run(title, content, noteType, sourceFile, audioDuration, folderId, clientNoteId);
 
       const fetchStmt = this.db.prepare("SELECT * FROM notes WHERE id = ?");
       const note = fetchStmt.get(result.lastInsertRowid);
@@ -657,7 +748,7 @@ class DatabaseManager {
       if (!this.db) {
         throw new Error("Database not initialized");
       }
-      const conditions = [];
+      const conditions = ["deleted_at IS NULL"];
       const params = [];
       if (noteType) {
         conditions.push("note_type = ?");
@@ -667,7 +758,7 @@ class DatabaseManager {
         conditions.push("folder_id = ?");
         params.push(folderId);
       }
-      const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      const where = `WHERE ${conditions.join(" AND ")}`;
       const stmt = this.db.prepare(`SELECT * FROM notes ${where} ORDER BY updated_at DESC LIMIT ?`);
       params.push(limit);
       return stmt.all(...params);
@@ -690,6 +781,10 @@ class DatabaseManager {
         "transcript",
         "calendar_event_id",
         "participants",
+        "sync_status",
+        "deleted_at",
+        "client_note_id",
+        "cloud_id",
       ];
       const fields = [];
       const values = [];
@@ -732,9 +827,10 @@ class DatabaseManager {
       if (existing) return { success: false, error: "A folder with that name already exists" };
       const maxOrder = this.db.prepare("SELECT MAX(sort_order) as max_order FROM folders").get();
       const sortOrder = (maxOrder?.max_order ?? 0) + 1;
+      const clientFolderId = randomUUID();
       const result = this.db
-        .prepare("INSERT INTO folders (name, sort_order) VALUES (?, ?)")
-        .run(trimmed, sortOrder);
+        .prepare("INSERT INTO folders (name, sort_order, client_folder_id) VALUES (?, ?, ?)")
+        .run(trimmed, sortOrder, clientFolderId);
       const folder = this.db
         .prepare("SELECT * FROM folders WHERE id = ?")
         .get(result.lastInsertRowid);
@@ -790,7 +886,7 @@ class DatabaseManager {
     try {
       if (!this.db) throw new Error("Database not initialized");
       return this.db
-        .prepare("SELECT folder_id, COUNT(*) as count FROM notes GROUP BY folder_id")
+        .prepare("SELECT folder_id, COUNT(*) as count FROM notes WHERE deleted_at IS NULL GROUP BY folder_id")
         .all();
     } catch (error) {
       debugLogger.error("Error getting folder note counts", { error: error.message }, "notes");
@@ -885,7 +981,9 @@ class DatabaseManager {
       if (!this.db) {
         throw new Error("Database not initialized");
       }
-      const stmt = this.db.prepare("DELETE FROM notes WHERE id = ?");
+      const stmt = this.db.prepare(
+        "UPDATE notes SET deleted_at = datetime('now'), sync_status = 'pending', updated_at = datetime('now') WHERE id = ?"
+      );
       const result = stmt.run(id);
       return { success: result.changes > 0, id };
     } catch (error) {
@@ -897,9 +995,10 @@ class DatabaseManager {
   createAgentConversation(title = "Untitled", noteId = null) {
     try {
       if (!this.db) throw new Error("Database not initialized");
+      const clientConversationId = randomUUID();
       const result = this.db
-        .prepare("INSERT INTO agent_conversations (title, note_id) VALUES (?, ?)")
-        .run(title, noteId);
+        .prepare("INSERT INTO agent_conversations (title, note_id, client_conversation_id) VALUES (?, ?, ?)")
+        .run(title, noteId, clientConversationId);
       return this.db
         .prepare("SELECT * FROM agent_conversations WHERE id = ?")
         .get(result.lastInsertRowid);
@@ -938,7 +1037,7 @@ class DatabaseManager {
     try {
       if (!this.db) throw new Error("Database not initialized");
       return this.db
-        .prepare("SELECT * FROM agent_conversations ORDER BY updated_at DESC LIMIT ?")
+        .prepare("SELECT * FROM agent_conversations WHERE deleted_at IS NULL ORDER BY updated_at DESC LIMIT ?")
         .all(limit);
     } catch (error) {
       debugLogger.error("Error getting agent conversations", { error: error.message }, "database");
@@ -966,8 +1065,11 @@ class DatabaseManager {
   deleteAgentConversation(id) {
     try {
       if (!this.db) throw new Error("Database not initialized");
-      this.db.prepare("DELETE FROM agent_messages WHERE conversation_id = ?").run(id);
-      const result = this.db.prepare("DELETE FROM agent_conversations WHERE id = ?").run(id);
+      const result = this.db
+        .prepare(
+          "UPDATE agent_conversations SET deleted_at = datetime('now'), sync_status = 'pending', updated_at = datetime('now') WHERE id = ?"
+        )
+        .run(id);
       return { success: result.changes > 0 };
     } catch (error) {
       debugLogger.error("Error deleting agent conversation", { error: error.message }, "database");
@@ -1266,7 +1368,7 @@ class DatabaseManager {
         SELECT n.*
         FROM notes n
         JOIN notes_fts ON notes_fts.rowid = n.id
-        WHERE notes_fts MATCH ?
+        WHERE notes_fts MATCH ? AND n.deleted_at IS NULL
         ORDER BY notes_fts.rank
         LIMIT ?
       `
@@ -1427,8 +1529,8 @@ class DatabaseManager {
     try {
       if (!this.db) throw new Error("Database not initialized");
       const archiveFilter = includeArchived
-        ? "WHERE c.archived_at IS NOT NULL"
-        : "WHERE c.archived_at IS NULL";
+        ? "WHERE c.archived_at IS NOT NULL AND c.deleted_at IS NULL"
+        : "WHERE c.archived_at IS NULL AND c.deleted_at IS NULL";
       return this.db
         .prepare(
           `SELECT c.id, c.title, c.created_at, c.updated_at, c.archived_at, c.cloud_id,
@@ -1466,7 +1568,7 @@ class DatabaseManager {
           FROM agent_conversations c
           LEFT JOIN agent_messages m ON m.conversation_id = c.id
           LEFT JOIN agent_messages ms ON ms.conversation_id = c.id
-          WHERE c.archived_at IS NULL
+          WHERE c.archived_at IS NULL AND c.deleted_at IS NULL
             AND (c.title LIKE ? OR ms.content LIKE ?)
           GROUP BY c.id
           ORDER BY c.updated_at DESC
@@ -1751,6 +1853,347 @@ class DatabaseManager {
         { error: error.message },
         "database"
       );
+      throw error;
+    }
+  }
+
+
+  getPendingNotes() {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      return this.db
+        .prepare("SELECT * FROM notes WHERE sync_status = 'pending' AND deleted_at IS NULL")
+        .all();
+    } catch (error) {
+      debugLogger.error("Error getting pending notes", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  getPendingNoteDeletes() {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      return this.db
+        .prepare("SELECT * FROM notes WHERE deleted_at IS NOT NULL AND cloud_id IS NOT NULL AND sync_status = 'pending'")
+        .all();
+    } catch (error) {
+      debugLogger.error("Error getting pending note deletes", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  getNoteByClientId(clientNoteId) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      return this.db.prepare("SELECT * FROM notes WHERE client_note_id = ?").get(clientNoteId) || null;
+    } catch (error) {
+      debugLogger.error("Error getting note by client id", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  upsertNoteFromCloud(cloudNote, localFolderId) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      const stmt = this.db.prepare(`
+        INSERT INTO notes (client_note_id, cloud_id, title, content, enhanced_content,
+          enhancement_prompt, enhanced_at_content_hash, note_type, source_file,
+          audio_duration_seconds, transcript, folder_id, sync_status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?)
+        ON CONFLICT(client_note_id) DO UPDATE SET
+          cloud_id = excluded.cloud_id,
+          title = excluded.title,
+          content = excluded.content,
+          enhanced_content = excluded.enhanced_content,
+          enhancement_prompt = excluded.enhancement_prompt,
+          enhanced_at_content_hash = excluded.enhanced_at_content_hash,
+          transcript = excluded.transcript,
+          folder_id = excluded.folder_id,
+          sync_status = 'synced',
+          updated_at = excluded.updated_at
+      `);
+      stmt.run(
+        cloudNote.client_note_id,
+        cloudNote.id,
+        cloudNote.title,
+        cloudNote.content,
+        cloudNote.enhanced_content || null,
+        cloudNote.enhancement_prompt || null,
+        cloudNote.enhanced_at_content_hash || null,
+        cloudNote.note_type || "personal",
+        cloudNote.source_file || null,
+        cloudNote.audio_duration_seconds || null,
+        cloudNote.transcript || null,
+        localFolderId,
+        cloudNote.created_at,
+        cloudNote.updated_at
+      );
+      return this.db.prepare("SELECT * FROM notes WHERE client_note_id = ?").get(cloudNote.client_note_id);
+    } catch (error) {
+      debugLogger.error("Error upserting note from cloud", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  markNoteSynced(id, cloudId) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      this.db.prepare("UPDATE notes SET sync_status = 'synced', cloud_id = ? WHERE id = ?").run(cloudId, id);
+      return { success: true };
+    } catch (error) {
+      debugLogger.error("Error marking note synced", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  markNoteSyncError(id) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      this.db.prepare("UPDATE notes SET sync_status = 'error' WHERE id = ?").run(id);
+      return { success: true };
+    } catch (error) {
+      debugLogger.error("Error marking note sync error", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  hardDeleteNote(id) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      const result = this.db.prepare("DELETE FROM notes WHERE id = ?").run(id);
+      return { success: result.changes > 0, id };
+    } catch (error) {
+      debugLogger.error("Error hard deleting note", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+
+  getPendingFolders() {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      return this.db.prepare("SELECT * FROM folders WHERE sync_status = 'pending'").all();
+    } catch (error) {
+      debugLogger.error("Error getting pending folders", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  getFolderByClientId(clientFolderId) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      return this.db.prepare("SELECT * FROM folders WHERE client_folder_id = ?").get(clientFolderId) || null;
+    } catch (error) {
+      debugLogger.error("Error getting folder by client id", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  upsertFolderFromCloud(cloudFolder) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      const stmt = this.db.prepare(`
+        INSERT INTO folders (client_folder_id, cloud_id, name, is_default, sort_order, sync_status, created_at)
+        VALUES (?, ?, ?, ?, ?, 'synced', ?)
+        ON CONFLICT(client_folder_id) DO UPDATE SET
+          cloud_id = excluded.cloud_id,
+          name = excluded.name,
+          sort_order = excluded.sort_order,
+          sync_status = 'synced'
+      `);
+      stmt.run(
+        cloudFolder.client_folder_id,
+        cloudFolder.id,
+        cloudFolder.name,
+        cloudFolder.is_default ? 1 : 0,
+        cloudFolder.sort_order || 0,
+        cloudFolder.created_at
+      );
+      return this.db.prepare("SELECT * FROM folders WHERE client_folder_id = ?").get(cloudFolder.client_folder_id);
+    } catch (error) {
+      debugLogger.error("Error upserting folder from cloud", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  markFolderSynced(id, cloudId) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      this.db.prepare("UPDATE folders SET sync_status = 'synced', cloud_id = ? WHERE id = ?").run(cloudId, id);
+      return { success: true };
+    } catch (error) {
+      debugLogger.error("Error marking folder synced", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  getFolderIdMap() {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      return this.db.prepare("SELECT * FROM folders").all();
+    } catch (error) {
+      debugLogger.error("Error getting folder id map", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+
+  getPendingConversations() {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      return this.db
+        .prepare("SELECT * FROM agent_conversations WHERE sync_status = 'pending' AND deleted_at IS NULL")
+        .all();
+    } catch (error) {
+      debugLogger.error("Error getting pending conversations", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  getPendingConversationDeletes() {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      return this.db
+        .prepare("SELECT * FROM agent_conversations WHERE deleted_at IS NOT NULL AND cloud_id IS NOT NULL AND sync_status = 'pending'")
+        .all();
+    } catch (error) {
+      debugLogger.error("Error getting pending conversation deletes", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  getConversationByClientId(clientId) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      return this.db.prepare("SELECT * FROM agent_conversations WHERE client_conversation_id = ?").get(clientId) || null;
+    } catch (error) {
+      debugLogger.error("Error getting conversation by client id", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  upsertConversationFromCloud(cloudConv, messages) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      const transaction = this.db.transaction(() => {
+        const convStmt = this.db.prepare(`
+          INSERT INTO agent_conversations (client_conversation_id, cloud_id, title, note_id, sync_status, created_at, updated_at)
+          VALUES (?, ?, ?, ?, 'synced', ?, ?)
+          ON CONFLICT(client_conversation_id) DO UPDATE SET
+            cloud_id = excluded.cloud_id,
+            title = excluded.title,
+            note_id = excluded.note_id,
+            sync_status = 'synced',
+            updated_at = excluded.updated_at
+        `);
+        convStmt.run(
+          cloudConv.client_conversation_id,
+          cloudConv.id,
+          cloudConv.title,
+          cloudConv.note_id || null,
+          cloudConv.created_at,
+          cloudConv.updated_at
+        );
+        const conv = this.db
+          .prepare("SELECT * FROM agent_conversations WHERE client_conversation_id = ?")
+          .get(cloudConv.client_conversation_id);
+        this.db.prepare("DELETE FROM agent_messages WHERE conversation_id = ?").run(conv.id);
+        if (messages && messages.length > 0) {
+          const msgStmt = this.db.prepare(
+            "INSERT INTO agent_messages (conversation_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?)"
+          );
+          for (const msg of messages) {
+            msgStmt.run(conv.id, msg.role, msg.content, msg.metadata || null, msg.created_at);
+          }
+        }
+        return conv;
+      });
+      return transaction();
+    } catch (error) {
+      debugLogger.error("Error upserting conversation from cloud", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  markConversationSynced(id, cloudId) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      this.db.prepare("UPDATE agent_conversations SET sync_status = 'synced', cloud_id = ? WHERE id = ?").run(cloudId, id);
+      return { success: true };
+    } catch (error) {
+      debugLogger.error("Error marking conversation synced", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  hardDeleteConversation(id) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      this.db.prepare("DELETE FROM agent_messages WHERE conversation_id = ?").run(id);
+      const result = this.db.prepare("DELETE FROM agent_conversations WHERE id = ?").run(id);
+      return { success: result.changes > 0 };
+    } catch (error) {
+      debugLogger.error("Error hard deleting conversation", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+
+  getPendingTranscriptions() {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      return this.db.prepare("SELECT * FROM transcriptions WHERE sync_status = 'pending'").all();
+    } catch (error) {
+      debugLogger.error("Error getting pending transcriptions", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  getTranscriptionByClientId(clientId) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      return this.db.prepare("SELECT * FROM transcriptions WHERE client_transcription_id = ?").get(clientId) || null;
+    } catch (error) {
+      debugLogger.error("Error getting transcription by client id", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  upsertTranscriptionFromCloud(cloudTranscription) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      const stmt = this.db.prepare(`
+        INSERT INTO transcriptions (client_transcription_id, cloud_id, text, raw_text, status, sync_status, created_at)
+        VALUES (?, ?, ?, ?, ?, 'synced', ?)
+        ON CONFLICT(client_transcription_id) DO UPDATE SET
+          cloud_id = excluded.cloud_id,
+          text = excluded.text,
+          raw_text = excluded.raw_text,
+          status = excluded.status,
+          sync_status = 'synced'
+      `);
+      stmt.run(
+        cloudTranscription.client_transcription_id,
+        cloudTranscription.id,
+        cloudTranscription.text,
+        cloudTranscription.raw_text || null,
+        cloudTranscription.status || "completed",
+        cloudTranscription.created_at
+      );
+      return this.db.prepare("SELECT * FROM transcriptions WHERE client_transcription_id = ?").get(cloudTranscription.client_transcription_id);
+    } catch (error) {
+      debugLogger.error("Error upserting transcription from cloud", { error: error.message }, "database");
+      throw error;
+    }
+  }
+
+  markTranscriptionSynced(id, cloudId) {
+    try {
+      if (!this.db) throw new Error("Database not initialized");
+      this.db.prepare("UPDATE transcriptions SET sync_status = 'synced', cloud_id = ? WHERE id = ?").run(cloudId, id);
+      return { success: true };
+    } catch (error) {
+      debugLogger.error("Error marking transcription synced", { error: error.message }, "database");
       throw error;
     }
   }

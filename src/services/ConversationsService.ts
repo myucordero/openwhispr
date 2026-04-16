@@ -66,22 +66,28 @@ async function deleteConversation(id: string): Promise<void> {
   if (!res.ok) throw new Error(await res.text());
 }
 
+interface CloudConversationWithMessages extends CloudConversation {
+  messages?: CloudMessage[];
+}
+
 async function list(
   limit?: number,
   before?: string,
-  archived?: boolean
-): Promise<{ conversations: CloudConversation[] }> {
+  archived?: boolean,
+  include?: string
+): Promise<{ conversations: CloudConversationWithMessages[] }> {
   const params = new URLSearchParams();
   if (limit !== undefined) params.set("limit", String(limit));
   if (before !== undefined) params.set("before", before);
   if (archived) params.set("archived", "true");
+  if (include !== undefined) params.set("include", include);
   const query = params.toString();
   const res = await fetch(
     `${OPENWHISPR_API_URL}/api/conversations/list${query ? `?${query}` : ""}`,
     { credentials: "include" }
   );
   if (!res.ok) throw new Error(await res.text());
-  return res.json() as Promise<{ conversations: CloudConversation[] }>;
+  return res.json() as Promise<{ conversations: CloudConversationWithMessages[] }>;
 }
 
 async function addMessage(

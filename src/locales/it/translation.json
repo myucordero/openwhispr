@@ -392,6 +392,7 @@
         "server": "Errore server ({{error}}). Riprova più tardi.",
         "generic": "Download non riuscito: {{error}}",
         "extractionFailed": "Modello scaricato, ma l'installazione non è riuscita. Clicca su scarica per ritentare l'installazione senza riscaricare.",
+        "tlsError": "Errore di certificato — la tua rete potrebbe usare l'ispezione SSL che blocca i download. Prova a scaricare da un'altra rete.",
         "unknown": "Errore sconosciuto"
       },
       "downloadFailed": {
@@ -859,6 +860,10 @@
         "description": "Piani, utilizzo e fatturazione",
         "label": "Piani e fatturazione"
       },
+      "apiKeys": {
+        "label": "Chiavi API",
+        "description": "Gestisci accesso API"
+      },
       "general": {
         "description": "Aspetto, suoni e avvio",
         "label": "Preferenze"
@@ -1088,6 +1093,11 @@
         "bulletPoints": "Hey {{agentName}}, converti questo in elenco puntato"
       }
     },
+    "apiKeys": {
+      "title": "Chiavi API",
+      "signInRequired": "Accesso richiesto",
+      "signInRequiredDescription": "Accedi per gestire le tue chiavi API."
+    },
     "aiModels": {
       "customSetup": "Configurazione personalizzata",
       "customSetupDescription": "Usa il tuo provider e la tua chiave API.",
@@ -1231,6 +1241,8 @@
       },
       "clipboard": {
         "title": "Appunti",
+        "autoPaste": "Incollaggio automatico",
+        "autoPasteDescription": "Incolla automaticamente il testo trascritto nell'app attiva al termine della dettatura",
         "keepInClipboard": "Mantieni la trascrizione negli appunti",
         "keepInClipboardDescription": "Mantieni il testo dettato negli appunti per poterlo incollare manualmente se necessario"
       },
@@ -1474,6 +1486,7 @@
     }
   },
   "models": {
+    "learnMore": "Scopri di più",
     "descriptions": {
       "parakeet": {
         "parakeet_tdt_0_6b_v3": "ASR multilingue veloce con rilevamento automatico della lingua (25 lingue)"
@@ -1922,6 +1935,7 @@
     "upgradeUnlimited": "Passa a Pro — trascrizioni illimitate"
   },
   "support": {
+    "documentation": "Documentazione",
     "joinDiscord": "Unisciti a Discord",
     "contactSupport": "Contatta il supporto",
     "submitBug": "Segnala un bug"
@@ -2193,6 +2207,54 @@
     "title": "Autorizzazioni necessarie",
     "description": "OpenWhispr ha bisogno di alcune autorizzazioni per funzionare su questo computer.",
     "continue": "Continua"
+  },
+  "apiKeysSection": {
+    "title": "Chiavi API",
+    "description": "Crea chiavi per accedere all'API di OpenWhispr in modo programmatico.",
+    "empty": "Nessuna chiave API ancora",
+    "createButton": "Crea chiave API",
+    "create": {
+      "title": "Crea chiave API",
+      "nameLabel": "Nome della chiave",
+      "namePlaceholder": "es. La mia integrazione",
+      "scopesLabel": "Permessi",
+      "expiryLabel": "Scadenza",
+      "expiryOptions": {
+        "never": "Non scade mai",
+        "30days": "30 giorni",
+        "60days": "60 giorni",
+        "90days": "90 giorni",
+        "1year": "1 anno"
+      },
+      "submit": "Crea",
+      "cancel": "Annulla"
+    },
+    "created": {
+      "title": "Chiave API creata",
+      "warning": "Copia questa chiave ora. Non verrà più mostrata.",
+      "copied": "Copiato!",
+      "copyButton": "Copia negli appunti",
+      "done": "Fatto"
+    },
+    "scopes": {
+      "notesRead": "Leggi note",
+      "notesWrite": "Crea e modifica note",
+      "transcriptionsRead": "Leggi trascrizioni",
+      "usageRead": "Visualizza utilizzo"
+    },
+    "revoke": {
+      "button": "Revoca",
+      "confirm": "Revocare questa chiave? Le integrazioni che la utilizzano smetteranno di funzionare.",
+      "success": "Chiave API revocata"
+    },
+    "neverUsed": "Mai utilizzata",
+    "lastUsed": "Ultimo utilizzo {{time}}",
+    "maxKeysReached": "Massimo {{max}} chiavi consentite",
+    "errors": {
+      "loadFailed": "Impossibile caricare le chiavi API",
+      "createFailed": "Impossibile creare la chiave API",
+      "revokeFailed": "Impossibile revocare la chiave API"
+    }
   },
   "embeddedChat": {
     "askPlaceholder": "Chiedi qualcosa...",

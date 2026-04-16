@@ -143,41 +143,6 @@ export function useMigration(): { total: number; done: number } | null {
   return useNoteStore((state) => state.migration);
 }
 
-export async function syncNoteToCloud(note: NoteItem): Promise<void> {
-  const { NotesService } = await import("../services/NotesService.js");
-  const cloudNote = await NotesService.create({
-    client_note_id: String(note.id),
-    title: note.title,
-    content: note.content,
-    enhanced_content: note.enhanced_content,
-    enhancement_prompt: note.enhancement_prompt,
-    note_type: note.note_type,
-    source_file: note.source_file,
-    audio_duration_seconds: note.audio_duration_seconds,
-    created_at: note.created_at,
-    updated_at: note.updated_at,
-  });
-  await window.electronAPI.updateNoteCloudId(note.id, cloudNote.id);
-  updateNoteInStore({ ...note, cloud_id: cloudNote.id });
-}
-
-export async function syncNoteUpdateToCloud(
-  note: NoteItem,
-  updates: Partial<NoteItem>
-): Promise<void> {
-  const { NotesService } = await import("../services/NotesService.js");
-  if (note.cloud_id) {
-    await NotesService.update(note.cloud_id, updates);
-  } else {
-    await syncNoteToCloud(note);
-  }
-}
-
-export async function syncNoteDeleteToCloud(cloudId: string): Promise<void> {
-  const { NotesService } = await import("../services/NotesService.js");
-  await NotesService.delete(cloudId);
-}
-
 export async function startMigration(): Promise<void> {
   const allNotes = (await window.electronAPI?.getNotes(null, 9999, null)) ?? [];
   const unsynced = allNotes.filter((n) => !n.cloud_id);
@@ -193,7 +158,7 @@ export async function startMigration(): Promise<void> {
     try {
       const { created } = await NotesService.batchCreate(
         chunk.map((n) => ({
-          client_note_id: String(n.id),
+          client_note_id: n.client_note_id,
           title: n.title,
           content: n.content,
           enhanced_content: n.enhanced_content,
@@ -205,10 +170,14 @@ export async function startMigration(): Promise<void> {
           updated_at: n.updated_at,
         }))
       );
+      const notesByClientId = new Map(chunk.map((n) => [n.client_note_id, n]));
       await Promise.all(
-        created.map(({ client_note_id, id: cloudId }) =>
-          window.electronAPI.updateNoteCloudId(parseInt(client_note_id, 10), cloudId)
-        )
+        created.map(({ client_note_id, id: cloudId }) => {
+          const local = notesByClientId.get(client_note_id);
+          return local
+            ? window.electronAPI.updateNoteCloudId(local.id, cloudId)
+            : Promise.resolve();
+        })
       );
       useNoteStore.setState((s) => ({
         migration: s.migration

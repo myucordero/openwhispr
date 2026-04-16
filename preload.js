@@ -716,6 +716,33 @@ contextBridge.exposeInMainWorld("electronAPI", {
   semanticSearchConversations: (query, limit) =>
     ipcRenderer.invoke("db-semantic-search-conversations", query, limit),
 
+  // Sync operations
+  getPendingNotes: () => ipcRenderer.invoke('db-get-pending-notes'),
+  getPendingNoteDeletes: () => ipcRenderer.invoke('db-get-pending-note-deletes'),
+  getNoteByClientId: (clientNoteId) => ipcRenderer.invoke('db-get-note-by-client-id', clientNoteId),
+  upsertNoteFromCloud: (cloudNote, localFolderId) => ipcRenderer.invoke('db-upsert-note-from-cloud', cloudNote, localFolderId),
+  markNoteSynced: (id, cloudId) => ipcRenderer.invoke('db-mark-note-synced', id, cloudId),
+  markNoteSyncError: (id) => ipcRenderer.invoke('db-mark-note-sync-error', id),
+  hardDeleteNote: (id) => ipcRenderer.invoke('db-hard-delete-note', id),
+
+  getPendingFolders: () => ipcRenderer.invoke('db-get-pending-folders'),
+  getFolderByClientId: (clientFolderId) => ipcRenderer.invoke('db-get-folder-by-client-id', clientFolderId),
+  upsertFolderFromCloud: (cloudFolder) => ipcRenderer.invoke('db-upsert-folder-from-cloud', cloudFolder),
+  markFolderSynced: (id, cloudId) => ipcRenderer.invoke('db-mark-folder-synced', id, cloudId),
+  getFolderIdMap: () => ipcRenderer.invoke('db-get-folder-id-map'),
+
+  getPendingConversations: () => ipcRenderer.invoke('db-get-pending-conversations'),
+  getPendingConversationDeletes: () => ipcRenderer.invoke('db-get-pending-conversation-deletes'),
+  getConversationByClientId: (clientId) => ipcRenderer.invoke('db-get-conversation-by-client-id', clientId),
+  upsertConversationFromCloud: (cloudConv, messages) => ipcRenderer.invoke('db-upsert-conversation-from-cloud', cloudConv, messages),
+  markConversationSynced: (id, cloudId) => ipcRenderer.invoke('db-mark-conversation-synced', id, cloudId),
+  hardDeleteConversation: (id) => ipcRenderer.invoke('db-hard-delete-conversation', id),
+
+  getPendingTranscriptions: () => ipcRenderer.invoke('db-get-pending-transcriptions'),
+  getTranscriptionByClientId: (clientId) => ipcRenderer.invoke('db-get-transcription-by-client-id', clientId),
+  upsertTranscriptionFromCloud: (cloudTranscription) => ipcRenderer.invoke('db-upsert-transcription-from-cloud', cloudTranscription),
+  markTranscriptionSynced: (id, cloudId) => ipcRenderer.invoke('db-mark-transcription-synced', id, cloudId),
+
   // Google Calendar
   gcalStartOAuth: () => ipcRenderer.invoke("gcal-start-oauth"),
   gcalDisconnect: () => ipcRenderer.invoke("gcal-disconnect"),

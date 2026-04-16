@@ -16,6 +16,7 @@ export interface LocalModel {
   sizeBytes?: number;
   description: string;
   descriptionKey?: string;
+  specUrl?: string;
   isDownloaded?: boolean;
   downloaded?: boolean;
   recommended?: boolean;
@@ -174,9 +175,8 @@ export default function LocalModelPicker({
             (model): ModelCardOption => ({
               value: model.id,
               label: model.name,
-              description: model.descriptionKey
-                ? `${model.size} · ${t(model.descriptionKey, { defaultValue: model.description })}`
-                : model.size,
+              description: model.size,
+              specUrl: model.specUrl,
               icon: getProviderIcon(selectedProvider),
               invertInDark: isMonochromeProvider(selectedProvider),
               recommended: model.recommended,

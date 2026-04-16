@@ -392,6 +392,7 @@
         "server": "Error del servidor ({{error}}). Inténtalo más tarde.",
         "generic": "Falló la descarga: {{error}}",
         "extractionFailed": "Modelo descargado, pero la instalación falló. Haz clic en descargar para reintentar la instalación sin volver a descargar.",
+        "tlsError": "Error de certificado — tu red puede usar inspección SSL que bloquea las descargas. Intenta descargar desde otra red.",
         "unknown": "Error desconocido"
       },
       "downloadFailed": {
@@ -609,6 +610,54 @@
         "transcriptionPipeline": "Flujo de transcripción"
       },
       "title": "Qué se registra"
+    }
+  },
+  "apiKeysSection": {
+    "title": "Claves API",
+    "description": "Crea claves para acceder a la API de OpenWhispr de forma programática.",
+    "empty": "Aún no hay claves API",
+    "createButton": "Crear clave API",
+    "create": {
+      "title": "Crear clave API",
+      "nameLabel": "Nombre de la clave",
+      "namePlaceholder": "ej. Mi Integración",
+      "scopesLabel": "Permisos",
+      "expiryLabel": "Caducidad",
+      "expiryOptions": {
+        "never": "Nunca caduca",
+        "30days": "30 días",
+        "60days": "60 días",
+        "90days": "90 días",
+        "1year": "1 año"
+      },
+      "submit": "Crear",
+      "cancel": "Cancelar"
+    },
+    "created": {
+      "title": "Clave API creada",
+      "warning": "Copia esta clave ahora. No se mostrará de nuevo.",
+      "copied": "¡Copiado!",
+      "copyButton": "Copiar al portapapeles",
+      "done": "Listo"
+    },
+    "scopes": {
+      "notesRead": "Leer notas",
+      "notesWrite": "Crear y editar notas",
+      "transcriptionsRead": "Leer transcripciones",
+      "usageRead": "Ver uso"
+    },
+    "revoke": {
+      "button": "Revocar",
+      "confirm": "¿Revocar esta clave? Las integraciones que la usen dejarán de funcionar.",
+      "success": "Clave API revocada"
+    },
+    "neverUsed": "Nunca usada",
+    "lastUsed": "Último uso {{time}}",
+    "maxKeysReached": "Máximo de {{max}} claves permitidas",
+    "errors": {
+      "loadFailed": "No se pudieron cargar las claves API",
+      "createFailed": "No se pudo crear la clave API",
+      "revokeFailed": "No se pudo revocar la clave API"
     }
   },
   "dictionarySuffix": "Sufijo del diccionario",
@@ -859,6 +908,10 @@
         "description": "Planes, uso y facturación",
         "label": "Planes y facturación"
       },
+      "apiKeys": {
+        "label": "Claves API",
+        "description": "Gestionar acceso API"
+      },
       "general": {
         "description": "Apariencia, sonidos e inicio",
         "label": "Preferencias"
@@ -1088,6 +1141,11 @@
         "bulletPoints": "Hey {{agentName}}, convierte esto en viñetas"
       }
     },
+    "apiKeys": {
+      "title": "Claves de API",
+      "signInRequired": "Inicio de sesión requerido",
+      "signInRequiredDescription": "Inicia sesión para administrar tus claves de API."
+    },
     "aiModels": {
       "customSetup": "Configuración personalizada",
       "customSetupDescription": "Usa tu propio proveedor y clave API.",
@@ -1231,6 +1289,8 @@
       },
       "clipboard": {
         "title": "Portapapeles",
+        "autoPaste": "Pegado automático",
+        "autoPasteDescription": "Pegar automáticamente el texto transcrito en la aplicación activa al finalizar el dictado",
         "keepInClipboard": "Mantener transcripción en el portapapeles",
         "keepInClipboardDescription": "Mantener el texto dictado en el portapapeles para poder pegarlo manualmente si es necesario"
       },
@@ -1474,6 +1534,7 @@
     }
   },
   "models": {
+    "learnMore": "Más información",
     "descriptions": {
       "parakeet": {
         "parakeet_tdt_0_6b_v3": "ASR multilingüe rápido con detección automática de idioma (25 idiomas)"
@@ -1922,6 +1983,7 @@
     "upgradeUnlimited": "Actualizar a Pro — transcripciones ilimitadas"
   },
   "support": {
+    "documentation": "Documentación",
     "joinDiscord": "Unirse a Discord",
     "contactSupport": "Contactar soporte",
     "submitBug": "Reportar un error"

@@ -392,6 +392,7 @@
         "server": "服务器错误（{{error}}），请稍后重试。",
         "generic": "下载失败：{{error}}",
         "extractionFailed": "模型已下载但安装失败。点击下载以重新安装，无需重新下载。",
+        "tlsError": "证书错误 — 您的网络可能使用了阻止下载的SSL检查。请尝试从其他网络下载。",
         "unknown": "未知错误"
       },
       "downloadFailed": {
@@ -859,6 +860,10 @@
         "description": "套餐、用量与账单",
         "label": "套餐与账单"
       },
+      "apiKeys": {
+        "label": "API 密钥",
+        "description": "管理 API 访问"
+      },
       "general": {
         "description": "外观、声音与启动",
         "label": "偏好设置"
@@ -1083,6 +1088,11 @@
         "bulletPoints": "Hey {{agentName}}，把这个转换成要点列表"
       }
     },
+    "apiKeys": {
+      "title": "API 密钥",
+      "signInRequired": "需要登录",
+      "signInRequiredDescription": "登录以管理您的 API 密钥。"
+    },
     "aiModels": {
       "customSetup": "自定义设置",
       "customSetupDescription": "使用你自己的服务商和 API Key。",
@@ -1226,6 +1236,8 @@
       },
       "clipboard": {
         "title": "剪贴板",
+        "autoPaste": "自动粘贴",
+        "autoPasteDescription": "听写结束后自动将转录文本粘贴到当前活动的应用中",
         "keepInClipboard": "将转录内容保留在剪贴板",
         "keepInClipboardDescription": "将听写文本保留在剪贴板中，以便在需要时手动粘贴"
       },
@@ -1469,6 +1481,7 @@
     }
   },
   "models": {
+    "learnMore": "了解更多",
     "descriptions": {
       "parakeet": {
         "parakeet_tdt_0_6b_v3": "快速多语言语音识别，自动语言检测（25 种语言）"
@@ -1917,6 +1930,7 @@
     "upgradeUnlimited": "升级到 Pro — 无限转录"
   },
   "support": {
+    "documentation": "文档",
     "joinDiscord": "加入 Discord",
     "contactSupport": "联系支持",
     "submitBug": "提交 Bug"
@@ -2188,6 +2202,54 @@
     "title": "需要权限",
     "description": "OpenWhispr 需要一些权限才能在此电脑上正常运行。",
     "continue": "继续"
+  },
+  "apiKeysSection": {
+    "title": "API 密钥",
+    "description": "创建密钥以编程方式访问 OpenWhispr API。",
+    "empty": "暂无 API 密钥",
+    "createButton": "创建 API 密钥",
+    "create": {
+      "title": "创建 API 密钥",
+      "nameLabel": "密钥名称",
+      "namePlaceholder": "例如：我的集成",
+      "scopesLabel": "权限",
+      "expiryLabel": "有效期",
+      "expiryOptions": {
+        "never": "永不过期",
+        "30days": "30 天",
+        "60days": "60 天",
+        "90days": "90 天",
+        "1year": "1 年"
+      },
+      "submit": "创建",
+      "cancel": "取消"
+    },
+    "created": {
+      "title": "API 密钥已创建",
+      "warning": "请立即复制此密钥，它将不会再次显示。",
+      "copied": "已复制！",
+      "copyButton": "复制到剪贴板",
+      "done": "完成"
+    },
+    "scopes": {
+      "notesRead": "读取笔记",
+      "notesWrite": "创建和编辑笔记",
+      "transcriptionsRead": "读取转录",
+      "usageRead": "查看使用情况"
+    },
+    "revoke": {
+      "button": "撤销",
+      "confirm": "撤销此密钥？使用它的集成将停止工作。",
+      "success": "API 密钥已撤销"
+    },
+    "neverUsed": "从未使用",
+    "lastUsed": "上次使用 {{time}}",
+    "maxKeysReached": "最多允许 {{max}} 个密钥",
+    "errors": {
+      "loadFailed": "无法加载 API 密钥",
+      "createFailed": "无法创建 API 密钥",
+      "revokeFailed": "无法撤销 API 密钥"
+    }
   },
   "embeddedChat": {
     "askPlaceholder": "随便问点什么...",

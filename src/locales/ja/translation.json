@@ -392,6 +392,7 @@
         "server": "サーバーエラー（{{error}}）。後でもう一度お試しください。",
         "generic": "ダウンロードに失敗しました: {{error}}",
         "extractionFailed": "モデルのダウンロードは完了しましたが、インストールに失敗しました。ダウンロードをクリックして再ダウンロードなしでインストールを再試行してください。",
+        "tlsError": "証明書エラー — ネットワークのSSL検査がダウンロードをブロックしている可能性があります。別のネットワークからお試しください。",
         "unknown": "不明なエラー"
       },
       "downloadFailed": {
@@ -859,6 +860,10 @@
         "description": "プラン、使用状況、請求",
         "label": "プランと請求"
       },
+      "apiKeys": {
+        "description": "APIキーの管理",
+        "label": "APIキー"
+      },
       "general": {
         "description": "外観、サウンド、起動設定",
         "label": "環境設定"
@@ -1088,6 +1093,11 @@
         "bulletPoints": "Hey {{agentName}}、これを箇条書きに変換して"
       }
     },
+    "apiKeys": {
+      "title": "APIキー",
+      "signInRequired": "サインインが必要です",
+      "signInRequiredDescription": "APIキーを管理するにはサインインしてください。"
+    },
     "aiModels": {
       "customSetup": "カスタム設定",
       "customSetupDescription": "独自のプロバイダーと API キーを使用。",
@@ -1231,6 +1241,8 @@
       },
       "clipboard": {
         "title": "クリップボード",
+        "autoPaste": "自動貼り付け",
+        "autoPasteDescription": "ディクテーション完了後、文字起こしテキストをアクティブなアプリに自動的に貼り付けます",
         "keepInClipboard": "文字起こしをクリップボードに保持",
         "keepInClipboardDescription": "必要に応じて手動で貼り付けできるよう、音声入力テキストをクリップボードに保持します"
       },
@@ -1474,6 +1486,7 @@
     }
   },
   "models": {
+    "learnMore": "詳細を見る",
     "descriptions": {
       "parakeet": {
         "parakeet_tdt_0_6b_v3": "高速多言語 ASR、自動言語検出対応（25 言語）"
@@ -1922,6 +1935,7 @@
     "upgradeUnlimited": "Proにアップグレード — 無制限の文字起こし"
   },
   "support": {
+    "documentation": "ドキュメント",
     "joinDiscord": "Discord に参加",
     "contactSupport": "サポートに問い合わせ",
     "submitBug": "バグを報告"
@@ -2193,6 +2207,54 @@
     "title": "権限が必要です",
     "description": "OpenWhispr がこのコンピュータで動作するために、いくつかの権限が必要です。",
     "continue": "続行"
+  },
+  "apiKeysSection": {
+    "title": "APIキー",
+    "description": "アカウントへのプログラムアクセス用のキーを管理",
+    "empty": "APIキーはまだありません",
+    "createButton": "キーを作成",
+    "create": {
+      "title": "APIキーを作成",
+      "nameLabel": "キー名",
+      "namePlaceholder": "例: マイインテグレーション",
+      "scopesLabel": "権限",
+      "expiryLabel": "有効期限",
+      "expiryOptions": {
+        "never": "無期限",
+        "30days": "30日間",
+        "60days": "60日間",
+        "90days": "90日間",
+        "1year": "1年"
+      },
+      "submit": "作成",
+      "cancel": "キャンセル"
+    },
+    "created": {
+      "title": "キーが作成されました",
+      "warning": "このキーを今すぐコピーしてください。再度表示されることはありません。",
+      "copied": "コピー済み",
+      "copyButton": "クリップボードにコピー",
+      "done": "完了"
+    },
+    "scopes": {
+      "notesRead": "ノートの読み取り",
+      "notesWrite": "ノートの作成と編集",
+      "transcriptionsRead": "文字起こしの読み取り",
+      "usageRead": "使用状況の表示"
+    },
+    "revoke": {
+      "button": "取り消し",
+      "confirm": "このAPIキーを取り消しますか？このキーを使用しているインテグレーションは機能しなくなります。",
+      "success": "APIキーが取り消されました"
+    },
+    "neverUsed": "未使用",
+    "lastUsed": "{{time}}に使用",
+    "maxKeysReached": "キーの上限（{{max}}個）に達しました",
+    "errors": {
+      "loadFailed": "APIキーを読み込めませんでした",
+      "createFailed": "APIキーを作成できませんでした",
+      "revokeFailed": "APIキーを取り消せませんでした"
+    }
   },
   "embeddedChat": {
     "askPlaceholder": "何でも聞いてください...",

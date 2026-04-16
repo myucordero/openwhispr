@@ -32,6 +32,9 @@ export interface TranscriptionItem {
   status: TranscriptionStatus;
   error_message: string | null;
   error_code: TranscriptionErrorCode;
+  client_transcription_id: string;
+  cloud_id: string | null;
+  sync_status: "synced" | "pending" | "error";
 }
 
 export interface NoteItem {
@@ -51,6 +54,9 @@ export interface NoteItem {
   cloud_id: string | null;
   created_at: string;
   updated_at: string;
+  client_note_id: string;
+  sync_status: "synced" | "pending" | "error";
+  deleted_at: string | null;
 }
 
 export interface FolderItem {
@@ -59,6 +65,9 @@ export interface FolderItem {
   is_default: number;
   sort_order: number;
   created_at: string;
+  client_folder_id: string;
+  cloud_id: string | null;
+  sync_status: "synced" | "pending" | "error";
 }
 
 export interface ActionItem {
@@ -317,6 +326,9 @@ export interface ConversationPreview {
   updated_at: string;
   archived_at?: string | null;
   cloud_id?: string | null;
+  client_conversation_id?: string;
+  sync_status?: "synced" | "pending" | "error";
+  deleted_at?: string | null;
   message_count: number;
   last_message?: string | null;
   last_message_role?: "user" | "assistant" | "system" | null;
@@ -1543,6 +1555,41 @@ declare global {
         bounds?: { x: number; y: number; width: number; height: number };
       }>;
       sendDictationPreviewAudio?: (data: ArrayBuffer) => void;
+
+      // Sync operations
+      getPendingNotes?: () => Promise<NoteItem[]>;
+      getPendingNoteDeletes?: () => Promise<NoteItem[]>;
+      getNoteByClientId?: (clientNoteId: string) => Promise<NoteItem | null>;
+      upsertNoteFromCloud?: (
+        cloudNote: Record<string, unknown>,
+        localFolderId: number | null
+      ) => Promise<NoteItem>;
+      markNoteSynced?: (id: number, cloudId: string) => Promise<void>;
+      markNoteSyncError?: (id: number) => Promise<void>;
+      hardDeleteNote?: (id: number) => Promise<void>;
+
+      getPendingFolders?: () => Promise<FolderItem[]>;
+      getFolderByClientId?: (clientFolderId: string) => Promise<FolderItem | null>;
+      upsertFolderFromCloud?: (cloudFolder: Record<string, unknown>) => Promise<FolderItem>;
+      markFolderSynced?: (id: number, cloudId: string) => Promise<void>;
+      getFolderIdMap?: () => Promise<FolderItem[]>;
+
+      getPendingConversations?: () => Promise<ConversationPreview[]>;
+      getPendingConversationDeletes?: () => Promise<ConversationPreview[]>;
+      getConversationByClientId?: (clientId: string) => Promise<ConversationPreview | null>;
+      upsertConversationFromCloud?: (
+        cloudConv: Record<string, unknown>,
+        messages: Array<Record<string, unknown>>
+      ) => Promise<void>;
+      markConversationSynced?: (id: number, cloudId: string) => Promise<void>;
+      hardDeleteConversation?: (id: number) => Promise<void>;
+
+      getPendingTranscriptions?: () => Promise<TranscriptionItem[]>;
+      getTranscriptionByClientId?: (clientId: string) => Promise<TranscriptionItem | null>;
+      upsertTranscriptionFromCloud?: (
+        cloudTranscription: Record<string, unknown>
+      ) => Promise<TranscriptionItem>;
+      markTranscriptionSynced?: (id: number, cloudId: string) => Promise<void>;
     };
 
     api?: {

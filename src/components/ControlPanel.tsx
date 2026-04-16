@@ -26,6 +26,7 @@ import { getCachedPlatform } from "../utils/platform";
 import { isAccessibilitySkipped } from "../utils/permissions";
 import { setActiveNoteId, setActiveFolderId, initializeNotes } from "../stores/noteStore";
 import HistoryView from "./HistoryView";
+import { syncService } from "../services/SyncService.js";
 
 const platform = getCachedPlatform();
 
@@ -267,6 +268,10 @@ export default function ControlPanel() {
     });
     return () => cleanup?.();
   }, [toast, t]);
+
+  useEffect(() => {
+    syncService.syncAll().catch(console.error);
+  }, []);
 
   const handleMeetingRecordingRequestHandled = useCallback(
     () => setMeetingRecordingRequest(null),
