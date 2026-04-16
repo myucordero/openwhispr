@@ -79,6 +79,7 @@ interface NoteEditorProps {
   onStartRecording: () => void;
   onStopRecording: () => void;
   onExportNote?: (format: "md" | "txt") => void;
+  onExportTranscript?: (format: "txt" | "srt" | "json") => void;
   enhancement?: Enhancement;
   actionPicker?: React.ReactNode;
   actionProcessingState?: ActionProcessingState;
@@ -109,6 +110,7 @@ export default function NoteEditor({
   onStartRecording,
   onStopRecording,
   onExportNote,
+  onExportTranscript,
   enhancement,
   actionPicker,
   actionProcessingState,
@@ -766,7 +768,7 @@ export default function NoteEditor({
                   )}
                 </div>
               )}
-              {onExportNote && (
+              {(onExportNote || onExportTranscript) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
@@ -777,14 +779,48 @@ export default function NoteEditor({
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" sideOffset={4}>
-                    <DropdownMenuItem onClick={() => onExportNote("md")} className="text-xs gap-2">
-                      <FileText size={13} className="text-foreground/40" />
-                      {t("notes.editor.asMarkdown")}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onExportNote("txt")} className="text-xs gap-2">
-                      <FileText size={13} className="text-foreground/40" />
-                      {t("notes.editor.asPlainText")}
-                    </DropdownMenuItem>
+                    {viewMode === "transcript" && onExportTranscript ? (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() => onExportTranscript("txt")}
+                          className="text-xs gap-2"
+                        >
+                          <FileText size={13} className="text-foreground/40" />
+                          {t("notes.editor.asTranscriptText")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => onExportTranscript("srt")}
+                          className="text-xs gap-2"
+                        >
+                          <FileText size={13} className="text-foreground/40" />
+                          {t("notes.editor.asSubtitles")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => onExportTranscript("json")}
+                          className="text-xs gap-2"
+                        >
+                          <FileText size={13} className="text-foreground/40" />
+                          {t("notes.editor.asJson")}
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() => onExportNote?.("md")}
+                          className="text-xs gap-2"
+                        >
+                          <FileText size={13} className="text-foreground/40" />
+                          {t("notes.editor.asMarkdown")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => onExportNote?.("txt")}
+                          className="text-xs gap-2"
+                        >
+                          <FileText size={13} className="text-foreground/40" />
+                          {t("notes.editor.asPlainText")}
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}

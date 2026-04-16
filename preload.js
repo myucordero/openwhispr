@@ -84,6 +84,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   updateNote: (id, updates) => ipcRenderer.invoke("db-update-note", id, updates),
   deleteNote: (id) => ipcRenderer.invoke("db-delete-note", id),
   exportNote: (noteId, format) => ipcRenderer.invoke("export-note", noteId, format),
+  exportTranscript: (noteId, format) => ipcRenderer.invoke("export-transcript", noteId, format),
   searchNotes: (query, limit) => ipcRenderer.invoke("db-search-notes", query, limit),
   semanticSearchNotes: (query, limit) =>
     ipcRenderer.invoke("db-semantic-search-notes", query, limit),

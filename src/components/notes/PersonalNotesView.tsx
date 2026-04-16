@@ -451,6 +451,14 @@ export default function PersonalNotesView({
     [activeNoteId]
   );
 
+  const handleExportTranscript = useCallback(
+    async (format: "txt" | "srt" | "json") => {
+      if (!activeNoteId) return;
+      await window.electronAPI.exportTranscript(activeNoteId, format);
+    },
+    [activeNoteId]
+  );
+
   // Pre-warm WebSocket when entering meeting mode (before user hits record)
   useEffect(() => {
     if (isMeetingMode) {
@@ -890,6 +898,7 @@ export default function PersonalNotesView({
               onStartRecording={startRecording}
               onStopRecording={stopRecording}
               onExportNote={handleExportNote}
+              onExportTranscript={handleExportTranscript}
               enhancement={
                 localEnhancedContent
                   ? {
