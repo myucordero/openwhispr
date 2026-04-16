@@ -1,4 +1,5 @@
 import { Globe, Download, Trash2, X, ExternalLink } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "./button";
 import type { ColorScheme } from "../../utils/modelPickerStyles";
 import { createExternalLinkHandler } from "../../utils/externalLinks";
@@ -61,6 +62,7 @@ export default function ModelCardList({
   onCancelDownload,
   isCancelling = false,
 }: ModelCardListProps) {
+  const { t } = useTranslation();
   const styles = COLOR_CONFIG[colorScheme];
   const isLocalMode = Boolean(onDownload);
 
@@ -160,7 +162,7 @@ export default function ModelCardList({
                   onClick={createExternalLinkHandler(model.specUrl)}
                   className="inline-flex items-center gap-0.5 text-xs text-primary/60 hover:text-primary transition-colors shrink-0"
                 >
-                  Model info
+                  {t("models.learnMore")}
                   <ExternalLink size={9} />
                 </a>
               )}

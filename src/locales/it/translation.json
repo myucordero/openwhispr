@@ -1469,6 +1469,7 @@
     }
   },
   "models": {
+    "learnMore": "Scopri di più",
     "descriptions": {
       "parakeet": {
         "parakeet_tdt_0_6b_v3": "ASR multilingue veloce con rilevamento automatico della lingua (25 lingue)"
