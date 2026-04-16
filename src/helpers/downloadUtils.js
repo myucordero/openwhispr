@@ -39,8 +39,7 @@ const TLS_ERROR_CODES = new Set([
 function isTlsError(error) {
   return (
     TLS_ERROR_CODES.has(error.code) ||
-    (error.message &&
-      error.message.includes("unable to get local issuer certificate"))
+    (error.message && error.message.includes("unable to get local issuer certificate"))
   );
 }
 
@@ -238,10 +237,10 @@ function downloadAttempt(url, tempPath, options) {
         reject(Object.assign(new Error("Download cancelled"), { isAbort: true }));
       } else if (isTlsError(err)) {
         reject(
-          Object.assign(
-            new Error(`Certificate error: ${err.message}`),
-            { code: "TLS_ERROR", isTlsError: true },
-          ),
+          Object.assign(new Error(`Certificate error: ${err.message}`), {
+            code: "TLS_ERROR",
+            isTlsError: true,
+          })
         );
       } else {
         reject(err);

@@ -17,8 +17,7 @@
     "paths": {
       "@/*": ["./*"]
     },
-    "baseUrl": ".",
-    "ignoreDeprecations": "6.0"
+    "baseUrl": "."
   },
   "include": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
   "exclude": ["node_modules", "dist"]

@@ -71,7 +71,7 @@ export const updateNoteTool: ToolDefinition = {
         return { success: false, data: null, displayText: "Failed to update note" };
       }
 
-      syncService.debouncedPush('note', id);
+      syncService.debouncedPush("note", id);
 
       const suffix = folderCreated ? ` (moved to new folder "${folderName}")` : "";
       return {

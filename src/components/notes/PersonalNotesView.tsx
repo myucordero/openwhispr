@@ -200,6 +200,13 @@ export default function PersonalNotesView({
         setLocalTitle(activeNote.title);
         setLocalContent(activeNote.content);
         setLocalEnhancedContent(activeNote.enhanced_content ?? null);
+      } else if (activeNote && activeNote.id === activeNoteRef.current && !saveTimeoutRef.current) {
+        // External update (e.g. AI chat tool) — resync only when no user save is pending
+        if (activeNote.title !== localTitleRef.current) setLocalTitle(activeNote.title);
+        if (activeNote.content !== localContentRef.current) setLocalContent(activeNote.content);
+        if ((activeNote.enhanced_content ?? null) !== localEnhancedContent) {
+          setLocalEnhancedContent(activeNote.enhanced_content ?? null);
+        }
       }
       if (!activeNote) {
         if (saveTimeoutRef.current) {
@@ -217,7 +224,7 @@ export default function PersonalNotesView({
       }
     };
     syncNote();
-  }, [activeNote]);
+  }, [activeNote, localEnhancedContent]);
 
   const debouncedSave = useCallback((noteId: number, title: string, content: string) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);

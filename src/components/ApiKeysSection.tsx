@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import { Skeleton } from "./ui/skeleton";
-import { useToast } from "./ui/Toast";
+import { useToast } from "./ui/useToast";
 import {
   Dialog,
   DialogContent,

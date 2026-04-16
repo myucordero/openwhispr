@@ -63,7 +63,7 @@ export default function NoteEditor({ note, cloudEnabled, onDelete, onUpdate }: N
           await window.electronAPI.updateNote(note.id, updates);
           const updated = { ...note, ...updates };
           onUpdate(updated);
-          syncService.debouncedPush('note', note.id);
+          syncService.debouncedPush("note", note.id);
           setSaveState("saved");
           fadeTimerRef.current = setTimeout(() => setSaveState("idle"), 2000);
         } catch {

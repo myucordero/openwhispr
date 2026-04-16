@@ -58,7 +58,7 @@ export const createNoteTool: ToolDefinition = {
         return { success: false, data: null, displayText: "Failed to create note" };
       }
 
-      syncService.debouncedPush('note', result.note.id);
+      syncService.debouncedPush("note", result.note.id);
 
       const suffix = folderCreated ? ` in new folder "${folderName}"` : "";
       return {

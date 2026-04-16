@@ -464,7 +464,9 @@ class DatabaseManager {
         if (!err.message.includes("duplicate column")) throw err;
       }
       try {
-        this.db.exec("ALTER TABLE agent_conversations ADD COLUMN sync_status TEXT DEFAULT 'pending'");
+        this.db.exec(
+          "ALTER TABLE agent_conversations ADD COLUMN sync_status TEXT DEFAULT 'pending'"
+        );
       } catch (err) {
         if (!err.message.includes("duplicate column")) throw err;
       }
@@ -506,10 +508,18 @@ class DatabaseManager {
         }
       }
 
-      this.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_client_note_id ON notes(client_note_id)");
-      this.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_folders_client_folder_id ON folders(client_folder_id)");
-      this.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_conversations_client_id ON agent_conversations(client_conversation_id)");
-      this.db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_transcriptions_client_id ON transcriptions(client_transcription_id)");
+      this.db.exec(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_client_note_id ON notes(client_note_id)"
+      );
+      this.db.exec(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_folders_client_folder_id ON folders(client_folder_id)"
+      );
+      this.db.exec(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_conversations_client_id ON agent_conversations(client_conversation_id)"
+      );
+      this.db.exec(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_transcriptions_client_id ON transcriptions(client_transcription_id)"
+      );
 
       return true;
     } catch (error) {
@@ -531,7 +541,14 @@ class DatabaseManager {
       const stmt = this.db.prepare(
         "INSERT INTO transcriptions (text, raw_text, status, error_message, error_code, client_transcription_id) VALUES (?, ?, ?, ?, ?, ?)"
       );
-      const result = stmt.run(text, rawText, status, errorMessage, errorCode, clientTranscriptionId);
+      const result = stmt.run(
+        text,
+        rawText,
+        status,
+        errorMessage,
+        errorCode,
+        clientTranscriptionId
+      );
 
       const fetchStmt = this.db.prepare("SELECT * FROM transcriptions WHERE id = ?");
       const transcription = fetchStmt.get(result.lastInsertRowid);
@@ -718,7 +735,15 @@ class DatabaseManager {
       const stmt = this.db.prepare(
         "INSERT INTO notes (title, content, note_type, source_file, audio_duration_seconds, folder_id, client_note_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
       );
-      const result = stmt.run(title, content, noteType, sourceFile, audioDuration, folderId, clientNoteId);
+      const result = stmt.run(
+        title,
+        content,
+        noteType,
+        sourceFile,
+        audioDuration,
+        folderId,
+        clientNoteId
+      );
 
       const fetchStmt = this.db.prepare("SELECT * FROM notes WHERE id = ?");
       const note = fetchStmt.get(result.lastInsertRowid);
@@ -886,7 +911,9 @@ class DatabaseManager {
     try {
       if (!this.db) throw new Error("Database not initialized");
       return this.db
-        .prepare("SELECT folder_id, COUNT(*) as count FROM notes WHERE deleted_at IS NULL GROUP BY folder_id")
+        .prepare(
+          "SELECT folder_id, COUNT(*) as count FROM notes WHERE deleted_at IS NULL GROUP BY folder_id"
+        )
         .all();
     } catch (error) {
       debugLogger.error("Error getting folder note counts", { error: error.message }, "notes");
@@ -997,7 +1024,9 @@ class DatabaseManager {
       if (!this.db) throw new Error("Database not initialized");
       const clientConversationId = randomUUID();
       const result = this.db
-        .prepare("INSERT INTO agent_conversations (title, note_id, client_conversation_id) VALUES (?, ?, ?)")
+        .prepare(
+          "INSERT INTO agent_conversations (title, note_id, client_conversation_id) VALUES (?, ?, ?)"
+        )
         .run(title, noteId, clientConversationId);
       return this.db
         .prepare("SELECT * FROM agent_conversations WHERE id = ?")
@@ -1037,7 +1066,9 @@ class DatabaseManager {
     try {
       if (!this.db) throw new Error("Database not initialized");
       return this.db
-        .prepare("SELECT * FROM agent_conversations WHERE deleted_at IS NULL ORDER BY updated_at DESC LIMIT ?")
+        .prepare(
+          "SELECT * FROM agent_conversations WHERE deleted_at IS NULL ORDER BY updated_at DESC LIMIT ?"
+        )
         .all(limit);
     } catch (error) {
       debugLogger.error("Error getting agent conversations", { error: error.message }, "database");
@@ -1857,7 +1888,6 @@ class DatabaseManager {
     }
   }
 
-
   getPendingNotes() {
     try {
       if (!this.db) throw new Error("Database not initialized");
@@ -1874,7 +1904,9 @@ class DatabaseManager {
     try {
       if (!this.db) throw new Error("Database not initialized");
       return this.db
-        .prepare("SELECT * FROM notes WHERE deleted_at IS NOT NULL AND cloud_id IS NOT NULL AND sync_status = 'pending'")
+        .prepare(
+          "SELECT * FROM notes WHERE deleted_at IS NOT NULL AND cloud_id IS NOT NULL AND sync_status = 'pending'"
+        )
         .all();
     } catch (error) {
       debugLogger.error("Error getting pending note deletes", { error: error.message }, "database");
@@ -1885,7 +1917,9 @@ class DatabaseManager {
   getNoteByClientId(clientNoteId) {
     try {
       if (!this.db) throw new Error("Database not initialized");
-      return this.db.prepare("SELECT * FROM notes WHERE client_note_id = ?").get(clientNoteId) || null;
+      return (
+        this.db.prepare("SELECT * FROM notes WHERE client_note_id = ?").get(clientNoteId) || null
+      );
     } catch (error) {
       debugLogger.error("Error getting note by client id", { error: error.message }, "database");
       throw error;
@@ -1928,7 +1962,9 @@ class DatabaseManager {
         cloudNote.created_at,
         cloudNote.updated_at
       );
-      return this.db.prepare("SELECT * FROM notes WHERE client_note_id = ?").get(cloudNote.client_note_id);
+      return this.db
+        .prepare("SELECT * FROM notes WHERE client_note_id = ?")
+        .get(cloudNote.client_note_id);
     } catch (error) {
       debugLogger.error("Error upserting note from cloud", { error: error.message }, "database");
       throw error;
@@ -1938,7 +1974,9 @@ class DatabaseManager {
   markNoteSynced(id, cloudId) {
     try {
       if (!this.db) throw new Error("Database not initialized");
-      this.db.prepare("UPDATE notes SET sync_status = 'synced', cloud_id = ? WHERE id = ?").run(cloudId, id);
+      this.db
+        .prepare("UPDATE notes SET sync_status = 'synced', cloud_id = ? WHERE id = ?")
+        .run(cloudId, id);
       return { success: true };
     } catch (error) {
       debugLogger.error("Error marking note synced", { error: error.message }, "database");
@@ -1968,7 +2006,6 @@ class DatabaseManager {
     }
   }
 
-
   getPendingFolders() {
     try {
       if (!this.db) throw new Error("Database not initialized");
@@ -1982,7 +2019,10 @@ class DatabaseManager {
   getFolderByClientId(clientFolderId) {
     try {
       if (!this.db) throw new Error("Database not initialized");
-      return this.db.prepare("SELECT * FROM folders WHERE client_folder_id = ?").get(clientFolderId) || null;
+      return (
+        this.db.prepare("SELECT * FROM folders WHERE client_folder_id = ?").get(clientFolderId) ||
+        null
+      );
     } catch (error) {
       debugLogger.error("Error getting folder by client id", { error: error.message }, "database");
       throw error;
@@ -2009,7 +2049,9 @@ class DatabaseManager {
         cloudFolder.sort_order || 0,
         cloudFolder.created_at
       );
-      return this.db.prepare("SELECT * FROM folders WHERE client_folder_id = ?").get(cloudFolder.client_folder_id);
+      return this.db
+        .prepare("SELECT * FROM folders WHERE client_folder_id = ?")
+        .get(cloudFolder.client_folder_id);
     } catch (error) {
       debugLogger.error("Error upserting folder from cloud", { error: error.message }, "database");
       throw error;
@@ -2019,7 +2061,9 @@ class DatabaseManager {
   markFolderSynced(id, cloudId) {
     try {
       if (!this.db) throw new Error("Database not initialized");
-      this.db.prepare("UPDATE folders SET sync_status = 'synced', cloud_id = ? WHERE id = ?").run(cloudId, id);
+      this.db
+        .prepare("UPDATE folders SET sync_status = 'synced', cloud_id = ? WHERE id = ?")
+        .run(cloudId, id);
       return { success: true };
     } catch (error) {
       debugLogger.error("Error marking folder synced", { error: error.message }, "database");
@@ -2037,15 +2081,20 @@ class DatabaseManager {
     }
   }
 
-
   getPendingConversations() {
     try {
       if (!this.db) throw new Error("Database not initialized");
       return this.db
-        .prepare("SELECT * FROM agent_conversations WHERE sync_status = 'pending' AND deleted_at IS NULL")
+        .prepare(
+          "SELECT * FROM agent_conversations WHERE sync_status = 'pending' AND deleted_at IS NULL"
+        )
         .all();
     } catch (error) {
-      debugLogger.error("Error getting pending conversations", { error: error.message }, "database");
+      debugLogger.error(
+        "Error getting pending conversations",
+        { error: error.message },
+        "database"
+      );
       throw error;
     }
   }
@@ -2054,10 +2103,16 @@ class DatabaseManager {
     try {
       if (!this.db) throw new Error("Database not initialized");
       return this.db
-        .prepare("SELECT * FROM agent_conversations WHERE deleted_at IS NOT NULL AND cloud_id IS NOT NULL AND sync_status = 'pending'")
+        .prepare(
+          "SELECT * FROM agent_conversations WHERE deleted_at IS NOT NULL AND cloud_id IS NOT NULL AND sync_status = 'pending'"
+        )
         .all();
     } catch (error) {
-      debugLogger.error("Error getting pending conversation deletes", { error: error.message }, "database");
+      debugLogger.error(
+        "Error getting pending conversation deletes",
+        { error: error.message },
+        "database"
+      );
       throw error;
     }
   }
@@ -2065,9 +2120,17 @@ class DatabaseManager {
   getConversationByClientId(clientId) {
     try {
       if (!this.db) throw new Error("Database not initialized");
-      return this.db.prepare("SELECT * FROM agent_conversations WHERE client_conversation_id = ?").get(clientId) || null;
+      return (
+        this.db
+          .prepare("SELECT * FROM agent_conversations WHERE client_conversation_id = ?")
+          .get(clientId) || null
+      );
     } catch (error) {
-      debugLogger.error("Error getting conversation by client id", { error: error.message }, "database");
+      debugLogger.error(
+        "Error getting conversation by client id",
+        { error: error.message },
+        "database"
+      );
       throw error;
     }
   }
@@ -2110,7 +2173,11 @@ class DatabaseManager {
       });
       return transaction();
     } catch (error) {
-      debugLogger.error("Error upserting conversation from cloud", { error: error.message }, "database");
+      debugLogger.error(
+        "Error upserting conversation from cloud",
+        { error: error.message },
+        "database"
+      );
       throw error;
     }
   }
@@ -2118,7 +2185,9 @@ class DatabaseManager {
   markConversationSynced(id, cloudId) {
     try {
       if (!this.db) throw new Error("Database not initialized");
-      this.db.prepare("UPDATE agent_conversations SET sync_status = 'synced', cloud_id = ? WHERE id = ?").run(cloudId, id);
+      this.db
+        .prepare("UPDATE agent_conversations SET sync_status = 'synced', cloud_id = ? WHERE id = ?")
+        .run(cloudId, id);
       return { success: true };
     } catch (error) {
       debugLogger.error("Error marking conversation synced", { error: error.message }, "database");
@@ -2138,13 +2207,16 @@ class DatabaseManager {
     }
   }
 
-
   getPendingTranscriptions() {
     try {
       if (!this.db) throw new Error("Database not initialized");
       return this.db.prepare("SELECT * FROM transcriptions WHERE sync_status = 'pending'").all();
     } catch (error) {
-      debugLogger.error("Error getting pending transcriptions", { error: error.message }, "database");
+      debugLogger.error(
+        "Error getting pending transcriptions",
+        { error: error.message },
+        "database"
+      );
       throw error;
     }
   }
@@ -2152,9 +2224,17 @@ class DatabaseManager {
   getTranscriptionByClientId(clientId) {
     try {
       if (!this.db) throw new Error("Database not initialized");
-      return this.db.prepare("SELECT * FROM transcriptions WHERE client_transcription_id = ?").get(clientId) || null;
+      return (
+        this.db
+          .prepare("SELECT * FROM transcriptions WHERE client_transcription_id = ?")
+          .get(clientId) || null
+      );
     } catch (error) {
-      debugLogger.error("Error getting transcription by client id", { error: error.message }, "database");
+      debugLogger.error(
+        "Error getting transcription by client id",
+        { error: error.message },
+        "database"
+      );
       throw error;
     }
   }
@@ -2180,9 +2260,15 @@ class DatabaseManager {
         cloudTranscription.status || "completed",
         cloudTranscription.created_at
       );
-      return this.db.prepare("SELECT * FROM transcriptions WHERE client_transcription_id = ?").get(cloudTranscription.client_transcription_id);
+      return this.db
+        .prepare("SELECT * FROM transcriptions WHERE client_transcription_id = ?")
+        .get(cloudTranscription.client_transcription_id);
     } catch (error) {
-      debugLogger.error("Error upserting transcription from cloud", { error: error.message }, "database");
+      debugLogger.error(
+        "Error upserting transcription from cloud",
+        { error: error.message },
+        "database"
+      );
       throw error;
     }
   }
@@ -2190,7 +2276,9 @@ class DatabaseManager {
   markTranscriptionSynced(id, cloudId) {
     try {
       if (!this.db) throw new Error("Database not initialized");
-      this.db.prepare("UPDATE transcriptions SET sync_status = 'synced', cloud_id = ? WHERE id = ?").run(cloudId, id);
+      this.db
+        .prepare("UPDATE transcriptions SET sync_status = 'synced', cloud_id = ? WHERE id = ?")
+        .run(cloudId, id);
       return { success: true };
     } catch (error) {
       debugLogger.error("Error marking transcription synced", { error: error.message }, "database");

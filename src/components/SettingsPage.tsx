@@ -3447,25 +3447,35 @@ EOF`,
                       {t("settingsPage.privacy.cloudNotesMigrationDone")}
                     </p>
                   )}
-                  {cloudBackupEnabled && isSignedIn && (() => {
-                    const lastSyncedAt = localStorage.getItem("lastSyncedAt");
-                    if (!lastSyncedAt) return null;
-                    const date = new Date(lastSyncedAt);
-                    const now = new Date();
-                    const diffMs = now.getTime() - date.getTime();
-                    const diffMin = Math.floor(diffMs / 60000);
-                    const diffHr = Math.floor(diffMs / 3600000);
-                    let relative: string;
-                    if (diffMin < 1) relative = t("settingsPage.privacy.justNow");
-                    else if (diffMin < 60) relative = t("settingsPage.privacy.minutesAgo", { count: diffMin });
-                    else if (diffHr < 24) relative = t("settingsPage.privacy.hoursAgo", { count: diffHr });
-                    else relative = date.toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-                    return (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {t("settingsPage.privacy.lastSynced", { time: relative })}
-                      </p>
-                    );
-                  })()}
+                  {cloudBackupEnabled &&
+                    isSignedIn &&
+                    (() => {
+                      const lastSyncedAt = localStorage.getItem("lastSyncedAt");
+                      if (!lastSyncedAt) return null;
+                      const date = new Date(lastSyncedAt);
+                      const now = new Date();
+                      const diffMs = now.getTime() - date.getTime();
+                      const diffMin = Math.floor(diffMs / 60000);
+                      const diffHr = Math.floor(diffMs / 3600000);
+                      let relative: string;
+                      if (diffMin < 1) relative = t("settingsPage.privacy.justNow");
+                      else if (diffMin < 60)
+                        relative = t("settingsPage.privacy.minutesAgo", { count: diffMin });
+                      else if (diffHr < 24)
+                        relative = t("settingsPage.privacy.hoursAgo", { count: diffHr });
+                      else
+                        relative = date.toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
+                      return (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {t("settingsPage.privacy.lastSynced", { time: relative })}
+                        </p>
+                      );
+                    })()}
                 </div>
               )}
 

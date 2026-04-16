@@ -1144,6 +1144,7 @@ declare global {
           title: string;
           archived_at?: string;
           cloud_id?: string;
+          client_conversation_id?: string;
           created_at: string;
           updated_at: string;
         }>

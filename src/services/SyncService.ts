@@ -222,7 +222,9 @@ class SyncService {
           cloudFolder.client_folder_id ?? ""
         );
         if (!local || cloudFolder.updated_at > local.created_at) {
-          await window.electronAPI.upsertFolderFromCloud?.(cloudFolder);
+          await window.electronAPI.upsertFolderFromCloud?.(
+            cloudFolder as unknown as Record<string, unknown>
+          );
         }
       }
     } catch (err) {
@@ -319,7 +321,10 @@ class SyncService {
             : defaultFolderId;
 
           if (!local || cloudNote.updated_at > local.updated_at) {
-            await window.electronAPI.upsertNoteFromCloud?.(cloudNote, localFolderId);
+            await window.electronAPI.upsertNoteFromCloud?.(
+              cloudNote as unknown as Record<string, unknown>,
+              localFolderId
+            );
           }
         }
       }
@@ -411,8 +416,8 @@ class SyncService {
           );
           if (!local || cloudConv.updated_at > local.updated_at) {
             await window.electronAPI.upsertConversationFromCloud?.(
-              cloudConv,
-              cloudConv.messages ?? []
+              cloudConv as unknown as Record<string, unknown>,
+              (cloudConv.messages ?? []) as unknown as Array<Record<string, unknown>>
             );
           }
         }
@@ -478,7 +483,9 @@ class SyncService {
             cloudT.client_transcription_id ?? ""
           );
           if (!local) {
-            await window.electronAPI.upsertTranscriptionFromCloud?.(cloudT);
+            await window.electronAPI.upsertTranscriptionFromCloud?.(
+              cloudT as unknown as Record<string, unknown>
+            );
           }
         }
       }
