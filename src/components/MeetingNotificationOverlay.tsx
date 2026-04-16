@@ -13,7 +13,6 @@ interface NotificationData {
 export default function MeetingNotificationOverlay() {
   const [data, setData] = useState<NotificationData | null>(null);
   const [isVisible, setIsVisible] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
     let shown = false;
@@ -50,7 +49,7 @@ export default function MeetingNotificationOverlay() {
   );
 
   return (
-    <div className="meeting-notification-window w-full h-full bg-transparent pl-4 pr-2 pt-4 pb-2 overflow-visible">
+    <div className="meeting-notification-window w-full h-full bg-transparent p-2">
       <div
         className={[
           "relative",
@@ -62,25 +61,14 @@ export default function MeetingNotificationOverlay() {
             ? "translate-x-0 opacity-100 scale-100"
             : "translate-x-[120%] opacity-0 scale-95",
         ].join(" ")}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
       >
-        <button
-          onClick={() => respond("dismiss")}
-          className={[
-            "absolute -left-2 -top-2 z-10 size-6 rounded-full",
-            "flex items-center justify-center",
-            "bg-white/10 backdrop-blur-sm border border-white/10",
-            "text-white/70 hover:text-white hover:bg-white/20",
-            "transition-all duration-150",
-            "focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30",
-            isHovered ? "opacity-100 scale-100" : "opacity-0 scale-75 pointer-events-none",
-          ].join(" ")}
-        >
-          <X className="size-3" />
-        </button>
-
         <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => respond("dismiss")}
+            className="shrink-0 size-6 rounded-full flex items-center justify-center bg-black/5 dark:bg-white/8 text-muted-foreground/50 hover:text-foreground hover:bg-black/10 dark:hover:bg-white/15 transition-colors duration-150"
+          >
+            <X className="size-3" />
+          </button>
           <div className="shrink-0 bg-primary/10 rounded-md p-1">
             <svg viewBox="0 0 1024 1024" className="w-4.5 h-4.5">
               <rect width="1024" height="1024" rx="241" fill="#2056DF" />
