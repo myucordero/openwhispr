@@ -1182,6 +1182,7 @@ export default function SettingsPage({ activeSection = "general" }: SettingsPage
     pro: true,
     business: true,
   });
+  const [checkoutTier, setCheckoutTier] = useState<string | null>(null);
   const [switchPreview, setSwitchPreview] = useState<{
     plan: "monthly" | "annual";
     tier: "pro" | "business";
@@ -1260,7 +1261,9 @@ export default function SettingsPage({ activeSection = "general" }: SettingsPage
 
   const handleCheckout = useCallback(
     async (plan: "monthly" | "annual", tier: "pro" | "business") => {
+      setCheckoutTier(tier);
       const result = await usage.openCheckout({ plan, tier });
+      setCheckoutTier(null);
       if (!result.success) {
         toast({
           title: t("settingsPage.account.checkout.couldNotOpenTitle"),
@@ -1651,11 +1654,15 @@ export default function SettingsPage({ activeSection = "general" }: SettingsPage
                         onClick={() =>
                           handleCheckout(billingState.pro ? "annual" : "monthly", "pro")
                         }
-                        disabled={usage?.checkoutLoading}
+                        disabled={!!checkoutTier}
                         size="sm"
                         className="mt-2 w-full h-6 text-[10px]"
                       >
-                        {t("settingsPage.account.pricing.pro.cta")}
+                        {checkoutTier === "pro" ? (
+                          <Loader2 size={10} className="animate-spin" />
+                        ) : (
+                          t("settingsPage.account.pricing.pro.cta")
+                        )}
                       </Button>
                     )}
                   </div>
@@ -1741,11 +1748,15 @@ export default function SettingsPage({ activeSection = "general" }: SettingsPage
                         onClick={() =>
                           handleCheckout(billingState.business ? "annual" : "monthly", "business")
                         }
-                        disabled={usage?.checkoutLoading}
+                        disabled={!!checkoutTier}
                         size="sm"
                         className="mt-2 w-full h-6 text-[10px]"
                       >
-                        {t("settingsPage.account.pricing.business.cta")}
+                        {checkoutTier === "business" ? (
+                          <Loader2 size={10} className="animate-spin" />
+                        ) : (
+                          t("settingsPage.account.pricing.business.cta")
+                        )}
                       </Button>
                     )}
                   </div>
