@@ -161,7 +161,8 @@ class LinuxKeyManager extends EventEmitter {
     if (this.process) {
       try {
         this.process.kill();
-      } catch {} finally {
+      } catch {
+      } finally {
         this.process = null;
       }
     }
@@ -187,7 +188,13 @@ class LinuxKeyManager extends EventEmitter {
         path.join(process.resourcesPath, "resources", binaryNameWithArch),
         path.join(process.resourcesPath, "resources", "bin", binaryNameWithArch),
         path.join(process.resourcesPath, "app.asar.unpacked", "resources", binaryNameWithArch),
-        path.join(process.resourcesPath, "app.asar.unpacked", "resources", "bin", binaryNameWithArch),
+        path.join(
+          process.resourcesPath,
+          "app.asar.unpacked",
+          "resources",
+          "bin",
+          binaryNameWithArch
+        ),
       ].forEach((candidate) => candidates.add(candidate));
     }
 

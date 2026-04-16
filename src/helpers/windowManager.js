@@ -220,7 +220,10 @@ class WindowManager {
       }
 
       // Push mode: defer to native listener (globalShortcut can't detect key-up)
-      if ((process.platform === "win32" || process.platform === "linux") && activationMode === "push") {
+      if (
+        (process.platform === "win32" || process.platform === "linux") &&
+        activationMode === "push"
+      ) {
         return;
       }
 

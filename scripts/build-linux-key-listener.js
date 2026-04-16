@@ -84,14 +84,7 @@ function attemptCompile(command, args) {
   });
 }
 
-const compileArgs = [
-  "-O2",
-  "-Wall",
-  "-Wextra",
-  cSource,
-  "-o",
-  outputBinary,
-];
+const compileArgs = ["-O2", "-Wall", "-Wextra", cSource, "-o", outputBinary];
 
 let result = attemptCompile("gcc", compileArgs);
 
