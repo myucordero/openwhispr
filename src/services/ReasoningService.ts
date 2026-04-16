@@ -29,6 +29,7 @@ class ReasoningService extends BaseReasoningService {
   private static readonly MAX_TOOL_STEPS = 20;
   private cacheCleanupStop: (() => void) | undefined;
   private streamAbortController: AbortController | null = null;
+  private probedBases = new Set<string>();
 
   constructor() {
     super();
@@ -201,6 +202,49 @@ class ReasoningService extends BaseReasoningService {
         JSON.stringify(data)
       );
     } catch {}
+  }
+
+  /** Probe /v1/models to detect llama.cpp and prefer /chat/completions. */
+  private async detectReasoningServerType(base: string): Promise<void> {
+    if (this.probedBases.has(base) || this.getStoredOpenAiPreference(base) !== undefined) {
+      return;
+    }
+
+    const lower = base.toLowerCase();
+    if (lower.endsWith("/responses") || lower.endsWith("/chat/completions")) {
+      return;
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const res = await fetch(buildApiUrl(base, "/models"), {
+        method: "GET",
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        this.probedBases.add(base);
+        return;
+      }
+
+      const body = await res.json();
+      const first = body?.data?.[0];
+
+      if (first?.owned_by === "llamacpp") {
+        this.rememberOpenAiPreference(base, "chat");
+        logger.logReasoning("LLAMACPP_DETECTED_VIA_MODELS", {
+          base,
+          modelId: first?.id,
+          ownedBy: first.owned_by,
+        });
+      }
+
+      this.probedBases.add(base);
+    } catch {
+      this.probedBases.add(base);
+    }
   }
 
   private async getApiKey(
@@ -545,6 +589,7 @@ class ReasoningService extends BaseReasoningService {
       ];
 
       const openAiBase = this.getConfiguredOpenAIBase();
+      await this.detectReasoningServerType(openAiBase);
       const endpointCandidates = this.getOpenAIEndpointCandidates(openAiBase);
       const isCustomEndpoint = openAiBase !== API_ENDPOINTS.OPENAI_BASE;
 
