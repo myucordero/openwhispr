@@ -2150,12 +2150,12 @@ class DatabaseManager {
             updated_at = excluded.updated_at
         `);
         convStmt.run(
-          cloudConv.client_conversation_id,
-          cloudConv.id,
-          cloudConv.title,
-          cloudConv.note_id || null,
-          cloudConv.created_at,
-          cloudConv.updated_at
+          cloudConv.client_conversation_id ?? null,
+          cloudConv.id ?? null,
+          cloudConv.title ?? "Untitled",
+          cloudConv.note_id ?? null,
+          cloudConv.created_at ?? new Date().toISOString(),
+          cloudConv.updated_at ?? new Date().toISOString()
         );
         const conv = this.db
           .prepare("SELECT * FROM agent_conversations WHERE client_conversation_id = ?")
