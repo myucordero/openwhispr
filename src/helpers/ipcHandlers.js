@@ -5663,7 +5663,10 @@ class IPCHandlers {
 
         return { success: true, data };
       } catch (error) {
-        debugLogger.error(`Cloud API request error (${opts?.path}):`, error);
+        debugLogger.error(
+          `Cloud API request error (${opts?.path}): ${error?.message || error} ${error?.code || ""}`.trim(),
+          error?.stack
+        );
         return { success: false, error: error.message };
       }
     });
