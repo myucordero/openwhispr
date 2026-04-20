@@ -1537,8 +1537,7 @@
     "selfHosted": {
       "endpointUrl": "エンドポイント URL",
       "serverUrl": "サーバー URL",
-      "apiKeyOptional": "API キー（任意）",
-      "lanHint": "音声はネットワーク内に留まります — LAN の外には出ません。"
+      "apiKeyOptional": "API キー（任意）"
     }
   },
   "models": {

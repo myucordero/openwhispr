@@ -1537,8 +1537,7 @@
     "selfHosted": {
       "endpointUrl": "Endpunkt-URL",
       "serverUrl": "Server-URL",
-      "apiKeyOptional": "API-Schlüssel (optional)",
-      "lanHint": "Audio bleibt in Ihrem Netzwerk — nichts verlässt Ihr LAN."
+      "apiKeyOptional": "API-Schlüssel (optional)"
     }
   },
   "models": {

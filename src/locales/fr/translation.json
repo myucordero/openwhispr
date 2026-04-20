@@ -1585,8 +1585,7 @@
     "selfHosted": {
       "endpointUrl": "URL du point d'accès",
       "serverUrl": "URL du serveur",
-      "apiKeyOptional": "Clé API (facultative)",
-      "lanHint": "L'audio reste sur votre réseau — rien ne quitte votre LAN."
+      "apiKeyOptional": "Clé API (facultative)"
     }
   },
   "models": {

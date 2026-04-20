@@ -1509,8 +1509,7 @@
     "selfHosted": {
       "endpointUrl": "URL do endpoint",
       "serverUrl": "URL do servidor",
-      "apiKeyOptional": "API Key (opcional)",
-      "lanHint": "O áudio permanece na sua rede — nada sai da sua LAN."
+      "apiKeyOptional": "API Key (opcional)"
     }
   },
   "models": {

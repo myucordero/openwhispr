@@ -1532,8 +1532,7 @@
     "selfHosted": {
       "endpointUrl": "端点 URL",
       "serverUrl": "服务器 URL",
-      "apiKeyOptional": "API Key（可选）",
-      "lanHint": "音频留在你的网络中 — 不会离开你的 LAN。"
+      "apiKeyOptional": "API Key（可选）"
     }
   },
   "models": {
