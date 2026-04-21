@@ -1720,7 +1720,11 @@
       "folderName": "Название папки",
       "couldNotCreate": "Не удалось создать папку",
       "couldNotRename": "Не удалось переименовать папку",
-      "couldNotDelete": "Не удалось удалить папку"
+      "couldNotDelete": "Не удалось удалить папку",
+      "deleteTitle": "Удалить папку?",
+      "deleteDescription": "Это навсегда удалит «{{name}}» и {{count}} заметок в ней. Это действие нельзя отменить.",
+      "deleteDescriptionEmpty": "Это навсегда удалит «{{name}}». Это действие нельзя отменить.",
+      "deleteConfirm": "Удалить папку и заметки"
     },
     "list": {
       "title": "Заметки",

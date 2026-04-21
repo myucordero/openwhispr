@@ -899,20 +899,21 @@ class DatabaseManager {
       const folder = this.db.prepare("SELECT * FROM folders WHERE id = ?").get(id);
       if (!folder) return { success: false, error: "Folder not found" };
       if (folder.is_default) return { success: false, error: "Cannot delete default folders" };
-      const personal = this.db
-        .prepare("SELECT id FROM folders WHERE name = 'Personal' AND is_default = 1")
-        .get();
-      const reassignNotes = this.db.prepare("UPDATE notes SET folder_id = ? WHERE folder_id = ?");
-      const tombstone = this.db.prepare(
+      const noteIds = this.db
+        .prepare("SELECT id FROM notes WHERE folder_id = ?")
+        .all(id)
+        .map((row) => row.id);
+      const hardDeleteNotes = this.db.prepare("DELETE FROM notes WHERE folder_id = ?");
+      const tombstoneFolder = this.db.prepare(
         "UPDATE folders SET deleted_at = datetime('now'), sync_status = 'pending', name = '__deleted_' || id || '_' || name WHERE id = ?"
       );
-      const hardDelete = this.db.prepare("DELETE FROM folders WHERE id = ?");
+      const hardDeleteFolder = this.db.prepare("DELETE FROM folders WHERE id = ?");
       this.db.transaction(() => {
-        if (personal) reassignNotes.run(personal.id, id);
-        if (folder.cloud_id) tombstone.run(id);
-        else hardDelete.run(id);
+        hardDeleteNotes.run(id);
+        if (folder.cloud_id) tombstoneFolder.run(id);
+        else hardDeleteFolder.run(id);
       })();
-      return { success: true, id };
+      return { success: true, id, noteIds };
     } catch (error) {
       debugLogger.error("Error deleting folder", { error: error.message }, "notes");
       throw error;

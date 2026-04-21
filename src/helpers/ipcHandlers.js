@@ -972,11 +972,14 @@ class IPCHandlers {
       const folderName = this._noteFilesEnabled ? this._getFolderName(id) : null;
       const result = this.databaseManager.deleteFolder(id);
       if (result?.success) {
+        for (const noteId of result.noteIds ?? []) {
+          this._asyncVectorDelete(noteId);
+        }
         setImmediate(() => {
           this.broadcastToWindows("folder-deleted", { id });
           if (this._noteFilesEnabled && folderName) {
             const markdownMirror = require("./markdownMirror");
-            markdownMirror.deleteFolder(folderName, "Personal");
+            markdownMirror.deleteFolder(folderName);
           }
         });
       }

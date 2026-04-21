@@ -1720,7 +1720,11 @@
       "folderName": "Nome da pasta",
       "couldNotCreate": "Não foi possível criar a pasta",
       "couldNotRename": "Não foi possível renomear a pasta",
-      "couldNotDelete": "Não foi possível excluir a pasta"
+      "couldNotDelete": "Não foi possível excluir a pasta",
+      "deleteTitle": "Excluir pasta?",
+      "deleteDescription": "Isso excluirá permanentemente \"{{name}}\" e suas {{count}} nota(s). Esta ação não pode ser desfeita.",
+      "deleteDescriptionEmpty": "Isso excluirá permanentemente \"{{name}}\". Esta ação não pode ser desfeita.",
+      "deleteConfirm": "Excluir pasta e notas"
     },
     "list": {
       "title": "Notas",

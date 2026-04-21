@@ -1768,7 +1768,11 @@
       "folderName": "Nombre de la carpeta",
       "couldNotCreate": "No se pudo crear la carpeta",
       "couldNotRename": "No se pudo renombrar la carpeta",
-      "couldNotDelete": "No se pudo eliminar la carpeta"
+      "couldNotDelete": "No se pudo eliminar la carpeta",
+      "deleteTitle": "¿Eliminar carpeta?",
+      "deleteDescription": "Esto eliminará permanentemente \"{{name}}\" y sus {{count}} nota(s). Esta acción no se puede deshacer.",
+      "deleteDescriptionEmpty": "Esto eliminará permanentemente \"{{name}}\". Esta acción no se puede deshacer.",
+      "deleteConfirm": "Eliminar carpeta y notas"
     },
     "list": {
       "title": "Notas",
