@@ -160,7 +160,7 @@
       "systemAudioDescription": "Transcreva reuniões, chamadas, palestras, podcasts e outros áudios do sistema.",
       "optional": "Opcional",
       "recommended": "Recomendado",
-      "accessibilityTroubleshooting": "Não detectado? Remova o OpenWhispr da Acessibilidade nas Configurações do Sistema, adicione-o novamente e ative-o. Você pode pular isso e continuar — o texto será copiado para a área de transferência em vez de ser colado automaticamente."
+      "accessibilityTroubleshooting": "Em Configurações do Sistema → Acessibilidade, desative o interruptor do OpenWhispr e ative-o novamente. Se isso não funcionar, remova o OpenWhispr da lista e adicione-o de volta. Ainda com problemas? Envie um e-mail para support@openwhispr.com."
     },
     "transcription": {
       "title": "Configuração de transcrição",
@@ -2032,6 +2032,12 @@
     "joinDiscord": "Entrar no Discord",
     "contactSupport": "Contatar suporte",
     "submitBug": "Reportar um bug"
+  },
+  "tccReset": {
+    "title": "Conceder novamente as permissões do OpenWhispr",
+    "description": "Desculpe pelo incômodo. O OpenWhispr foi transferido para uma nova conta Apple Developer e o macOS apagou suas permissões. Por favor, conceda-as novamente.",
+    "done": "Concluído",
+    "remindLater": "Lembrar-me mais tarde"
   },
   "apiKeyInput": {
     "placeholder": "Cole sua chave API",

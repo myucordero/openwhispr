@@ -188,7 +188,7 @@
       "systemAudioDescription": "轉錄會議、通話、講座、播客和其他系統音訊。",
       "optional": "可選",
       "recommended": "建議",
-      "accessibilityTroubleshooting": "未偵測到？請在系統設定的輔助使用中移除 OpenWhispr，然後重新加入並開啟。您可以跳過此步驟繼續 — 文字將複製到剪貼簿而非自動貼上。"
+      "accessibilityTroubleshooting": "在系統設定 → 輔助使用中，將 OpenWhispr 的開關關閉再重新開啟。如果無效，請將 OpenWhispr 從清單中移除後重新加入。還是不行？請寄信至 support@openwhispr.com。"
     },
     "transcription": {
       "title": "轉錄設定",
@@ -2027,6 +2027,12 @@
     "joinDiscord": "加入 Discord",
     "contactSupport": "聯絡支援",
     "submitBug": "提交 Bug"
+  },
+  "tccReset": {
+    "title": "重新授予 OpenWhispr 權限",
+    "description": "抱歉造成不便。OpenWhispr 已遷移至新的 Apple Developer 帳號，macOS 已清除您的權限。請重新授予這些權限。",
+    "done": "完成",
+    "remindLater": "稍後提醒我"
   },
   "apiKeyInput": {
     "placeholder": "輸入你的 API Key",

@@ -188,7 +188,7 @@
       "systemAudioDescription": "会議、通話、講義、ポッドキャストなど、システム音声を文字起こしします。",
       "optional": "任意",
       "recommended": "推奨",
-      "accessibilityTroubleshooting": "検出されませんか？システム設定のアクセシビリティからOpenWhisprを削除し、再度追加してオンに切り替えてください。スキップして続行することもできます — テキストは自動貼り付けではなくクリップボードにコピーされます。"
+      "accessibilityTroubleshooting": "システム設定 → アクセシビリティで、OpenWhisprのスイッチをオフにしてから再度オンにしてください。それでもうまくいかない場合は、リストからOpenWhisprを削除して再度追加してみてください。それでも解決しませんか？support@openwhispr.com までメールでお問い合わせください。"
     },
     "transcription": {
       "title": "文字起こし設定",
@@ -2032,6 +2032,12 @@
     "joinDiscord": "Discord に参加",
     "contactSupport": "サポートに問い合わせ",
     "submitBug": "バグを報告"
+  },
+  "tccReset": {
+    "title": "OpenWhispr の権限を再付与してください",
+    "description": "ご不便をおかけしてすみません。OpenWhispr が新しい Apple Developer アカウントに移行したため、macOS が権限をリセットしました。お手数ですが、もう一度権限を付与してください。",
+    "done": "完了",
+    "remindLater": "後で通知"
   },
   "apiKeyInput": {
     "placeholder": "API キーを入力",
