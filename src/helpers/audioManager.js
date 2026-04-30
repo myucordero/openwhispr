@@ -574,6 +574,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
             "OpenWhispr Cloud requires sign-in. Please sign in again or switch to BYOK mode."
           );
           err.code = "AUTH_REQUIRED";
+          err.messageKey = "hooks.audioRecording.errorDescriptions.sessionExpired";
           throw err;
         }
         activeModel = "openwhispr-cloud";
@@ -640,6 +641,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
           title: "Transcription Error",
           description: `Transcription failed: ${error.message}`,
           code: error.code,
+          messageKey: error.messageKey,
         });
 
         // Save failed transcription with audio so the user can retry later
@@ -1273,6 +1275,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
     if (!navigator.onLine) {
       const err = new Error("You're offline. Cloud transcription requires an internet connection.");
       err.code = "OFFLINE";
+      err.messageKey = "hooks.audioRecording.errorDescriptions.offline";
       throw err;
     }
 
@@ -1587,8 +1590,10 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
         );
         const err = new Error(`API Error: ${response.status} ${errorText}`);
         if (response.status === 401) err.code = "INVALID_KEY";
-        else if (response.status === 429) err.code = "LIMIT_REACHED";
-        else if (response.status >= 500) err.code = "SERVER_ERROR";
+        else if (response.status === 429) {
+          err.code = "LIMIT_REACHED";
+          err.messageKey = "hooks.audioRecording.errorDescriptions.dailyLimitReached";
+        } else if (response.status >= 500) err.code = "SERVER_ERROR";
         throw err;
       }
 
@@ -2262,6 +2267,7 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
           preferredLanguage: preferredLang,
           cloudTranscriptionModel,
           cloudTranscriptionMode,
+          useLocalWhisper,
         } = getSettings();
         const res = await provider.start({
           sampleRate: 16000,
@@ -2275,8 +2281,19 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
           if (res.code === "NO_API") {
             return { needsFallback: true };
           }
+          if (res.code === "NETWORK_ERROR" && useLocalWhisper) {
+            this.onError?.({
+              code: "NETWORK_ERROR",
+              title: "streaming.errors.cloudUnreachable.title",
+              description: "Cloud unreachable — using local engine for this recording.",
+              messageKey: "streaming.errors.cloudUnreachable.fallback",
+            });
+            return { needsFallback: true };
+          }
           const err = new Error(res.error || "Failed to start streaming session");
           err.code = res.code;
+          err.messageKey = res.messageKey;
+          err.networkCode = res.networkCode;
           throw err;
         }
         return res;
@@ -2335,9 +2352,14 @@ registerProcessor("pcm-streaming-processor", PCMStreamingProcessor);
         errorTitle = "Sign-in Required";
         errorDescription =
           "Your OpenWhispr Cloud session is unavailable. Please sign in again from Settings.";
+      } else if (error.code === "NETWORK_ERROR") {
+        errorTitle = "streaming.errors.cloudUnreachable.title";
+        errorDescription = error.messageKey || "streaming.errors.cloudUnreachable.generic";
       }
 
       this.onError?.({
+        code: error.code,
+        messageKey: error.messageKey,
         title: errorTitle,
         description: errorDescription,
       });
