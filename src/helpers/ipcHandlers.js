@@ -3388,6 +3388,9 @@ class IPCHandlers {
         if (!cookieHeader) throw new Error("No session cookies available");
 
         const audioData = Buffer.from(audioBuffer);
+        // Reused for the local SQLite row so SyncService upserts the existing
+        // cloud row (filling in text) instead of creating a duplicate.
+        const clientTranscriptionId = crypto.randomUUID();
         const multipartFields = {
           language: opts.language,
           prompt: opts.prompt,
@@ -3396,6 +3399,7 @@ class IPCHandlers {
           appVersion: app.getVersion(),
           clientVersion: app.getVersion(),
           sessionId: this.sessionId,
+          clientTranscriptionId,
         };
 
         debugLogger.debug("Cloud transcribe request", { audioSize: audioData.length }, "cloud-api");
@@ -3411,6 +3415,7 @@ class IPCHandlers {
           return {
             success: true,
             text,
+            clientTranscriptionId,
             wordsUsed: lastResponse?.wordsUsed,
             wordsRemaining: lastResponse?.wordsRemaining,
             plan: lastResponse?.plan,
@@ -3443,6 +3448,7 @@ class IPCHandlers {
         return {
           success: true,
           text: result.text,
+          clientTranscriptionId,
           wordsUsed: result.wordsUsed,
           wordsRemaining: result.wordsRemaining,
           plan: result.plan,

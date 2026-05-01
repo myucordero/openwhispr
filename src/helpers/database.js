@@ -548,13 +548,17 @@ class DatabaseManager {
   saveTranscription(
     text,
     rawText = null,
-    { status = "completed", errorMessage = null, errorCode = null } = {}
+    {
+      status = "completed",
+      errorMessage = null,
+      errorCode = null,
+      clientTranscriptionId = randomUUID(),
+    } = {}
   ) {
     try {
       if (!this.db) {
         throw new Error("Database not initialized");
       }
-      const clientTranscriptionId = randomUUID();
       const stmt = this.db.prepare(
         "INSERT INTO transcriptions (text, raw_text, status, error_message, error_code, client_transcription_id) VALUES (?, ?, ?, ?, ?, ?)"
       );
