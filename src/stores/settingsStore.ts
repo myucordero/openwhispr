@@ -577,7 +577,7 @@ function debouncedSaveSecret(provider: SecretProvider, key: string) {
       | undefined;
     save?.(key)?.catch((err) => {
       logger.warn(
-        "Failed to persist secret to safeStorage",
+        "Failed to persist secret",
         { provider, error: (err as Error).message },
         "settings"
       );

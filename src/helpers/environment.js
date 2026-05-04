@@ -1,9 +1,10 @@
 const path = require("path");
 const fs = require("fs");
 const fsPromises = require("fs/promises");
-const { app, safeStorage } = require("electron");
+const { app } = require("electron");
 const debugLogger = require("./debugLogger");
 const { normalizeUiLanguage } = require("./i18nMain");
+const secretCrypto = require("./secretCrypto");
 
 const SECRET_KEYS = [
   "OPENAI_API_KEY",
@@ -86,11 +87,11 @@ class EnvironmentManager {
     }
   }
 
-  // safeStorage requires app.whenReady(), so init runs after construction.
+  // Encryption init runs after construction; safeStorage fallback needs app.whenReady().
   async init() {
     if (!this._encryptionAvailable()) {
       debugLogger.warn(
-        "safeStorage unavailable — secrets remain in plaintext .env",
+        "Secret encryption unavailable — secrets remain in plaintext .env",
         { platform: process.platform },
         "environment"
       );
@@ -109,7 +110,7 @@ class EnvironmentManager {
 
   _encryptionAvailable() {
     try {
-      return safeStorage.isEncryptionAvailable();
+      return secretCrypto.isAvailable();
     } catch {
       return false;
     }
@@ -131,7 +132,9 @@ class EnvironmentManager {
     const filePath = this._getSecretFilePath(envVarName);
     try {
       const buffer = await fsPromises.readFile(filePath);
-      process.env[envVarName] = safeStorage.decryptString(buffer);
+      const { value, needsReencrypt } = secretCrypto.decrypt(buffer);
+      process.env[envVarName] = value;
+      if (needsReencrypt) await this._saveSecretKey(envVarName, value);
     } catch (error) {
       if (error.code === "ENOENT") return;
       debugLogger.error(
@@ -155,7 +158,7 @@ class EnvironmentManager {
 
     const filePath = this._getSecretFilePath(envVarName);
     const tmpPath = `${filePath}.tmp`;
-    const encrypted = safeStorage.encryptString(value);
+    const encrypted = secretCrypto.encrypt(value);
 
     await fsPromises.writeFile(tmpPath, encrypted);
     await fsPromises.rename(tmpPath, filePath);
@@ -189,7 +192,7 @@ class EnvironmentManager {
         await this._saveSecretKey(name, value);
         // Round-trip verify before stripping plaintext .env.
         const buffer = await fsPromises.readFile(this._getSecretFilePath(name));
-        if (safeStorage.decryptString(buffer) !== value) {
+        if (secretCrypto.decrypt(buffer).value !== value) {
           throw new Error(`round-trip verification failed for ${name}`);
         }
         migrated.push(name);
