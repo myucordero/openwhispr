@@ -66,6 +66,7 @@ import {
 import {
   useMeetingRecordingStore,
   useIsMeetingMode,
+  useIsNarrowWindow,
   startRecording as storeStartRecording,
   stopRecording as storeStopRecording,
   lockSpeaker,
@@ -100,9 +101,11 @@ export default function PersonalNotesView({
   onMeetingRecordingRequestHandled,
 }: PersonalNotesViewProps) {
   const isMeetingMode = useIsMeetingMode();
+  const isNarrowWindow = useIsNarrowWindow();
   const { t } = useTranslation();
   const notes = useNotes();
   const activeNoteId = useActiveNoteId();
+  const isSidePanelLayout = isMeetingMode || (isNarrowWindow && activeNoteId != null);
   const activeFolderId = useActiveFolderId();
   const [isSaving, setIsSaving] = useState(false);
   const [localTitle, setLocalTitle] = useState("");
@@ -585,7 +588,7 @@ export default function PersonalNotesView({
     <div className="flex h-full">
       <div
         className="shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
-        style={{ width: isMeetingMode ? 0 : "13rem" }}
+        style={{ width: isSidePanelLayout ? 0 : "13rem" }}
       >
         <div className="w-52 shrink-0 border-r border-border/15 dark:border-white/4 flex flex-col h-full">
           <div className="px-2 pt-2 pb-1 shrink-0 space-y-0.5">

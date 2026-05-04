@@ -73,6 +73,8 @@ export default function ControlPanel() {
   const isMeetingMode = useIsMeetingMode();
   const isNarrowWindow = useIsNarrowWindow();
   const activeNoteId = useActiveNoteId();
+  const isSidePanelLayout =
+    isMeetingMode || (isNarrowWindow && activeView === "personal-notes" && activeNoteId != null);
   const recordingNoteId = useMeetingRecordingStore((s) => s.recordingNoteId);
   const recordingFolderId = useMeetingRecordingStore((s) => s.recordingFolderId);
   const [meetingRecordingRequest, setMeetingRecordingRequest] = useState<{
@@ -670,7 +672,7 @@ export default function ControlPanel() {
       <div className="flex flex-1 overflow-hidden">
         <div
           className="shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
-          style={{ width: isMeetingMode ? 0 : undefined }}
+          style={{ width: isSidePanelLayout ? 0 : undefined }}
         >
           <ControlPanelSidebar
             activeView={activeView}
@@ -717,7 +719,7 @@ export default function ControlPanel() {
             className="flex items-center justify-between w-full h-10 shrink-0"
             style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
           >
-            {isNarrowWindow && (
+            {isSidePanelLayout && (
               <div
                 className={platform === "darwin" ? "ml-[84px] mt-[16px]" : "ml-2"}
                 style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
