@@ -52,6 +52,9 @@ A big release: new sign-in options, smoother meeting recording, faster cross-dev
 - **More reliable ONNX inference** (speaker embeddings, semantic search): long meetings no longer crash the app from a memory allocation failure deep in the speaker model.
 - **Local helpers shut down cleanly on Quit.** Local Whisper, Parakeet, llama-server, Qdrant, and the diarization helper now stop properly when you Quit. If a previous session ever leaves one stuck, the app catches and cleans it up on the next launch — so dictation and transcription work right away without manual cleanup.
 - **Local LLM startup is more patient.** llama-server with Vulkan acceleration now gets a longer startup window before the app gives up; a stuck server is also fully stopped before any re-download attempt, so partial files don't get clobbered mid-write.
+- **Model downloads work behind redirects.** Whisper, Parakeet, Qdrant, MiniLM, and local LLM (GGUF) downloads from Hugging Face and GitHub Releases now follow 3xx redirects correctly — a regression where the manual redirect handler aborted the request before the follow could land has been fixed.
+- **Local LLM downloads share the same plumbing** as Whisper and Parakeet (proxy-aware, resume on stall, retry with backoff), removing ~50 lines of duplicated download code.
+- **ONNX worker failures are now visible.** When the speaker-embedding / semantic-search worker crashes, stderr and `onnx-worker.log` capture the cause; the parent caps respawn at 5 attempts and degrades to FTS5 keyword search instead of restarting in a tight loop.
 
 ### Sync
 
@@ -80,6 +83,8 @@ A big release: new sign-in options, smoother meeting recording, faster cross-dev
 - **Chat — first message saved** the moment the conversation is created, eliminating a race that could orphan it.
 - **Note move** keeps the active note selected and removes the source-folder entry immediately.
 - **Local semantic search (Qdrant)** writes to the user data directory, not the read-only app bundle.
+- **No more hotkey re-register storm** when dismissing Settings with a hotkey field focused — the IPC handler short-circuits duplicate listening-mode changes (one call per slot, not four).
+- **macOS native helpers bundled correctly.** `macos-audio-tap`, `macos-globe-listener`, `macos-fast-paste`, `macos-mic-listener`, `macos-text-monitor`, `macos-media-remote`, and the `linux-*` helpers now land under `Resources/bin/` in the packaged app — matching where the runtime resolvers and CI verify step look for them.
 
 ### macOS / Windows: bundle identifier change
 
