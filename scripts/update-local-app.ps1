@@ -1,4 +1,4 @@
-# Personal pipeline, native-Windows side: pull the pushed branch, refresh
+﻿# Personal pipeline, native-Windows side: pull the pushed branch, refresh
 # dependencies/runtime only when their lockfiles changed, rebuild the local
 # packaged app (dist\win-unpacked), and keep the Start Menu shortcut healthy.
 #
@@ -34,7 +34,7 @@ $unpackedExe = Join-Path $RepoDir "dist\win-unpacked\OpenWhispr.exe"
 $running = Get-Process -Name "OpenWhispr" -ErrorAction SilentlyContinue |
     Where-Object { $_.Path -eq $unpackedExe }
 if ($running) {
-    Warn "OpenWhispr is running from win-unpacked — closing it for the rebuild."
+    Warn "OpenWhispr is running from win-unpacked - closing it for the rebuild."
     $running | Stop-Process
     Start-Sleep -Seconds 2
 }
@@ -49,7 +49,7 @@ if ((git branch --show-current).Trim() -ne $Branch) {
 }
 $dirty = git status --porcelain
 if ($dirty) {
-    throw "Windows clone has local changes — the dual-clone rule says code lives in WSL. Resolve manually:`n$dirty"
+    throw "Windows clone has local changes - the dual-clone rule says code lives in WSL. Resolve manually:`n$dirty"
 }
 Step "pulling $Remote/$Branch (fast-forward only)..."
 git pull --ff-only $Remote $Branch
@@ -92,7 +92,7 @@ if (Test-Path $uvLock) {
 
 # --- build -------------------------------------------------------------------
 if ($SkipBuild) {
-    Warn "SkipBuild set — not rebuilding the packaged app."
+    Warn "SkipBuild set - not rebuilding the packaged app."
 } else {
     Step "building packaged app (npm run build:local:win)..."
     npm run build:local:win
@@ -117,5 +117,5 @@ $head = (git log --oneline -1).Trim()
 Step ("done. {0} at {1}" -f $Branch, $head)
 if (Test-Path $unpackedExe) {
     $stamp = (Get-Item $unpackedExe).LastWriteTime
-    Step "app: $unpackedExe (built $stamp) — launch it from the Start Menu (OpenWhispr)."
+    Step "app: $unpackedExe (built $stamp) - launch it from the Start Menu (OpenWhispr)."
 }
