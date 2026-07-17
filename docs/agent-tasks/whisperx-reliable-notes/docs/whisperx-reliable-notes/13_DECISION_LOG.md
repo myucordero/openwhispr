@@ -238,6 +238,14 @@ Use:
 **Decision:** `tools/whisperx-sidecar` (pyproject, uv.lock, src, README — excluding tests/venv/caches) is staged to `resources/whisperx-sidecar` through the electron-builder `extraResources` allowlist, matching `whisperxMain`'s packaged path. The Python runtime itself is provisioned on the user machine by pinned uv (never bundled). NSIS uninstall removes the managed runtime and model caches but preserves `recording-jobs`.  
 **Consequences:** A-006 resolved as "stage provisioner inputs, provision on demand"; packaged verification itself requires the Windows clone.
 
+### D-112 — Windows CUDA torch via explicit cu128 index
+
+**Date:** 2026-07-17  
+**Status:** accepted  
+**Decision:** torch/torchaudio are declared as direct sidecar dependencies and steered to `download.pytorch.org/whl/cu128` on win32 through `tool.uv.sources`; Linux/macOS keep PyPI. `uv.lock` regenerated (dual-source 2.8.0 / 2.8.0+cu128).  
+**Evidence:** native-Windows provisioning resolved `torch 2.8.0+cpu` (doctor WARN "CUDA unavailable — CPU fallback"); PyPI win32 torch wheels are CPU-only while Linux PyPI wheels bundle CUDA. After the fix the native doctor reports CUDA on the RTX 4060.  
+**Consequences:** This is the D-004-sanctioned kind of pinned-dependency change, recorded here with the compatibility evidence.
+
 ### D-106 — New tests go under tests/**/*.test.cjs
 
 **Date:** 2026-07-16  
