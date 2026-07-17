@@ -44,6 +44,13 @@ test("notes onboarding LLM picker is pinned to local in local-only builds", () =
   assert.match(notes, /LOCAL_ONLY_MODE\s*\?\s*\{\s*mode:\s*"local"/);
 });
 
+test("local-only skips auth client construction (empty baseURL would crash the renderer)", () => {
+  // createAuthClient({baseURL:""}) throws BetterAuthError("Invalid base URL: file://"),
+  // which white-screens the app. Local-only must not construct the client.
+  const auth = read("src/lib/auth.ts");
+  assert.match(auth, /authClient\s*=\s*LOCAL_ONLY_MODE\s*\?\s*null/);
+});
+
 test("claude/codex CLI inference providers are registered and guard-exempt", () => {
   const registry = read("src/services/ai/inferenceProviders/index.ts");
   assert.match(registry, /"claude-cli":\s*claudeCliProvider/);

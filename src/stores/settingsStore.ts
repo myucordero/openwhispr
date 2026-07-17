@@ -270,7 +270,7 @@ migrateProviderSettings();
 // the seeded localStorage is what the store hydrates from. Bumping
 // LOCAL_ONLY_SEED_VERSION re-applies on the next launch (e.g. after a pipeline
 // change); the user's later manual tweaks are preserved between bumps.
-const LOCAL_ONLY_SEED_VERSION = "1";
+const LOCAL_ONLY_SEED_VERSION = "2";
 function seedLocalOnlyDefaults() {
   if (!isBrowser || !LOCAL_ONLY_MODE) return;
   if (localStorage.getItem("localOnlyDefaultsSeeded") === LOCAL_ONLY_SEED_VERSION) return;
@@ -301,8 +301,10 @@ function seedLocalOnlyDefaults() {
     chatAgentMode: "local",
     chatAgentProvider: "qwen",
     chatAgentModel: "qwen3.5-2b-q4_k_m",
-    // Skip onboarding — everything is pre-configured.
+    // Skip onboarding — everything is pre-configured — and mark auth as
+    // skipped so AppRouter doesn't show a re-auth prompt (no cloud account).
     onboardingCompleted: "true",
+    authenticationSkipped: "true",
   };
   for (const [key, value] of Object.entries(seed)) {
     localStorage.setItem(key, value);
