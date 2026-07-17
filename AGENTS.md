@@ -442,6 +442,36 @@ On GNOME Wayland, Electron's `globalShortcut` API doesn't work due to Wayland's 
 - GNOME format: `<Alt>r`, `<Control><Shift>space`
 - Backtick (`) → `grave` in GNOME keysym format
 
+## Fork-Specific Features
+
+This fork (`feat/whisperx-reliable-notes`) adds four capabilities not in
+upstream. `CLAUDE.md` §18–21 has the authoritative detail; summarized here:
+
+- **WhisperX reliable notes** (`src/helpers/whisperx/`, `docs/whisperx-reliable-notes.md`):
+  a local-first pipeline that turns an uploaded recording into a timestamped,
+  word-aligned transcript and evidence-grounded Markdown notes (every claim
+  cites transcript segment IDs). Managed Python runtime via `uv`
+  (`tools/whisperx-sidecar/uv.lock`); jobs are cancellable/retryable and
+  survive restarts.
+- **Local-only build** (`VITE_LOCAL_ONLY`, `src/lib/features.ts`): build-time
+  flag that hides every cloud surface (sign-in/account, cloud transcription,
+  cloud reasoning) with a fail-closed guard in `ReasoningService` and an
+  auto-seeder in `settingsStore` that writes a ready-to-use local config. In
+  local-only, `src/lib/auth.ts` returns `authClient = null` (constructing
+  better-auth with an empty baseURL throws and white-screens the renderer).
+- **Claude/Codex CLI inference bridge** (`src/helpers/cliInference.js`,
+  `inferenceProviders/cliProvider.ts`): runs the user's local `claude`/`codex`
+  CLI as a reasoning backend (subscription auth). Untrusted text goes via
+  stdin; the model is never forwarded (account default). Allow-listed in
+  local-only as an opt-in cloud exception.
+- **MP4 / video upload**: the notes Upload screen accepts `.mp4`/`.m4v`; ffmpeg
+  extracts the audio track in the existing transcription paths, so video
+  processes like audio.
+
+The dual-clone build/ship pipeline is documented in the `openwhispr-local-build`
+skill (`.claude/skills/`) — `npm run ship:local` (WSL) then
+`scripts/update-local-app.ps1` (Windows).
+
 ## Development Guidelines
 
 ### Adding New Features

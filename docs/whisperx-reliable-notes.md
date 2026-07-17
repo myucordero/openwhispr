@@ -6,17 +6,21 @@ never replaces — live hotkey dictation (whisper.cpp / Parakeet).
 
 ## What it does
 
-- Upload or drag audio files (mp3, wav, m4a, webm, ogg, flac, aac) and pick a
+- Upload or drag audio files (mp3, wav, m4a, webm, ogg, flac, aac) or MP4 video
+  (mp4, m4v — the audio track is extracted automatically via ffmpeg) and pick a
   profile: **Personal Memo**, **Meeting**, or **Critical / Research Interview**.
 - Transcribes with WhisperX (faster-whisper `large-v3-turbo` / `large-v3`,
   CUDA float16 by default) with word alignment and optional pyannote speaker
   diarization.
 - Preserves immutable evidence per job: canonical transcript JSON, raw TXT,
   speaker Markdown, SRT/VTT, artifact manifest with SHA-256 hashes.
-- Generates notes through a schema-constrained local LLM extraction where
+- Generates notes through a schema-constrained LLM extraction where
   **every substantive claim cites transcript segment IDs**; deterministic
   code validates evidence, merges chunks, and renders the Markdown. Claims
-  without valid evidence are dropped, never rendered.
+  without valid evidence are dropped, never rendered. The note LLM is
+  pluggable: a local GGUF model (llama.cpp) or the Claude/Codex CLI bridge
+  (`claude-cli` / `codex-cli`, subscription auth) — both stay on-device to
+  invoke; the CLI backends call the vendor cloud.
 - Jobs are cancellable (real process-tree kill), retryable, and survive app
   restarts. Failed or cancelled jobs never appear complete.
 
@@ -91,7 +95,7 @@ Run `npm run doctor:whisperx` (add `--json` for machine output). Common codes:
 | `HF_TOKEN_REQUIRED` / `DIARIZATION_MODEL_NOT_READY` | Configure the token / accept model terms, or disable diarization — the transcript still completes. |
 | `MODEL_NOT_AVAILABLE_OFFLINE` | Re-run a job once with the download confirmation, then return offline. |
 | `WORKER_TIMEOUT` / `WORKER_CRASHED` | Job stays failed and retryable; see redacted diagnostics; retry from the Recordings panel. |
-| `NOTE_MODEL_UNAVAILABLE` | Select a local note-formatting model (Settings → AI Models) and use "Generate notes" on the job. |
+| `NOTE_MODEL_UNAVAILABLE` | Select a note-formatting backend — a local GGUF model or the Claude/Codex CLI (Settings → AI Models) — and use "Generate notes" on the job. |
 | `NOTE_EVIDENCE_INVALID` | The extraction produced no evidence-valid items; the transcript is intact — retry note generation. |
 
 Maintenance commands:
