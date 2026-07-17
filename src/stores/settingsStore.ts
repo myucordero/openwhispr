@@ -270,16 +270,18 @@ migrateProviderSettings();
 // the seeded localStorage is what the store hydrates from. Bumping
 // LOCAL_ONLY_SEED_VERSION re-applies on the next launch (e.g. after a pipeline
 // change); the user's later manual tweaks are preserved between bumps.
-const LOCAL_ONLY_SEED_VERSION = "2";
+const LOCAL_ONLY_SEED_VERSION = "3";
 function seedLocalOnlyDefaults() {
   if (!isBrowser || !LOCAL_ONLY_MODE) return;
   if (localStorage.getItem("localOnlyDefaultsSeeded") === LOCAL_ONLY_SEED_VERSION) return;
   const seed: Record<string, string> = {
-    // Live hotkey dictation: local Whisper large-v3-turbo.
+    // Live hotkey dictation: local Whisper large-v3-turbo. whisper.cpp's id for
+    // that model is "turbo" (ggml-large-v3-turbo.bin); "large-v3-turbo" is the
+    // WhisperX id and is invalid for whisper.cpp.
     useLocalWhisper: "true",
     localTranscriptionProvider: "whisper",
-    whisperModel: "large-v3-turbo",
-    // Uploaded-recording notes: WhisperX.
+    whisperModel: "turbo",
+    // Uploaded-recording notes: WhisperX (its own model id space).
     uploadUseLocalWhisper: "true",
     uploadLocalTranscriptionProvider: "whisperx",
     whisperxModel: "large-v3-turbo",

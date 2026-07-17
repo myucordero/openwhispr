@@ -70,7 +70,9 @@ test("local-only build seeds a ready-to-use local model configuration", () => {
   const store = read("src/stores/settingsStore.ts");
   assert.match(store, /function seedLocalOnlyDefaults/);
   // Hybrid: local Whisper live, WhisperX uploads, local cleanup, Claude-CLI notes.
-  assert.match(store, /whisperModel:\s*"large-v3-turbo"/);
+  // Live dictation uses whisper.cpp's "turbo" id (not the WhisperX "large-v3-turbo").
+  assert.match(store, /whisperModel:\s*"turbo"/);
+  assert.match(store, /whisperxModel:\s*"large-v3-turbo"/);
   assert.match(store, /uploadLocalTranscriptionProvider:\s*"whisperx"/);
   assert.match(store, /cleanupProvider:\s*"qwen"/);
   assert.match(store, /noteFormattingProvider:\s*"claude-cli"/);
