@@ -932,8 +932,6 @@ declare global {
         cli: "claude" | "codex";
         prompt: string;
         systemPrompt?: string;
-        model?: string;
-        timeoutMs?: number;
       }) => Promise<{ success: boolean; text?: string; error?: string; code?: string }>;
       cliInferenceAvailable: (
         cli: "claude" | "codex"

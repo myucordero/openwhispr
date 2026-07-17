@@ -84,11 +84,15 @@ function resolveReasoningRoute(
   const isCloudAgent = isCloudDictationAgentMode();
   const isSelfHostedAgent =
     settings.dictationAgentMode === "self-hosted" && !!settings.dictationAgentRemoteUrl?.trim();
+  const isCliAgent =
+    settings.dictationAgentProvider === "claude-cli" ||
+    settings.dictationAgentProvider === "codex-cli";
   const agentReachable = resolveDictationAgentReachability({
     useDictationAgent: settings.useDictationAgent,
     dictationAgentModel: agentModel,
     isCloudAgent,
     isSelfHostedAgent,
+    isCliAgent,
   });
 
   const isCloudTranslation = isCloudTranslationMode();

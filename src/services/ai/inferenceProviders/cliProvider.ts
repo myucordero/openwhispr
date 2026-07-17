@@ -9,7 +9,7 @@ import logger from "../../../utils/logger";
 function makeCliProvider(id: string, cli: "claude" | "codex"): InferenceProvider {
   return {
     id,
-    async call({ text, model, agentName, config, ctx }) {
+    async call({ text, agentName, config, ctx }) {
       if (typeof window === "undefined" || !window.electronAPI?.cliInference) {
         throw new Error(`${cli} CLI bridge is not available in this environment`);
       }
@@ -17,13 +17,14 @@ function makeCliProvider(id: string, cli: "claude" | "codex"): InferenceProvider
       // Cleanup passes no systemPrompt (wrap the transcript); agent/notes pass one.
       const prompt = config.systemPrompt ? text : wrapCleanupTranscript(text);
 
-      logger.logReasoning("CLI_START", { cli, agentName, model, textLength: text.length });
+      // model is intentionally not forwarded — the CLI uses the account default,
+      // and config.model may be a fallback-scope GGUF id that would break --model.
+      logger.logReasoning("CLI_START", { cli, agentName, textLength: text.length });
       const started = Date.now();
       const result = await window.electronAPI.cliInference({
         cli,
         prompt,
         systemPrompt: systemPrompt || undefined,
-        model: model?.trim() || undefined,
       });
       if (!result?.success || typeof result.text !== "string") {
         logger.logReasoning("CLI_ERROR", { cli, error: result?.error, code: result?.code });

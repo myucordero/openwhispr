@@ -39,6 +39,7 @@ import {
   MEETINGS_FOLDER_NAME,
 } from "./shared";
 import { useDialogs } from "../../hooks/useDialogs";
+import { useCliNoteReady } from "../../hooks/useCliNoteReady";
 import { useRecordingJobsStore } from "../../stores/recordingJobsStore";
 import WhisperXUploadOptions, {
   defaultWhisperXOptions,
@@ -250,8 +251,10 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
   const noteFormattingModel = useSettingsStore((s) => selectResolvedNoteFormatting(s).model);
   const isCliNoteProvider =
     noteFormattingProvider === "claude-cli" || noteFormattingProvider === "codex-cli";
+  const cliNoteReady = useCliNoteReady(noteFormattingProvider);
   const hasLocalNoteModel =
-    (noteFormattingProvider === "local" && noteFormattingModel.length > 0) || isCliNoteProvider;
+    ((noteFormattingProvider === "local" && noteFormattingModel.length > 0) || isCliNoteProvider) &&
+    cliNoteReady;
   // CLI backends have no model id to show; label them by the tool name (brand).
   const noteModelLabel = isCliNoteProvider
     ? noteFormattingProvider === "claude-cli"

@@ -3,53 +3,63 @@
 // runs on the user's machine but calls Anthropic/OpenAI cloud under the hood —
 // an intentional exception to the local-only build, opted into per scope.
 //
-// User content is piped over stdin (no argv length limit for long transcripts);
-// the system prompt (shorter) goes on the CLI flag.
+// Injection safety: argv is a fixed static list; ALL untrusted text (system
+// prompt + user content) goes over stdin. That keeps shell:true (needed on
+// Windows to launch npm-shim .cmd wrappers as well as native .exe) safe.
 const { spawn } = require("child_process");
 const debugLogger = require("./debugLogger");
 
-const CLI_BIN = {
-  claude: process.platform === "win32" ? "claude.exe" : "claude",
-  codex: process.platform === "win32" ? "codex.exe" : "codex",
-};
-
+// PATH-resolved names (no extension) so Windows shell resolution picks whichever
+// of claude.exe / claude.cmd exists; POSIX resolves the bin directly.
+const CLI_BIN = { claude: "claude", codex: "codex" };
+const IS_WIN = process.platform === "win32";
 const DEFAULT_TIMEOUT_MS = 180000;
 
-function buildArgs(cli, { systemPrompt, model }) {
-  if (cli === "claude") {
-    // -p reads the prompt from stdin; text output only; never touch the
-    // filesystem or run tools for a plain text-in/text-out reasoning call.
-    const args = ["-p", "--output-format", "text", "--permission-mode", "default"];
-    if (systemPrompt) args.push("--append-system-prompt", systemPrompt);
-    if (model) args.push("--model", model);
-    return args;
-  }
-  if (cli === "codex") {
-    // codex exec runs headless and prints the final message; prompt via stdin.
-    const args = ["exec", "--skip-git-repo-check", "-"];
-    if (model) args.splice(1, 0, "--model", model);
-    return args;
-  }
+function staticArgs(cli) {
+  // claude: -p reads the prompt from stdin, plain text out.
+  if (cli === "claude") return ["-p", "--output-format", "text"];
+  // codex exec runs headless; "-" reads the prompt from stdin.
+  if (cli === "codex") return ["exec", "--skip-git-repo-check", "-"];
   return null;
 }
 
-function runCliInference({ cli, prompt, systemPrompt, model, timeoutMs } = {}) {
+function killTree(child) {
+  if (!child || child.killed) return;
+  try {
+    if (IS_WIN && child.pid) {
+      // shell:true spawns cmd.exe as the child; kill the whole tree so the
+      // real CLI process can't be orphaned on timeout.
+      spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { windowsHide: true });
+    } else {
+      child.kill("SIGKILL");
+    }
+  } catch {
+    /* best effort */
+  }
+}
+
+// The CLI's model is intentionally NOT selectable: it always uses the account's
+// default model. `model` is accepted for API symmetry but never forwarded as an
+// arg (forwarding a stray GGUF id from a fallback scope would break the CLI).
+function runCliInference({ cli, prompt, systemPrompt } = {}) {
   return new Promise((resolve) => {
     const bin = CLI_BIN[cli];
-    if (!bin) return resolve({ success: false, error: `Unknown CLI: ${cli}`, code: "UNKNOWN_CLI" });
+    const args = staticArgs(cli);
+    if (!bin || !args) {
+      return resolve({ success: false, error: `Unknown CLI: ${cli}`, code: "UNKNOWN_CLI" });
+    }
     if (typeof prompt !== "string" || !prompt.trim()) {
       return resolve({ success: false, error: "Empty prompt", code: "EMPTY_PROMPT" });
     }
-    const args = buildArgs(cli, { systemPrompt, model });
-    if (!args) return resolve({ success: false, error: `Unknown CLI: ${cli}`, code: "UNKNOWN_CLI" });
 
-    // For codex the system prompt is prepended to the piped prompt (no flag).
     const stdinText =
-      cli === "codex" && systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
+      typeof systemPrompt === "string" && systemPrompt.trim()
+        ? `${systemPrompt}\n\n${prompt}`
+        : prompt;
 
     let child;
     try {
-      child = spawn(bin, args, { shell: false, windowsHide: true, env: process.env });
+      child = spawn(bin, args, { shell: IS_WIN, windowsHide: true, env: process.env });
     } catch (err) {
       return resolve({
         success: false,
@@ -69,11 +79,9 @@ function runCliInference({ cli, prompt, systemPrompt, model, timeoutMs } = {}) {
     };
 
     const timer = setTimeout(() => {
-      try {
-        child.kill(process.platform === "win32" ? undefined : "SIGKILL");
-      } catch {}
+      killTree(child);
       finish({ success: false, error: `${cli} timed out`, code: "CLI_TIMEOUT" });
-    }, timeoutMs || DEFAULT_TIMEOUT_MS);
+    }, DEFAULT_TIMEOUT_MS);
 
     child.stdout.on("data", (d) => (stdout += d.toString()));
     child.stderr.on("data", (d) => (stderr += d.toString()));
@@ -88,7 +96,11 @@ function runCliInference({ cli, prompt, systemPrompt, model, timeoutMs } = {}) {
     child.on("close", (exitCode) => {
       const text = stdout.trim();
       if (exitCode === 0 && text) return finish({ success: true, text });
-      debugLogger.debug?.("[cliInference] non-zero/empty", { cli, exitCode, stderrLen: stderr.length });
+      debugLogger.debug?.("[cliInference] non-zero/empty", {
+        cli,
+        exitCode,
+        stderrLen: stderr.length,
+      });
       finish({
         success: false,
         error: (stderr.trim() || `${cli} exited with code ${exitCode} and no output`).slice(0, 500),
@@ -100,19 +112,25 @@ function runCliInference({ cli, prompt, systemPrompt, model, timeoutMs } = {}) {
       child.stdin.write(stdinText);
       child.stdin.end();
     } catch (err) {
-      finish({ success: false, error: `Failed to send prompt to ${cli}: ${err.message}`, code: "STDIN_FAILED" });
+      finish({
+        success: false,
+        error: `Failed to send prompt to ${cli}: ${err.message}`,
+        code: "STDIN_FAILED",
+      });
     }
   });
 }
 
-// Cheap availability probe: spawn `<cli> --version` and resolve on exit.
+// Cheap availability probe: `<cli> --version`. Used by the renderer to gate the
+// note UI so a missing/unauthenticated CLI surfaces clearly instead of failing
+// every generation at runtime.
 function checkCliAvailable(cli, timeoutMs = 8000) {
   return new Promise((resolve) => {
     const bin = CLI_BIN[cli];
     if (!bin) return resolve({ available: false });
     let child;
     try {
-      child = spawn(bin, ["--version"], { shell: false, windowsHide: true, env: process.env });
+      child = spawn(bin, ["--version"], { shell: IS_WIN, windowsHide: true, env: process.env });
     } catch {
       return resolve({ available: false });
     }
@@ -125,9 +143,7 @@ function checkCliAvailable(cli, timeoutMs = 8000) {
       resolve(result);
     };
     const t = setTimeout(() => {
-      try {
-        child.kill();
-      } catch {}
+      killTree(child);
       done({ available: false });
     }, timeoutMs);
     child.stdout.on("data", (d) => (out += d.toString()));

@@ -632,7 +632,9 @@ class WhisperXMain {
     if (!isCli && (typeof model !== "string" || model.length === 0)) return null;
     return {
       provider,
-      model: typeof model === "string" ? model : "",
+      // CLI backends use the account default; never carry a (possibly fallback
+      // GGUF) model id that a caller might otherwise forward as --model.
+      model: isCli ? "" : model,
       disableThinking: disableThinking !== false,
     };
   }
@@ -654,7 +656,6 @@ class WhisperXMain {
         cli,
         prompt: userText,
         systemPrompt: systemPrompt ? `${systemPrompt}\n\n${jsonNudge}` : jsonNudge,
-        model: llmConfig.model || undefined,
       });
       if (!res || !res.success || typeof res.text !== "string") {
         throw new WhisperXMainError(

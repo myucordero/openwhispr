@@ -22,7 +22,15 @@ export function buildNoteFormattingOverrides(noteFormatting, isCloudMode, custom
     };
   }
 
-  const provider = mode === "providers" ? noteFormatting?.provider || undefined : undefined;
+  const rawProvider = noteFormatting?.provider;
+  const isCliProvider = rawProvider === "claude-cli" || rawProvider === "codex-cli";
+  // Forward the CLI provider even in "local" mode so note actions route to the
+  // CLI bridge instead of guessing "local" from the (fallback GGUF) model id.
+  const provider = isCliProvider
+    ? rawProvider
+    : mode === "providers"
+      ? rawProvider || undefined
+      : undefined;
   const isCustom = provider === "custom";
   return {
     provider,

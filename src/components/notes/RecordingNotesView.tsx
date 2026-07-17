@@ -4,6 +4,7 @@ import { AlertCircle, AlertTriangle, Loader2, RotateCcw, Sparkles } from "lucide
 import { Button } from "../ui/button";
 import { MarkdownRenderer } from "../ui/MarkdownRenderer";
 import { useRecordingJobsStore } from "../../stores/recordingJobsStore";
+import { useCliNoteReady } from "../../hooks/useCliNoteReady";
 import {
   useSettingsStore,
   selectResolvedNoteFormatting,
@@ -43,9 +44,11 @@ export default function RecordingNotesView({ job }: RecordingNotesViewProps) {
   const noteProvider = useSettingsStore((s) => selectResolvedNoteFormatting(s).provider);
   const noteModel = useSettingsStore((s) => selectResolvedNoteFormatting(s).model);
   const isCliNoteProvider = noteProvider === "claude-cli" || noteProvider === "codex-cli";
-  // Note generation is available with a local GGUF (needs a model) or the local
-  // CLI backend (claude/codex, no model id needed).
-  const isLocalNoteModel = (noteProvider === "local" && noteModel.length > 0) || isCliNoteProvider;
+  const cliNoteReady = useCliNoteReady(noteProvider);
+  // Note generation is available with a local GGUF (needs a model) or an
+  // installed local CLI backend (claude/codex, no model id needed).
+  const isLocalNoteModel =
+    ((noteProvider === "local" && noteModel.length > 0) || isCliNoteProvider) && cliNoteReady;
 
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
