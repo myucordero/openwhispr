@@ -12,7 +12,8 @@ param(
     [string]$RepoDir = "C:\dev\openwhispr",
     [string]$Remote = "origin",
     [string]$Branch = "",
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [switch]$ForceProvision
 )
 
 $ErrorActionPreference = "Stop"
@@ -90,12 +91,64 @@ if (Test-Path $uvLock) {
     }
 }
 
-# --- build -------------------------------------------------------------------
+# --- provision native binaries (network) -------------------------------------
+# resources/bin is gitignored and stable across builds, so the build's own
+# prebuild hook re-downloading every binary from GitHub on every run just burns
+# the 60-req/hr unauthenticated API limit (HTTP 403). Provision only when the
+# required binaries are missing OR the download scripts changed (a version bump)
+# - the same signal CI uses to key its resources/bin cache. Set
+# $env:GITHUB_TOKEN for reliable first-time / post-bump provisioning.
+$binDir = Join-Path $RepoDir "resources\bin"
+$requiredBins = @(
+    "whisper-server-win32-x64.exe",
+    "llama-server-win32-x64.exe",
+    "sherpa-onnx-ws-win32-x64.exe",
+    "qdrant-win32-x64.exe"
+)
+$binsMissing = @($requiredBins | Where-Object { -not (Test-Path (Join-Path $binDir $_)) })
+
+$downloadScripts = Get-ChildItem (Join-Path $RepoDir "scripts\download-*.js") | Sort-Object Name
+$concatHashes = ($downloadScripts | ForEach-Object { (Get-FileHash -Algorithm SHA256 $_.FullName).Hash }) -join ""
+$sha = [System.Security.Cryptography.SHA256]::Create()
+$downloadHash = [System.BitConverter]::ToString(
+    $sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($concatHashes))).Replace("-", "")
+$downloadMarker = Join-Path $markerDir "download-scripts.sha256"
+$markerExists = Test-Path $downloadMarker
+$markerMatches = $markerExists -and ((Get-Content $downloadMarker -Raw).Trim() -eq $downloadHash)
+
+# Re-provision only when binaries are genuinely missing, forced, or a KNOWN
+# marker changed (upstream bump). Absent marker + present binaries = trust the
+# existing binaries and just seed the marker (no GitHub calls) - this keeps the
+# first run after adopting the pipeline offline.
+$needProvision = ($binsMissing.Count -gt 0) -or $ForceProvision -or ($markerExists -and -not $markerMatches)
+
+if ($needProvision) {
+    if ($binsMissing.Count -gt 0) {
+        Step ("provisioning binaries (missing: {0})..." -f ($binsMissing -join ", "))
+    } elseif ($ForceProvision) {
+        Step "provisioning binaries (forced)..."
+    } else {
+        Step "provisioning binaries (download scripts changed - likely an upstream bump)..."
+    }
+    if (-not $env:GITHUB_TOKEN) {
+        Warn "GITHUB_TOKEN not set - GitHub API is capped at 60 req/hr; set it if provisioning hits HTTP 403."
+    }
+    npm run prebuild:local:win
+    if ($LASTEXITCODE -ne 0) { throw "binary provisioning (prebuild:local:win) failed" }
+    Set-Content -Path $downloadMarker -Value $downloadHash
+} elseif (-not $markerMatches) {
+    Step "binaries present; seeding provisioning marker (no GitHub calls)"
+    Set-Content -Path $downloadMarker -Value $downloadHash
+} else {
+    Step "native binaries present and download scripts unchanged -> skipping provisioning (no GitHub calls)"
+}
+
+# --- build (offline: skip the network prebuild; binaries already staged) ------
 if ($SkipBuild) {
     Warn "SkipBuild set - not rebuilding the packaged app."
 } else {
-    Step "building packaged app (npm run build:local:win)..."
-    npm run build:local:win
+    Step "building packaged app (build:local:win, prebuild skipped)..."
+    npm run build:local:win --ignore-scripts
     if ($LASTEXITCODE -ne 0) { throw "build:local:win failed" }
 }
 

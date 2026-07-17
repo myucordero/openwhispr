@@ -120,6 +120,15 @@ Notes:
 - Whisper/Parakeet/WhisperX models, the WhisperX runtime, recordings, and the
   encrypted secret store all live under `%APPDATA%\OpenWhispr` and
   `~/.cache/openwhispr` — rebuilds never touch them.
+- **Native binaries** (whisper.cpp, llama-server, sherpa-onnx, qdrant, Windows
+  helpers) live in `resources\bin` (gitignored, stable across builds). The
+  Windows script downloads them from GitHub releases **only** when they're
+  missing or a `scripts/download-*.js` changed (an upstream binary bump);
+  routine builds run fully offline (`build:local:win --ignore-scripts`) and
+  make no GitHub calls, so they never hit the 60-req/hr API rate limit. For a
+  fresh clone or a bump, set `$env:GITHUB_TOKEN` (a classic PAT, no scopes
+  needed) before running the script for reliable downloads; force a
+  re-download with `-ForceProvision`.
 - The Windows clone must stay clean (the script refuses to pull over local
   changes) — all editing happens in WSL, per the dual-clone rules above.
 - Upstream **OpenWhispr** updates: run the existing Fork Sync Routine below,
