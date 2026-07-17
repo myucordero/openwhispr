@@ -22,6 +22,23 @@ import { getConfiguredOpenAIBase } from "./ai/openaiBase";
 import { applyThinkingSuppression } from "./ai/thinkingSuppression";
 import { clearTinfoilClientCache } from "./ai/tinfoilClient";
 import { resolveChatRoute } from "../helpers/chatRouting";
+import { LOCAL_ONLY_MODE } from "../lib/features";
+
+// Fail-closed backstop for local-only builds: no inference may reach a cloud
+// provider, whatever a (possibly stale) mode/provider/model setting says. Only
+// bundled-local ("local") and the user's own endpoint ("lan"/self-hosted) pass.
+// Cloud UI is already hidden; this guarantees no cloud request even from stale
+// config. Callers treat a throw as "cleanup/agent unavailable" and fall back.
+const LOCAL_ONLY_ALLOWED_PROVIDERS = new Set(["local", "lan"]);
+function assertLocalOnlyProviderAllowed(providerId: string): void {
+  if (!LOCAL_ONLY_MODE) return;
+  const id = providerId || "";
+  if (LOCAL_ONLY_ALLOWED_PROVIDERS.has(id)) return;
+  if (id === "custom") return; // user-supplied OpenAI-compatible endpoint (self-hosted)
+  throw new Error(
+    `Cloud inference is disabled in this local-only build (provider: ${id || "unknown"})`
+  );
+}
 
 export type AgentStreamChunk =
   | { type: "content"; text: string }
@@ -334,6 +351,7 @@ class ReasoningService extends BaseReasoningService {
     const trimmedModel = model?.trim?.() || "";
     const isLanCleanup = !!config.lanUrl || this.isLanCleanupMode();
     const providerId = isLanCleanup ? "lan" : config.provider || getModelProvider(trimmedModel);
+    assertLocalOnlyProviderAllowed(providerId);
 
     if (!trimmedModel && providerId !== "openwhispr" && providerId !== "lan") {
       throw new Error("No reasoning model selected");
@@ -607,6 +625,12 @@ class ReasoningService extends BaseReasoningService {
     const isLocalProvider = route.kind === "local";
     const isLanChat = route.kind === "self-hosted";
 
+    if (LOCAL_ONLY_MODE && !isLocalProvider && !isLanChat) {
+      throw new Error(
+        `Cloud inference is disabled in this local-only build (chat route: ${route.kind})`
+      );
+    }
+
     if ((isLocalProvider || isLanChat) && !tools) {
       const contentGen = this.processTextStreaming(messages, model, provider, config);
       for await (const text of contentGen) {
@@ -830,6 +854,11 @@ class ReasoningService extends BaseReasoningService {
       ) => Promise<{ data: string; displayText: string; metadata?: Record<string, unknown> }>;
     }
   ): AsyncGenerator<AgentStreamChunk, void, unknown> {
+    if (LOCAL_ONLY_MODE) {
+      // Managed-cloud chat is unreachable in local-only (isSignedIn stays false);
+      // this is a defensive backstop so it can never make a hosted-cloud call.
+      throw new Error("Cloud inference is disabled in this local-only build");
+    }
     const maxSteps = config.tools?.length ? ReasoningService.MAX_TOOL_STEPS : 1;
     let currentMessages = [...messages];
 

@@ -8,6 +8,7 @@ import { getTranscriptionProviders, modelRegistry } from "../../models/ModelRegi
 import { useSettingsStore } from "../../stores/settingsStore";
 import { buildCortiOnboardingPayloads } from "../../helpers/reasoningRouting";
 import { USE_CASE_IDS } from "./useCases";
+import { LOCAL_ONLY_MODE } from "../../lib/features";
 
 const CORTI_SIGNUP_URL =
   "https://www.corti.ai/?utm_source=referral&utm_content=&utm_campaign=openwhispr";
@@ -43,7 +44,7 @@ export default function FinishStep({
   // registry (separate PR) — until then healthcare users see the default finish.
   const cortiProvider = getTranscriptionProviders().find((p) => p.id === "corti");
   const [showCorti, setShowCorti] = useState(
-    !!cortiProvider && useCases.includes(USE_CASE_IDS.healthcare)
+    !LOCAL_ONLY_MODE && !!cortiProvider && useCases.includes(USE_CASE_IDS.healthcare)
   );
   const hasCortiCredentials =
     cortiClientId.trim().length > 0 && cortiClientSecret.trim().length > 0;

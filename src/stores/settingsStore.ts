@@ -4,6 +4,7 @@ import i18n, { ensureLocaleResources, normalizeUiLanguage } from "../i18n";
 import { ensureAgentNameInDictionary } from "../utils/agentName";
 import { useStreamingProvidersStore } from "./streamingProvidersStore";
 import logger from "../utils/logger";
+import { LOCAL_ONLY_MODE } from "../lib/features";
 import whisperVadConstants from "../constants/whisperVad.json";
 import type { LocalTranscriptionProvider, InferenceMode, SelfHostedType } from "../types/electron";
 import type { WhisperXModel } from "../types/whisperx";
@@ -905,7 +906,7 @@ export const MAX_TRANSLATION_TARGETS = 5;
 
 export const useSettingsStore = create<SettingsState>()((set, get) => ({
   uiLanguage: normalizeUiLanguage(isBrowser ? localStorage.getItem("uiLanguage") : null),
-  useLocalWhisper: readBoolean("useLocalWhisper", true),
+  useLocalWhisper: LOCAL_ONLY_MODE ? true : readBoolean("useLocalWhisper", true),
   whisperModel: readString("whisperModel", "base"),
   localTranscriptionProvider: ((): LocalTranscriptionProvider => {
     const v = readString("localTranscriptionProvider", "whisper");
@@ -2027,6 +2028,14 @@ export interface ResolvedLLMConfig {
   disableThinking: boolean;
 }
 
+// In local-only builds, any cloud inference mode resolves to bundled local
+// inference. Keeps stale localStorage (mode: "openwhispr"/"providers"/
+// "enterprise") from routing to the cloud once the cloud UI is hidden.
+const LOCAL_ONLY_CLOUD_MODES = new Set<InferenceMode>(["openwhispr", "providers", "enterprise"]);
+function coerceLocalOnlyMode(mode: InferenceMode): InferenceMode {
+  return LOCAL_ONLY_MODE && LOCAL_ONLY_CLOUD_MODES.has(mode) ? "local" : mode;
+}
+
 export const selectResolvedLLMConfig = (
   state: SettingsState,
   scope: InferenceScope
@@ -2047,7 +2056,7 @@ export const selectResolvedLLMConfig = (
 
   return {
     scope,
-    mode: state[def.storeKeys.mode] as InferenceMode,
+    mode: coerceLocalOnlyMode(state[def.storeKeys.mode] as InferenceMode),
     provider: read("provider") || fallback?.provider || "",
     model: read("model") || fallback?.model || "",
     cloudMode: read("cloudMode") || fallback?.cloudMode,

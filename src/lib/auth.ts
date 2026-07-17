@@ -2,8 +2,14 @@ import { createAuthClient } from "better-auth/react";
 import { ssoClient } from "@better-auth/sso/client";
 import { OPENWHISPR_API_URL } from "../config/constants";
 import { openExternalLink } from "../utils/externalLinks";
+import { LOCAL_ONLY_MODE } from "./features";
 
-export const AUTH_URL = import.meta.env.VITE_AUTH_URL || "https://auth.openwhispr.com";
+// Local-only builds have no cloud account: force AUTH_URL empty so every
+// `!AUTH_URL` guard (AuthenticationStep, Settings account/billing panels) takes
+// its already-present "not configured" path and the sign-in UI never renders.
+export const AUTH_URL = LOCAL_ONLY_MODE
+  ? ""
+  : import.meta.env.VITE_AUTH_URL || "https://auth.openwhispr.com";
 export const authClient = createAuthClient({
   baseURL: AUTH_URL,
   plugins: [ssoClient()],

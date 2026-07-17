@@ -20,6 +20,15 @@ const { getTinfoilChatModels } = require("./tinfoilCatalog");
 const { transcribeWithTinfoil } = require("./tinfoilTranscription");
 const AudioStorageManager = require("./audioStorage");
 
+// Local-only builds (VITE_LOCAL_ONLY, loaded from the bundled .env into
+// process.env) must never run cloud inference in the main process, even though
+// the renderer already hides/gates every cloud entry point. Defense-in-depth
+// backstop for the main-process enterprise (Bedrock/Azure/Vertex) paths.
+function isLocalOnlyBuild() {
+  const v = process.env.VITE_LOCAL_ONLY;
+  return v === "1" || v === "true";
+}
+
 // Tinfoil's only realtime STT model — fallback when the renderer omits one.
 const TINFOIL_REALTIME_MODEL = "voxtral-mini-4b-realtime";
 const liveSpeakerIdentifier = require("./liveSpeakerIdentifier");
@@ -3325,6 +3334,9 @@ class IPCHandlers {
 
     // Enterprise provider test connection
     ipcMain.handle("test-enterprise-connection", async (event, provider, config) => {
+      if (isLocalOnlyBuild()) {
+        return { success: false, error: "Cloud inference is disabled in this local-only build" };
+      }
       const {
         mapEnterpriseError,
         pickEnterpriseConfig,
@@ -3365,6 +3377,9 @@ class IPCHandlers {
     ipcMain.handle(
       "process-enterprise-reasoning",
       async (event, text, modelId, _agentName, config) => {
+        if (isLocalOnlyBuild()) {
+          return { success: false, error: "Cloud inference is disabled in this local-only build" };
+        }
         const {
           isEnterpriseProvider,
           mapEnterpriseError,

@@ -33,6 +33,7 @@ import { getCachedPlatform } from "../utils/platform";
 import type { CudaWhisperStatus } from "../types/electron";
 import type { WhisperXReadiness, WhisperXModel } from "../types/whisperx";
 import { Badge } from "./ui/badge";
+import { LOCAL_ONLY_MODE } from "../lib/features";
 import logger from "../utils/logger";
 
 interface LocalModel {
@@ -663,7 +664,13 @@ export default function TranscriptionModelPicker({
   const setTinfoilApiKey = useSettingsStore((s) => s.setTinfoilApiKey);
   const customTranscriptionApiKey = useSettingsStore((s) => s.customTranscriptionApiKey);
   const setCustomTranscriptionApiKey = useSettingsStore((s) => s.setCustomTranscriptionApiKey);
-  const effectiveLocal = mode === "local" ? true : mode === "cloud" ? false : useLocalWhisper;
+  const effectiveLocal = LOCAL_ONLY_MODE
+    ? true
+    : mode === "local"
+      ? true
+      : mode === "cloud"
+        ? false
+        : useLocalWhisper;
   const [localModels, setLocalModels] = useState<LocalModel[]>([]);
   const [parakeetModels, setParakeetModels] = useState<LocalModel[]>([]);
   const [internalLocalProvider, setInternalLocalProvider] = useState(selectedLocalProvider);
@@ -1241,7 +1248,9 @@ export default function TranscriptionModelPicker({
 
   return (
     <div className={`space-y-2 ${className}`}>
-      {!mode && <ModeToggle useLocalWhisper={effectiveLocal} onModeChange={handleModeChange} />}
+      {!mode && !LOCAL_ONLY_MODE && (
+        <ModeToggle useLocalWhisper={effectiveLocal} onModeChange={handleModeChange} />
+      )}
 
       {!effectiveLocal ? (
         <>
