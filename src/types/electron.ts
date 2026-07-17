@@ -927,6 +927,18 @@ declare global {
       ) => Promise<{ success: boolean; text?: string; error?: string }>;
       checkLocalReasoningAvailable: () => Promise<boolean>;
 
+      // Local CLI inference bridge (claude/codex via the user's subscription).
+      cliInference: (params: {
+        cli: "claude" | "codex";
+        prompt: string;
+        systemPrompt?: string;
+        model?: string;
+        timeoutMs?: number;
+      }) => Promise<{ success: boolean; text?: string; error?: string; code?: string }>;
+      cliInferenceAvailable: (
+        cli: "claude" | "codex"
+      ) => Promise<{ available: boolean; version?: string }>;
+
       // Anthropic reasoning
       processAnthropicReasoning: (
         text: string,
@@ -2064,7 +2076,7 @@ declare global {
         customDictionary?: string[];
         allowModelDownload?: boolean;
         noteGeneration?: {
-          provider: "local";
+          provider: "local" | "claude-cli" | "codex-cli";
           model: string;
           disableThinking: boolean;
         };

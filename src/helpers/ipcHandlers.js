@@ -3708,6 +3708,18 @@ class IPCHandlers {
       }
     });
 
+    // Local CLI inference bridge (claude/codex via the user's subscription).
+    // Text-in/text-out; used for note formatting + dictation agent when the
+    // user opts into the CLI backend. Runs on-device but calls Anthropic/OpenAI.
+    ipcMain.handle("cli-inference", async (event, params) => {
+      const { runCliInference } = require("./cliInference");
+      return runCliInference(params || {});
+    });
+    ipcMain.handle("cli-inference-available", async (event, cli) => {
+      const { checkCliAvailable } = require("./cliInference");
+      return checkCliAvailable(cli);
+    });
+
     ipcMain.handle(
       "process-anthropic-reasoning",
       async (event, text, modelId, _agentName, config) => {

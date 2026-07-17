@@ -624,9 +624,46 @@ class WhisperXMain {
   _validateNoteLlmConfig(llm) {
     if (!llm || typeof llm !== "object") return null;
     const { provider, model, disableThinking } = llm;
-    if (provider !== "local") return null; // v1: reliable notes are local-only
-    if (typeof model !== "string" || model.length === 0) return null;
-    return { provider, model, disableThinking: disableThinking !== false };
+    const isCli = provider === "claude-cli" || provider === "codex-cli";
+    // Notes run on a local GGUF or the user's local CLI (claude/codex via
+    // subscription). CLI backends use the subscription's default model, so an
+    // empty model is valid there; a local GGUF still requires a model id.
+    if (provider !== "local" && !isCli) return null;
+    if (!isCli && (typeof model !== "string" || model.length === 0)) return null;
+    return {
+      provider,
+      model: typeof model === "string" ? model : "",
+      disableThinking: disableThinking !== false,
+    };
+  }
+
+  // CLI-backed note LLM: run `claude`/`codex` (subscription) once per chunk.
+  // The extraction prompt already asks for JSON; parseJsonObject tolerates
+  // fences, and we nudge the CLI toward raw JSON for good measure.
+  _cliLlm(llmConfig) {
+    const cli = llmConfig.provider === "codex-cli" ? "codex" : "claude";
+    return async ({ messages }) => {
+      const { runCliInference } = require("../cliInference");
+      const systemPrompt = messages.find((m) => m.role === "system")?.content || "";
+      const userText = messages
+        .filter((m) => m.role !== "system")
+        .map((m) => m.content)
+        .join("\n\n");
+      const jsonNudge = "Respond with ONLY the JSON object — no prose, no markdown fences.";
+      const res = await runCliInference({
+        cli,
+        prompt: userText,
+        systemPrompt: systemPrompt ? `${systemPrompt}\n\n${jsonNudge}` : jsonNudge,
+        model: llmConfig.model || undefined,
+      });
+      if (!res || !res.success || typeof res.text !== "string") {
+        throw new WhisperXMainError(
+          "NOTE_MODEL_UNAVAILABLE",
+          (res && res.error) || `${cli} CLI note inference failed`
+        );
+      }
+      return res.text;
+    };
   }
 
   // Auto-run hook after transcript completion. Never throws.
@@ -742,14 +779,19 @@ class WhisperXMain {
     });
 
     const speakerMappings = this.repo.getSpeakerMappings(jobId);
-    const lease = await this.coordinator.acquire(jobId, { label: `notes:${llmConfig.model}` });
+    // CLI note generation uses no local GPU, so it skips the exclusive
+    // inference lease entirely (nothing to sequence against WhisperX/llama).
+    const isCli = llmConfig.provider === "claude-cli" || llmConfig.provider === "codex-cli";
+    const lease = isCli
+      ? null
+      : await this.coordinator.acquire(jobId, { label: `notes:${llmConfig.model}` });
     let result;
     try {
       result = await compileNotes({
         transcript,
         jobId,
         profile: settings.profile,
-        llm: this._localLlm(llmConfig, lease),
+        llm: isCli ? this._cliLlm(llmConfig) : this._localLlm(llmConfig, lease),
         generation: {
           provider: llmConfig.provider,
           model: llmConfig.model,
@@ -779,7 +821,7 @@ class WhisperXMain {
       });
       throw error;
     } finally {
-      lease.release();
+      if (lease) lease.release();
     }
 
     // Persist artifacts into the finalized job directory (single-file atomic

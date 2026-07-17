@@ -43,3 +43,33 @@ test("notes onboarding LLM picker is pinned to local in local-only builds", () =
   const notes = read("src/components/notes/NotesOnboarding.tsx");
   assert.match(notes, /LOCAL_ONLY_MODE\s*\?\s*\{\s*mode:\s*"local"/);
 });
+
+test("claude/codex CLI inference providers are registered and guard-exempt", () => {
+  const registry = read("src/services/ai/inferenceProviders/index.ts");
+  assert.match(registry, /"claude-cli":\s*claudeCliProvider/);
+  assert.match(registry, /"codex-cli":\s*codexCliProvider/);
+  // The local-only guard must allow the CLI backends (user's subscription).
+  const rs = read("src/services/ReasoningService.ts");
+  assert.match(rs, /"local",\s*"lan",\s*"claude-cli",\s*"codex-cli"/);
+});
+
+test("WhisperX note generation accepts the CLI note providers", () => {
+  const main = read("src/helpers/whisperx/whisperxMain.js");
+  assert.match(main, /provider === "claude-cli" \|\| provider === "codex-cli"/);
+  assert.match(main, /_cliLlm/);
+});
+
+test("local-only build seeds a ready-to-use local model configuration", () => {
+  const store = read("src/stores/settingsStore.ts");
+  assert.match(store, /function seedLocalOnlyDefaults/);
+  // Hybrid: local Whisper live, WhisperX uploads, local cleanup, Claude-CLI notes.
+  assert.match(store, /whisperModel:\s*"large-v3-turbo"/);
+  assert.match(store, /uploadLocalTranscriptionProvider:\s*"whisperx"/);
+  assert.match(store, /cleanupProvider:\s*"qwen"/);
+  assert.match(store, /noteFormattingProvider:\s*"claude-cli"/);
+  assert.match(store, /onboardingCompleted:\s*"true"/);
+  // Must run after all migrations so nothing overwrites the seeded keys.
+  const seedCall = store.lastIndexOf("seedLocalOnlyDefaults();");
+  const lastMigration = store.lastIndexOf("migrateLLMScopeKeys();");
+  assert.ok(seedCall > lastMigration, "seedLocalOnlyDefaults() must run after migrateLLMScopeKeys()");
+});

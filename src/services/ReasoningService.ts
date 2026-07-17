@@ -29,7 +29,9 @@ import { LOCAL_ONLY_MODE } from "../lib/features";
 // bundled-local ("local") and the user's own endpoint ("lan"/self-hosted) pass.
 // Cloud UI is already hidden; this guarantees no cloud request even from stale
 // config. Callers treat a throw as "cleanup/agent unavailable" and fall back.
-const LOCAL_ONLY_ALLOWED_PROVIDERS = new Set(["local", "lan"]);
+// "claude-cli"/"codex-cli" run the user's local CLI (subscription auth) — an
+// explicit opt-in exception; the local-only guard treats them as allowed.
+const LOCAL_ONLY_ALLOWED_PROVIDERS = new Set(["local", "lan", "claude-cli", "codex-cli"]);
 function assertLocalOnlyProviderAllowed(providerId: string): void {
   if (!LOCAL_ONLY_MODE) return;
   const id = providerId || "";
@@ -353,7 +355,13 @@ class ReasoningService extends BaseReasoningService {
     const providerId = isLanCleanup ? "lan" : config.provider || getModelProvider(trimmedModel);
     assertLocalOnlyProviderAllowed(providerId);
 
-    if (!trimmedModel && providerId !== "openwhispr" && providerId !== "lan") {
+    // CLI backends use the subscription's default model when none is specified.
+    const providerUsesDefaultModel =
+      providerId === "openwhispr" ||
+      providerId === "lan" ||
+      providerId === "claude-cli" ||
+      providerId === "codex-cli";
+    if (!trimmedModel && !providerUsesDefaultModel) {
       throw new Error("No reasoning model selected");
     }
 

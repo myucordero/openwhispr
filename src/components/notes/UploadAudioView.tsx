@@ -248,7 +248,16 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
   // so the info line below reflects settings changes without a remount.
   const noteFormattingProvider = useSettingsStore((s) => selectResolvedNoteFormatting(s).provider);
   const noteFormattingModel = useSettingsStore((s) => selectResolvedNoteFormatting(s).model);
-  const hasLocalNoteModel = noteFormattingProvider === "local" && noteFormattingModel.length > 0;
+  const isCliNoteProvider =
+    noteFormattingProvider === "claude-cli" || noteFormattingProvider === "codex-cli";
+  const hasLocalNoteModel =
+    (noteFormattingProvider === "local" && noteFormattingModel.length > 0) || isCliNoteProvider;
+  // CLI backends have no model id to show; label them by the tool name (brand).
+  const noteModelLabel = isCliNoteProvider
+    ? noteFormattingProvider === "claude-cli"
+      ? "Claude"
+      : "Codex"
+    : noteFormattingModel;
   const startWhisperxJob = useRecordingJobsStore((s) => s.startJob);
   const attachWhisperxEvents = useRecordingJobsStore((s) => s.attachEvents);
   const [whisperxFiles, setWhisperxFiles] = useState<
@@ -557,15 +566,18 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
     const settingsState = useSettingsStore.getState();
     const customDictionary = settingsState.customDictionary;
 
-    // Resolve the noteFormatting scope at submit time. Only a local model takes
-    // effect (main rejects non-local providers); otherwise the job rests at
-    // transcript_complete and notes can be generated later from the review UI.
+    // Resolve the noteFormatting scope at submit time. A local GGUF model or the
+    // local CLI backend (claude/codex) takes effect; other providers are rejected
+    // by main, so the job rests at transcript_complete for later manual notes.
     const noteCfg = selectResolvedNoteFormatting(settingsState);
+    const isCliNote = noteCfg.provider === "claude-cli" || noteCfg.provider === "codex-cli";
     const noteGeneration =
-      noteCfg.provider === "local" && noteCfg.model
+      (noteCfg.provider === "local" && noteCfg.model) || isCliNote
         ? {
-            provider: "local" as const,
-            model: noteCfg.model,
+            provider: noteCfg.provider as "local" | "claude-cli" | "codex-cli",
+            // CLI backends use the subscription default; never forward the
+            // fallback GGUF model id (noteFormatting falls back to cleanup).
+            model: isCliNote ? "" : noteCfg.model,
             disableThinking:
               selectResolvedLLMConfig(settingsState, "noteFormatting").disableThinking !== false,
           }
@@ -1086,7 +1098,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
             setIsDragOver={setIsDragOver}
             getActiveModelLabel={getActiveModelLabel}
             hasLocalNoteModel={hasLocalNoteModel}
-            noteModel={noteFormattingModel}
+            noteModel={noteModelLabel}
           />
         ) : (
           <>

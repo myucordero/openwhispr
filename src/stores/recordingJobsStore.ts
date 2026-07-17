@@ -30,7 +30,7 @@ export interface StartJobPayload {
   customDictionary?: string[];
   allowModelDownload?: boolean;
   noteGeneration?: {
-    provider: "local";
+    provider: "local" | "claude-cli" | "codex-cli";
     model: string;
     disableThinking: boolean;
   };

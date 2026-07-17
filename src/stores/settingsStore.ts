@@ -262,6 +262,56 @@ function migrateProviderSettings() {
 
 migrateProviderSettings();
 
+// Local-only builds ship a ready-to-use local configuration so the user never
+// has to pick models in-app: local Whisper for live dictation, WhisperX for
+// uploaded-recording notes, a local GGUF for fast/private dictation cleanup,
+// and the Claude CLI (subscription) for note formatting + the dictation agent.
+// Runs once (versioned marker) before the store reads its initial values, so
+// the seeded localStorage is what the store hydrates from. Bumping
+// LOCAL_ONLY_SEED_VERSION re-applies on the next launch (e.g. after a pipeline
+// change); the user's later manual tweaks are preserved between bumps.
+const LOCAL_ONLY_SEED_VERSION = "1";
+function seedLocalOnlyDefaults() {
+  if (!isBrowser || !LOCAL_ONLY_MODE) return;
+  if (localStorage.getItem("localOnlyDefaultsSeeded") === LOCAL_ONLY_SEED_VERSION) return;
+  const seed: Record<string, string> = {
+    // Live hotkey dictation: local Whisper large-v3-turbo.
+    useLocalWhisper: "true",
+    localTranscriptionProvider: "whisper",
+    whisperModel: "large-v3-turbo",
+    // Uploaded-recording notes: WhisperX.
+    uploadUseLocalWhisper: "true",
+    uploadLocalTranscriptionProvider: "whisperx",
+    whisperxModel: "large-v3-turbo",
+    // Dictation cleanup: fast, private local GGUF.
+    useCleanupModel: "true",
+    cleanupMode: "local",
+    cleanupProvider: "qwen",
+    cleanupModel: "qwen3.5-2b-q4_k_m",
+    // Note formatting + dictation agent: Claude CLI (subscription). Empty model
+    // → the CLI's account default. Mode "local" keeps it off the cloud path;
+    // the provider id routes to the CLI bridge.
+    noteFormattingMode: "local",
+    noteFormattingProvider: "claude-cli",
+    noteFormattingModel: "",
+    dictationAgentMode: "local",
+    dictationAgentProvider: "claude-cli",
+    dictationAgentModel: "",
+    // Chat agent stays on the local GGUF so its note-search tools keep working.
+    chatAgentMode: "local",
+    chatAgentProvider: "qwen",
+    chatAgentModel: "qwen3.5-2b-q4_k_m",
+    // Skip onboarding — everything is pre-configured.
+    onboardingCompleted: "true",
+  };
+  for (const [key, value] of Object.entries(seed)) {
+    localStorage.setItem(key, value);
+  }
+  localStorage.setItem("localOnlyDefaultsSeeded", LOCAL_ONLY_SEED_VERSION);
+}
+// NB: invoked after ALL migrations below (they would otherwise clobber the
+// seeded scope/upload keys); see the seedLocalOnlyDefaults() call further down.
+
 // One-time seed of the dedicated audio-upload transcription settings. Runs
 // after migrateProviderSettings() so the `transcriptionMode` it derives and
 // persists is available to copy. Before this context existed the upload page
@@ -397,6 +447,9 @@ function migrateLLMScopeKeys() {
 }
 
 migrateLLMScopeKeys();
+
+// Runs last so no migration above can overwrite the seeded local-only config.
+seedLocalOnlyDefaults();
 
 export interface SettingsState
   extends

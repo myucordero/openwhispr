@@ -42,7 +42,10 @@ export default function RecordingNotesView({ job }: RecordingNotesViewProps) {
   // Current resolved note-formatting config (reactive to settings changes).
   const noteProvider = useSettingsStore((s) => selectResolvedNoteFormatting(s).provider);
   const noteModel = useSettingsStore((s) => selectResolvedNoteFormatting(s).model);
-  const isLocalNoteModel = noteProvider === "local" && noteModel.length > 0;
+  const isCliNoteProvider = noteProvider === "claude-cli" || noteProvider === "codex-cli";
+  // Note generation is available with a local GGUF (needs a model) or the local
+  // CLI backend (claude/codex, no model id needed).
+  const isLocalNoteModel = (noteProvider === "local" && noteModel.length > 0) || isCliNoteProvider;
 
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -99,7 +102,9 @@ export default function RecordingNotesView({ job }: RecordingNotesViewProps) {
       const res = await generateNotes(jobId, {
         llm: {
           provider: noteCfg.provider,
-          model: noteCfg.model,
+          // CLI backends use the subscription default; don't forward the
+          // fallback GGUF model id (noteFormatting falls back to cleanup).
+          model: isCliNoteProvider ? "" : noteCfg.model,
           disableThinking: llmCfg.disableThinking !== false,
         },
         strict,
@@ -160,7 +165,13 @@ export default function RecordingNotesView({ job }: RecordingNotesViewProps) {
 
         <p className="text-xs text-foreground/30">
           {isLocalNoteModel
-            ? t("whisperx.notes.notesModelInfo", { model: noteModel })
+            ? t("whisperx.notes.notesModelInfo", {
+                model: isCliNoteProvider
+                  ? noteProvider === "claude-cli"
+                    ? "Claude"
+                    : "Codex"
+                  : noteModel,
+              })
             : t("whisperx.notes.notesModelNone")}
         </p>
 
