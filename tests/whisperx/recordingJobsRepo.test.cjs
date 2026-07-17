@@ -380,15 +380,17 @@ test("getStorageUsage sums bytes per job", () => {
   ]);
 });
 
-test("foreign_keys pragma is effective: artifact for missing job throws", () => {
-  const { db } = makeDb();
-  assert.throws(() => {
-    db
-      .prepare(
-        `INSERT INTO recording_artifacts (
-          job_id, kind, relative_path, sha256, bytes, schema_version, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run("missing-job", "canonical-transcript", "transcript.json", "sha-x", 10, 1, "2026-01-01T00:00:00.000Z");
-  }, /FOREIGN KEY constraint failed/);
+test("schema does not flip the connection-global foreign_keys pragma (security review)", () => {
+  // The shared app connection must keep whatever FK semantics it already had
+  // (better-sqlite3 defaults OFF; node:sqlite defaults ON) — the repo module
+  // must not change it. deleteJob cascades explicitly instead.
+  const db = openMemoryDb();
+  const readPragma = () => {
+    const row = db.prepare("PRAGMA foreign_keys").get();
+    return Number(row.foreign_keys ?? Object.values(row)[0]);
+  };
+  const before = readPragma();
+  applyRecordingJobsSchema(db);
+  const after = readPragma();
+  assert.equal(after, before, "applyRecordingJobsSchema must not change the foreign_keys pragma");
 });

@@ -182,7 +182,15 @@ async function compileNotes({
   // ---- deterministic merge + full-transcript assembly ---------------------
   onProgress({ stage: "note_validating", completed: 0, total: 1 });
   const mergedBody = mergeFragments(fragments, transcript);
-  const transcriptArtifactSha = transcript.__artifactSha256 || "0".repeat(64);
+  // Provenance must be real: a zeroed hash would silently break the
+  // regenerate-against-which-transcript audit trail.
+  const transcriptArtifactSha = transcript.__artifactSha256;
+  if (!transcriptArtifactSha) {
+    throw new NoteCompilationError(
+      "NOTE_SCHEMA_INVALID",
+      "Transcript artifact hash missing — cannot record note provenance"
+    );
+  }
   const extraction = {
     schemaVersion: NOTE_EXTRACTION_SCHEMA_VERSION,
     jobId,

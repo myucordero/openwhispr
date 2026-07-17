@@ -156,7 +156,9 @@ function makeSetup({ mode = "success", getFreeDiskBytes = null } = {}) {
   };
 }
 
-async function pollJob(repo, jobId, statuses, timeoutMs = 15000) {
+// Generous default: test FILES run concurrently in node --test, so worker
+// spawns in this file contend for CPU with other spawn-heavy suites.
+async function pollJob(repo, jobId, statuses, timeoutMs = 30000) {
   const wanted = Array.isArray(statuses) ? statuses : [statuses];
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -196,7 +198,7 @@ async function waitForWorkerPid(manager, timeoutMs = 6000) {
   throw new Error("worker pid never became available");
 }
 
-test("success: memo job runs end-to-end to transcript_complete", { timeout: 20000 }, async () => {
+test("success: memo job runs end-to-end to transcript_complete", { timeout: 60000 }, async () => {
   const s = makeSetup({ mode: "success" });
   try {
     const created = await s.manager.createJob({ sourcePath: s.sourcePath, profile: "memo" });
@@ -237,7 +239,7 @@ test("success: memo job runs end-to-end to transcript_complete", { timeout: 2000
   }
 });
 
-test("sequential queue: the second job stays queued until the first finishes", { timeout: 30000 }, async () => {
+test("sequential queue: the second job stays queued until the first finishes", { timeout: 60000 }, async () => {
   const s = makeSetup({ mode: "success" });
   try {
     const job1 = await s.manager.createJob({ sourcePath: s.sourcePath, profile: "memo" });
@@ -263,7 +265,7 @@ test("sequential queue: the second job stays queued until the first finishes", {
   }
 });
 
-test("OOM ladder: one CUDA_OUT_OF_MEMORY fallback then success", { timeout: 25000 }, async () => {
+test("OOM ladder: one CUDA_OUT_OF_MEMORY fallback then success", { timeout: 60000 }, async () => {
   const s = makeSetup({ mode: "oom-once-then-success" });
   try {
     const created = await s.manager.createJob({ sourcePath: s.sourcePath, profile: "memo" });
@@ -286,7 +288,7 @@ test("OOM ladder: one CUDA_OUT_OF_MEMORY fallback then success", { timeout: 2500
   }
 });
 
-test("crash: job fails WORKER_CRASHED, staging cleaned, and is retryable", { timeout: 25000 }, async () => {
+test("crash: job fails WORKER_CRASHED, staging cleaned, and is retryable", { timeout: 60000 }, async () => {
   const s = makeSetup({ mode: "crash" });
   try {
     const created = await s.manager.createJob({ sourcePath: s.sourcePath, profile: "memo" });
@@ -305,7 +307,7 @@ test("crash: job fails WORKER_CRASHED, staging cleaned, and is retryable", { tim
   }
 });
 
-test("artifact hash mismatch: finalize verification fails the job", { timeout: 20000 }, async () => {
+test("artifact hash mismatch: finalize verification fails the job", { timeout: 60000 }, async () => {
   const s = makeSetup({ mode: "artifact-hash-mismatch" });
   try {
     const created = await s.manager.createJob({ sourcePath: s.sourcePath, profile: "memo" });
@@ -321,7 +323,7 @@ test("artifact hash mismatch: finalize verification fails the job", { timeout: 2
   }
 });
 
-test("invalid transcript: job fails TRANSCRIPT_SCHEMA_INVALID", { timeout: 20000 }, async () => {
+test("invalid transcript: job fails TRANSCRIPT_SCHEMA_INVALID", { timeout: 60000 }, async () => {
   const s = makeSetup({ mode: "invalid-transcript" });
   try {
     const created = await s.manager.createJob({ sourcePath: s.sourcePath, profile: "memo" });
@@ -333,7 +335,7 @@ test("invalid transcript: job fails TRANSCRIPT_SCHEMA_INVALID", { timeout: 20000
   }
 });
 
-test("cancel: queued job cancels without starting; running job is cancelled and retryable", { timeout: 30000 }, async () => {
+test("cancel: queued job cancels without starting; running job is cancelled and retryable", { timeout: 60000 }, async () => {
   const s = makeSetup({ mode: "slow-success" });
   try {
     const job1 = await s.manager.createJob({ sourcePath: s.sourcePath, profile: "memo" });
@@ -373,7 +375,7 @@ test("cancel: queued job cancels without starting; running job is cancelled and 
   }
 });
 
-test("deleteJob: removes final dir + rows (CASCADE); refuses a running job", { timeout: 30000 }, async () => {
+test("deleteJob: removes final dir + rows (CASCADE); refuses a running job", { timeout: 60000 }, async () => {
   const s = makeSetup({ mode: "success" });
   try {
     const created = await s.manager.createJob({ sourcePath: s.sourcePath, profile: "memo" });
@@ -405,7 +407,7 @@ test("deleteJob: removes final dir + rows (CASCADE); refuses a running job", { t
   }
 });
 
-test("startup recovery: an active job becomes interrupted, staging is cleared, retry works", { timeout: 25000 }, async () => {
+test("startup recovery: an active job becomes interrupted, staging is cleared, retry works", { timeout: 60000 }, async () => {
   const s = makeSetup({ mode: "success" });
   try {
     const jobId = "recover-1";

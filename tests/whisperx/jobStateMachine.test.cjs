@@ -113,11 +113,20 @@ test("note regeneration from complete", () => {
 });
 
 test("recoveryStateFor", async (t) => {
-  await t.test("every active state recovers to interrupted", () => {
-    for (const state of ACTIVE_STATES) {
+  const NOTE_STATES = ["note_extracting", "note_validating", "note_rendering"];
+  await t.test("pre-finalize active states recover to interrupted", () => {
+    for (const state of ACTIVE_STATES.filter((s) => !NOTE_STATES.includes(s))) {
       assert.equal(recoveryStateFor(state), "interrupted", `expected ${state} to recover`);
     }
   });
+  await t.test(
+    "note states recover to transcript_complete_note_failed (transcript already finalized; a full retry would dead-end on the finalize already-exists guard)",
+    () => {
+      for (const state of NOTE_STATES) {
+        assert.equal(recoveryStateFor(state), "transcript_complete_note_failed");
+      }
+    }
+  );
   await t.test("resting and terminal states do not recover", () => {
     for (const state of [...RESTING_STATES, ...TERMINAL_FAILURE_STATES]) {
       assert.equal(recoveryStateFor(state), null, `expected ${state} to be null`);

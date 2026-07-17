@@ -22,10 +22,13 @@ function mapRows(rows) {
 }
 
 function applyRecordingJobsSchema(db) {
-  // database.js does not enable foreign key enforcement on its connection,
-  // so this module enables it here. Cascading deletes below rely on it.
-  db.pragma("foreign_keys = ON");
-
+  // NOTE: foreign_keys is deliberately NOT enabled here — the pragma is
+  // connection-global and database.js shares one connection across every
+  // pre-existing table, so flipping it from a feature module would silently
+  // change enforcement semantics app-wide (security review finding).
+  // deleteJob() cascades explicitly inside a transaction instead; the FK
+  // clauses below remain as documentation and for any future DB-wide
+  // decision to enable enforcement.
   db.exec(`
     CREATE TABLE IF NOT EXISTS recording_jobs (
       id TEXT PRIMARY KEY,
@@ -248,7 +251,16 @@ function createRecordingJobsRepo(db) {
   }
 
   function deleteJob(id) {
-    const result = db.prepare("DELETE FROM recording_jobs WHERE id = ?").run(id);
+    // Explicit cascade in one transaction (FK enforcement is intentionally
+    // not enabled on the shared connection — see applyRecordingJobsSchema).
+    const runDelete = db.transaction((jobId) => {
+      db.prepare("DELETE FROM recording_artifacts WHERE job_id = ?").run(jobId);
+      db.prepare("DELETE FROM note_generation_runs WHERE job_id = ?").run(jobId);
+      db.prepare("DELETE FROM recording_speaker_mappings WHERE job_id = ?").run(jobId);
+      db.prepare("DELETE FROM transcript_revisions WHERE job_id = ?").run(jobId);
+      return db.prepare("DELETE FROM recording_jobs WHERE id = ?").run(jobId);
+    });
+    const result = runDelete(id);
     return { success: result.changes > 0 };
   }
 

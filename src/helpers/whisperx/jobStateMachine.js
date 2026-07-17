@@ -99,8 +99,15 @@ function canCancel(state) {
 }
 
 // Startup recovery: any job left in an active state has no live worker and
-// must be marked interrupted (never complete).
+// must be marked interrupted (never complete) — EXCEPT the note states,
+// which are only reachable after the transcript directory finalized: a crash
+// there must land on transcript_complete_note_failed so the finalized
+// transcript survives and only notes are retried (re-running ASR would hit
+// the finalize already-exists guard and dead-end the job).
+const NOTE_ACTIVE_STATES = ["note_extracting", "note_validating", "note_rendering"];
+
 function recoveryStateFor(state) {
+  if (NOTE_ACTIVE_STATES.includes(state)) return "transcript_complete_note_failed";
   return isActiveState(state) ? "interrupted" : null;
 }
 

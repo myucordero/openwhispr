@@ -497,7 +497,8 @@ class RecordingJobManager {
     const code =
       error instanceof RecordingJobError ||
       error instanceof WhisperXProcessError ||
-      error instanceof ArtifactStoreError
+      error instanceof ArtifactStoreError ||
+      error.code === "GPU_LEASE_CANCELLED"
         ? error.code
         : "UNKNOWN_INTERNAL_ERROR";
 
@@ -509,12 +510,18 @@ class RecordingJobManager {
       /* best effort */
     }
 
-    const target = code === "JOB_CANCELLED" ? "cancelled" : "failed";
+    // A lease request rejected by cancelPending and an explicit cancel flag
+    // both mean the user cancelled — never surface those as failures.
+    const wasCancelled =
+      code === "JOB_CANCELLED" ||
+      code === "GPU_LEASE_CANCELLED" ||
+      (this._running && this._running.jobId === jobId && this._running.cancelRequested);
+    const target = wasCancelled ? "cancelled" : "failed";
     if (isActiveState(job.status)) {
-      this.repo.updateJobStatus(jobId, target, { errorCode: code === "JOB_CANCELLED" ? null : code });
+      this.repo.updateJobStatus(jobId, target, { errorCode: wasCancelled ? null : code });
       this._emit(jobId, {
         status: target,
-        ...(code !== "JOB_CANCELLED" ? { warning: { code, message: error.message } } : {}),
+        ...(!wasCancelled ? { warning: { code, message: error.message } } : {}),
       });
     }
     this._log("warn", "Recording job did not complete", { jobId, code, message: error.message });

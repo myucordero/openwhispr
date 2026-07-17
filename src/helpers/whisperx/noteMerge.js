@@ -102,9 +102,11 @@ function mergeFragments(fragments, transcript) {
       const delta =
         earliestEvidenceStart(a, segmentStartById) - earliestEvidenceStart(b, segmentStartById);
       if (delta !== 0) return delta;
-      return normalizeForMatch(claimTextOf(category, a)).localeCompare(
-        normalizeForMatch(claimTextOf(category, b))
-      );
+      // Codepoint comparison, NOT localeCompare: the tiebreak (and therefore
+      // final item ids and rendered bytes) must not vary with the host locale.
+      const ta = normalizeForMatch(claimTextOf(category, a));
+      const tb = normalizeForMatch(claimTextOf(category, b));
+      return ta < tb ? -1 : ta > tb ? 1 : 0;
     });
     // Stable final IDs.
     const prefix = CATEGORY_ID_PREFIX[category];

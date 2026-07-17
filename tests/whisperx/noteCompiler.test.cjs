@@ -16,7 +16,11 @@ function loadFixture(name) {
 }
 
 function transcript() {
-  return loadFixture("valid-transcript.json");
+  const t = loadFixture("valid-transcript.json");
+  // compileNotes requires the canonical artifact hash for honest provenance
+  // (set by the caller from the artifact descriptor in production).
+  t.__artifactSha256 = "a".repeat(64);
+  return t;
 }
 
 // A transcript large enough that compileNotes' own (non-configurable) default

@@ -406,6 +406,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
     setWhisperxSubmitting(true);
     try {
       const newIds: string[] = [];
+      const submittedPaths = new Set<string>();
       // Submit sequentially; the main process queues jobs FIFO.
       for (const f of whisperxFiles) {
         const res = await startWhisperxJob({
@@ -419,6 +420,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
         });
         if (res.success && res.job) {
           newIds.push(res.job.id);
+          submittedPaths.add(f.path);
         } else {
           setWhisperxError(
             res.code
@@ -431,7 +433,9 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
       }
       if (newIds.length > 0) {
         setSubmittedJobIds((prev) => [...newIds, ...prev]);
-        setWhisperxFiles([]);
+        // Keep files that failed to enqueue selected so the user can retry
+        // them; only successfully submitted files leave the picker.
+        setWhisperxFiles((prev) => prev.filter((f) => !submittedPaths.has(f.path)));
       }
     } finally {
       setWhisperxSubmitting(false);

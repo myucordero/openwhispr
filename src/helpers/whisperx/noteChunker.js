@@ -72,11 +72,13 @@ function chunkSegments(segments, { maxInputTokens = 9000, overlapSegments = 2 } 
 
 // Serializes a chunk into the data block handed to the extraction prompt.
 // Transcript text is DATA — it is fenced and never concatenated into
-// instructions (spec 07 §9).
+// instructions (spec 07 §9). Spoken text that happens to contain the fence
+// sentinel is neutralized so it cannot close the data block early.
 function serializeChunk(chunk) {
   const lines = chunk.segments.map((segment) => {
     const speaker = segment.speakerId ? ` speaker=${segment.speakerId}` : "";
-    return `[${segment.id} start=${segment.start.toFixed(2)} end=${segment.end.toFixed(2)}${speaker}] ${segment.text}`;
+    const text = segment.text.replace(/TRANSCRIPT>>>/g, "TRANSCRIPT>»>").replace(/<<<TRANSCRIPT/g, "<«<TRANSCRIPT");
+    return `[${segment.id} start=${segment.start.toFixed(2)} end=${segment.end.toFixed(2)}${speaker}] ${text}`;
   });
   return lines.join("\n");
 }

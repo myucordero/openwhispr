@@ -516,13 +516,23 @@ class WhisperXMain {
   }
 
   // Source audio for transcript review playback (FR-036). The renderer only
-  // ever supplies a job id — the path comes from the job row, so no arbitrary
-  // filesystem read is reachable from the renderer. Bounded to 300 MB.
-  readSourceAudio(jobId) {
+  // supplies a job id, and bytes are served ONLY for jobs whose transcript
+  // finalized — the worker's probe/decode stages prove the file is real
+  // audio, so a renderer cannot round-trip arbitrary file bytes by starting
+  // a job on a non-audio path and reading it back. Bounded to 300 MB,
+  // read asynchronously.
+  async readSourceAudio(jobId) {
     this._assertJobId(jobId);
     const job = this.repo.getJob(jobId);
     if (!job || !job.sourcePath) {
       throw new WhisperXMainError("AUDIO_FILE_NOT_FOUND", "Job or source path not found");
+    }
+    const PLAYABLE_STATUSES = ["transcript_complete", "complete", "transcript_complete_note_failed"];
+    if (!PLAYABLE_STATUSES.includes(job.status)) {
+      throw new WhisperXMainError(
+        "AUDIO_UNSUPPORTED",
+        "Source audio is only served after the transcript has finalized"
+      );
     }
     let stat;
     try {
@@ -548,7 +558,7 @@ class WhisperXMain {
       ".aac": "audio/aac",
     };
     const ext = path.extname(job.sourcePath).toLowerCase();
-    const buffer = fs.readFileSync(job.sourcePath);
+    const buffer = await fs.promises.readFile(job.sourcePath);
     return {
       audio: buffer,
       mimeType: MIME_BY_EXT[ext] || "application/octet-stream",
@@ -712,13 +722,19 @@ class WhisperXMain {
       this._broadcast("whisperx-job-event", { jobId, status: to });
     };
 
+    if (!transcript.__artifactSha256) {
+      throw new WhisperXMainError(
+        "TRANSCRIPT_SCHEMA_INVALID",
+        "Canonical transcript artifact hash missing — cannot record note provenance"
+      );
+    }
     transitionTo("note_extracting");
     const noteRunId = this._uuid();
     this.repo.createNoteRun({
       id: noteRunId,
       jobId,
       status: "running",
-      sourceTranscriptSha256: transcript.__artifactSha256 || "0".repeat(64),
+      sourceTranscriptSha256: transcript.__artifactSha256,
       promptVersion: EXTRACTION_PROMPT_VERSION,
       provider: llmConfig.provider,
       model: llmConfig.model,
@@ -811,17 +827,30 @@ class WhisperXMain {
     ]);
 
     // Surface the notes as a regular OpenWhispr note (spec pipeline tail).
+    // Regeneration UPDATES the note row from the previous successful run
+    // instead of inserting a duplicate (review finding).
     let noteId = null;
     try {
       if (this.databaseManager && typeof this.databaseManager.saveNote === "function") {
         const job = this.repo.getJob(jobId);
-        const saved = this.databaseManager.saveNote(
-          job.sourceDisplayName,
-          result.markdown,
-          "whisperx-recording",
-          job.sourceDisplayName
-        );
-        noteId = saved && (saved.id ?? saved.lastInsertRowid ?? null);
+        const previousRun = this.repo
+          .listNoteRuns(jobId)
+          .find((run) => run.status === "complete" && run.noteId);
+        if (
+          previousRun &&
+          typeof this.databaseManager.updateNote === "function"
+        ) {
+          this.databaseManager.updateNote(previousRun.noteId, { content: result.markdown });
+          noteId = previousRun.noteId;
+        } else {
+          const saved = this.databaseManager.saveNote(
+            job.sourceDisplayName,
+            result.markdown,
+            "whisperx-recording",
+            job.sourceDisplayName
+          );
+          noteId = saved && (saved.id ?? saved.lastInsertRowid ?? null);
+        }
       }
     } catch (error) {
       this._log("warn", "Notes rendered but note row creation failed", {
