@@ -5,71 +5,51 @@ const debugLogger = require("./debugLogger");
 
 let cachedFFmpegPath = null;
 
-function ensureExecutable(pathToBinary) {
-  if (process.platform === "win32") return true;
-  try {
-    fs.accessSync(pathToBinary, fs.constants.X_OK);
-    return true;
-  } catch {
-    try {
-      fs.chmodSync(pathToBinary, 0o755);
-      return true;
-    } catch (chmodErr) {
-      debugLogger.warn("Failed to chmod FFmpeg", { error: chmodErr.message, path: pathToBinary });
-      return false;
-    }
-  }
-}
-
-function toUnpackedAsarPath(filePath) {
-  if (!filePath || !filePath.includes("app.asar")) return null;
-  return filePath.replace(/app\.asar([/\\])/, "app.asar.unpacked$1");
-}
-
-function isInsideAsar(filePath) {
-  return typeof filePath === "string" && /app\.asar([/\\]|$)/.test(filePath);
-}
-
 function getFFmpegPath() {
-  if (cachedFFmpegPath) {
-    if (fs.existsSync(cachedFFmpegPath)) {
-      return cachedFFmpegPath;
-    }
-    debugLogger.debug("Clearing stale cached FFmpeg path", { cachedFFmpegPath });
-    cachedFFmpegPath = null;
-  }
+  if (cachedFFmpegPath) return cachedFFmpegPath;
 
   try {
-    const binaryName = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
-    const candidates = [];
+    let ffmpegPath = require("ffmpeg-static");
+    ffmpegPath = path.normalize(ffmpegPath);
 
-    // Explicit packaged app location (most reliable in production builds)
-    if (process.resourcesPath) {
-      candidates.push(
-        path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "ffmpeg-static", binaryName)
-      );
-    }
-
-    let ffmpegPath = path.normalize(require("ffmpeg-static"));
     if (process.platform === "win32" && !ffmpegPath.endsWith(".exe")) {
       ffmpegPath += ".exe";
     }
 
-    const unpackedPath = toUnpackedAsarPath(ffmpegPath);
-    if (unpackedPath) candidates.push(path.normalize(unpackedPath));
+    // Try unpacked ASAR path first (production builds unpack ffmpeg-static)
+    const unpackedPath = ffmpegPath.includes("app.asar")
+      ? ffmpegPath.replace(/app\.asar([/\\])/, "app.asar.unpacked$1")
+      : null;
 
-    // Keep original path only if it is not inside app.asar (spawn cannot execute there)
-    if (!isInsideAsar(ffmpegPath)) {
-      candidates.push(ffmpegPath);
-    } else {
-      debugLogger.debug("Ignoring FFmpeg path inside app.asar for spawn()", { ffmpegPath });
+    if (unpackedPath && fs.existsSync(unpackedPath)) {
+      if (process.platform !== "win32") {
+        try {
+          fs.accessSync(unpackedPath, fs.constants.X_OK);
+        } catch {
+          try {
+            fs.chmodSync(unpackedPath, 0o755);
+          } catch (chmodErr) {
+            debugLogger.warn("Failed to chmod FFmpeg", { error: chmodErr.message });
+          }
+        }
+      }
+      cachedFFmpegPath = unpackedPath;
+      return unpackedPath;
     }
 
-    for (const candidate of candidates) {
-      if (!candidate || !fs.existsSync(candidate)) continue;
-      if (!ensureExecutable(candidate)) continue;
-      cachedFFmpegPath = candidate;
-      return candidate;
+    // Try original path (development or if not in ASAR). An in-asar path passes
+    // existsSync but can never be spawned, so fall through to system FFmpeg instead.
+    if (!unpackedPath && fs.existsSync(ffmpegPath)) {
+      if (process.platform !== "win32") {
+        try {
+          fs.accessSync(ffmpegPath, fs.constants.X_OK);
+        } catch {
+          debugLogger.debug("FFmpeg exists but not executable", { ffmpegPath });
+          throw new Error("Not executable");
+        }
+      }
+      cachedFFmpegPath = ffmpegPath;
+      return ffmpegPath;
     }
   } catch (err) {
     debugLogger.debug("Bundled FFmpeg not available", { error: err.message });
@@ -131,86 +111,77 @@ function isWavFormat(buffer) {
 function convertToWav(inputPath, outputPath, options = {}) {
   const { sampleRate = 16000, channels = 1 } = options;
 
-  const args = [
-    "-i",
-    inputPath,
-    "-ar",
-    String(sampleRate),
-    "-ac",
-    String(channels),
-    "-c:a",
-    "pcm_s16le",
-    "-y", // Overwrite output file
-    outputPath,
-  ];
+  return new Promise((resolve, reject) => {
+    const ffmpegPath = getFFmpegPath();
+    if (!ffmpegPath) {
+      reject(
+        new Error(
+          "FFmpeg not found - the bundled FFmpeg is missing from this install and no system FFmpeg was found on PATH; reinstalling OpenWhispr should fix this"
+        )
+      );
+      return;
+    }
 
-  debugLogger.debug("Converting audio with FFmpeg", {
-    input: inputPath,
-    output: outputPath,
-    sampleRate,
-    channels,
-  });
+    const args = [
+      "-i",
+      inputPath,
+      "-ar",
+      String(sampleRate),
+      "-ac",
+      String(channels),
+      "-c:a",
+      "pcm_s16le",
+      "-y", // Overwrite output file
+      outputPath,
+    ];
 
-  const runConversion = (attempt = 0) =>
-    new Promise((resolve, reject) => {
-      const ffmpegPath = getFFmpegPath();
-      if (!ffmpegPath) {
-        reject(new Error("FFmpeg not found - required for audio conversion"));
+    debugLogger.debug("Converting audio with FFmpeg", {
+      input: inputPath,
+      output: outputPath,
+      sampleRate,
+      channels,
+    });
+
+    const proc = spawn(ffmpegPath, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    });
+
+    let stderr = "";
+
+    proc.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    proc.on("error", (error) => {
+      reject(new Error(`FFmpeg process error: ${error.message}`));
+    });
+
+    proc.on("close", (code) => {
+      if (code !== 0) {
+        const stderrPreview = stderr.slice(-500).trim();
+        debugLogger.debug("FFmpeg conversion failed", { code, stderr: stderrPreview });
+        reject(
+          new Error(`FFmpeg exited with code ${code}${stderrPreview ? `: ${stderrPreview}` : ""}`)
+        );
         return;
       }
 
-      const proc = spawn(ffmpegPath, args, {
-        stdio: ["ignore", "pipe", "pipe"],
-        windowsHide: true,
-      });
+      if (!fs.existsSync(outputPath)) {
+        reject(new Error("FFmpeg conversion produced no output file"));
+        return;
+      }
 
-      let stderr = "";
+      const stats = fs.statSync(outputPath);
+      if (stats.size === 0) {
+        reject(new Error("FFmpeg conversion produced empty output file"));
+        return;
+      }
 
-      proc.stderr.on("data", (data) => {
-        stderr += data.toString();
-      });
-
-      proc.on("error", (error) => {
-        const isNotFound = error?.code === "ENOENT" || /ENOENT/i.test(error?.message || "");
-        if (isNotFound && attempt === 0) {
-          debugLogger.warn("FFmpeg path became unavailable; retrying with fresh resolution", {
-            ffmpegPath,
-            error: error.message,
-          });
-          clearCache();
-          runConversion(1).then(resolve).catch(reject);
-          return;
-        }
-        reject(new Error(`FFmpeg process error: ${error.message}`));
-      });
-
-      proc.on("close", (code) => {
-        if (code !== 0) {
-          const stderrPreview = stderr.slice(-500).trim();
-          debugLogger.debug("FFmpeg conversion failed", { code, stderr: stderrPreview });
-          reject(
-            new Error(`FFmpeg exited with code ${code}${stderrPreview ? `: ${stderrPreview}` : ""}`)
-          );
-          return;
-        }
-
-        if (!fs.existsSync(outputPath)) {
-          reject(new Error("FFmpeg conversion produced no output file"));
-          return;
-        }
-
-        const stats = fs.statSync(outputPath);
-        if (stats.size === 0) {
-          reject(new Error("FFmpeg conversion produced empty output file"));
-          return;
-        }
-
-        debugLogger.debug("FFmpeg conversion complete", { outputSize: stats.size });
-        resolve();
-      });
+      debugLogger.debug("FFmpeg conversion complete", { outputSize: stats.size });
+      resolve();
     });
-
-  return runConversion(0);
+  });
 }
 
 function wavToFloat32Samples(wavBuffer) {

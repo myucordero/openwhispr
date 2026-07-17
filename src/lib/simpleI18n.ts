@@ -1,6 +1,9 @@
 type LanguageResources = Record<string, Record<string, unknown>>;
 
-export type TFunction = (key: string, options?: Record<string, unknown>) => string;
+export interface TFunction {
+  (key: string, options: Record<string, unknown> & { returnObjects: true }): unknown;
+  (key: string, options?: Record<string, unknown>): string;
+}
 
 type EventName = "languageChanged";
 type Listener = (value: string) => void;
@@ -53,7 +56,9 @@ export class SimpleI18n {
     return Promise.resolve(this);
   }
 
-  t(key: string, options: Record<string, unknown> = {}): string {
+  t(key: string, options: Record<string, unknown> & { returnObjects: true }): unknown;
+  t(key: string, options?: Record<string, unknown>): string;
+  t(key: string, options: Record<string, unknown> = {}): unknown {
     const language = (options.lng as string) || this.language;
     const ns = (options.ns as string) || this.defaultNS;
     const current = getNestedValue(this.resources[language]?.[ns], key);
@@ -66,12 +71,14 @@ export class SimpleI18n {
           : options.defaultValue !== undefined
             ? options.defaultValue
             : key;
+    // returnObjects: hand back the raw array/object so callers can map/iterate.
+    if (options.returnObjects) return resolved;
     return interpolate(resolved, options);
   }
 
   getFixedT(language: string, ns?: string): TFunction {
-    return (key: string, options: Record<string, unknown> = {}) =>
-      this.t(key, { ...options, ns: ns || options.ns, lng: language });
+    return ((key: string, options: Record<string, unknown> = {}) =>
+      this.t(key, { ...options, ns: ns || options.ns, lng: language })) as TFunction;
   }
 
   hasResourceBundle(language: string, ns: string): boolean {

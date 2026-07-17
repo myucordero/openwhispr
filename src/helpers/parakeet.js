@@ -1,9 +1,9 @@
 const fs = require("fs");
 const fsPromises = require("fs").promises;
 const path = require("path");
-const { spawn } = require("child_process");
 const { pipeline } = require("stream/promises");
 const debugLogger = require("./debugLogger");
+const { runSystemTar } = require("./systemTar");
 const {
   downloadFile,
   createDownloadSignal,
@@ -14,6 +14,7 @@ const ParakeetServerManager = require("./parakeetServer");
 const { getModelsDirForService } = require("./modelDirUtils");
 
 const modelRegistryData = require("../models/modelRegistryData.json");
+const { getModelRuntime, REQUIRED_MODEL_FILES } = require("./parakeetModelInfo");
 
 function getParakeetModelConfig(modelName) {
   const modelInfo = modelRegistryData.parakeetModels[modelName];
@@ -72,7 +73,7 @@ class ParakeetManager {
       if (
         localTranscriptionProvider === "nvidia" &&
         parakeetModel &&
-        this.serverManager.isAvailable()
+        this.serverManager.isAvailable(getModelRuntime(parakeetModel))
       ) {
         if (this.serverManager.isModelDownloaded(parakeetModel)) {
           debugLogger.info("Pre-warming parakeet server", { model: parakeetModel });
@@ -112,15 +113,16 @@ class ParakeetManager {
 
     debugLogger.info("Parakeet initialization complete", {
       totalTimeMs: Date.now() - startTime,
-      binaryAvailable: this.serverManager.isAvailable(),
+      binaryAvailable: this.serverManager.hasAnyWsBinary(),
     });
   }
 
   async logDependencyStatus() {
     const status = {
       sherpaOnnx: {
-        available: this.serverManager.isAvailable(),
-        path: this.serverManager.getBinaryPath(),
+        available: this.serverManager.hasAnyWsBinary(),
+        path:
+          this.serverManager.getBinaryPath("offline") || this.serverManager.getBinaryPath("online"),
       },
       models: [],
     };
@@ -154,16 +156,13 @@ class ParakeetManager {
   }
 
   async checkInstallation() {
-    const binaryPath = this.serverManager.getBinaryPath();
+    const binaryPath =
+      this.serverManager.getBinaryPath("offline") || this.serverManager.getBinaryPath("online");
     if (!binaryPath) {
       return { installed: false, working: false };
     }
 
-    return {
-      installed: true,
-      working: this.serverManager.isAvailable(),
-      path: binaryPath,
-    };
+    return { installed: true, working: true, path: binaryPath };
   }
 
   async startServer(modelName) {
@@ -179,21 +178,35 @@ class ParakeetManager {
     return this.serverManager.getServerStatus();
   }
 
+  supportsOnlineStreaming(modelName) {
+    return getModelRuntime(modelName) === "online";
+  }
+
+  async createOnlineStream(modelName, options = {}) {
+    this.validateModelName(modelName);
+    const started = await this.serverManager.startServer(modelName);
+    if (!started.success) {
+      throw new Error(started.reason || "Failed to start parakeet streaming server");
+    }
+    return this.serverManager.createOnlineStream(options);
+  }
+
   async transcribeLocalParakeet(audioBlob, options = {}) {
+    const model = options.model || "parakeet-tdt-0.6b-v3";
+    const serverAvailable = this.serverManager.isAvailable(getModelRuntime(model));
+
     debugLogger.logSTTPipeline("transcribeLocalParakeet - start", {
       options,
       audioBlobType: audioBlob?.constructor?.name,
       audioBlobSize: audioBlob?.byteLength || audioBlob?.size || 0,
-      serverAvailable: this.serverManager.isAvailable(),
+      serverAvailable,
     });
 
-    if (!this.serverManager.isAvailable()) {
+    if (!serverAvailable) {
       throw new Error(
         "sherpa-onnx binary not found. Please ensure the app is installed correctly."
       );
     }
-
-    const model = options.model || "parakeet-tdt-0.6b-v3";
 
     if (!this.serverManager.isModelDownloaded(model)) {
       throw new Error(
@@ -341,7 +354,7 @@ class ParakeetManager {
         progressCallback({ type: "complete", model: modelName, percentage: 100 });
       }
 
-      if (this.serverManager.isAvailable()) {
+      if (this.serverManager.isAvailable(getModelRuntime(modelName))) {
         this.serverManager.startServer(modelName).catch((err) => {
           debugLogger.warn("Post-download server pre-warm failed (non-fatal)", {
             error: err.message,
@@ -392,7 +405,10 @@ class ParakeetManager {
         for (const entry of entries) {
           const entryPath = path.join(extractDir, entry);
           const stat = await fsPromises.stat(entryPath);
-          if (stat.isDirectory() && entry.includes("parakeet")) {
+          if (
+            stat.isDirectory() &&
+            REQUIRED_MODEL_FILES.every((file) => fs.existsSync(path.join(entryPath, file)))
+          ) {
             modelDir = entry;
             break;
           }
@@ -411,13 +427,7 @@ class ParakeetManager {
         }
       }
 
-      const requiredFiles = [
-        "encoder.int8.onnx",
-        "decoder.int8.onnx",
-        "joiner.int8.onnx",
-        "tokens.txt",
-      ];
-      const missing = requiredFiles.filter((f) => !fs.existsSync(path.join(targetDir, f)));
+      const missing = REQUIRED_MODEL_FILES.filter((f) => !fs.existsSync(path.join(targetDir, f)));
       if (missing.length > 0) {
         throw new Error(`Extracted model is missing required files: ${missing.join(", ")}`);
       }
@@ -434,40 +444,8 @@ class ParakeetManager {
   }
 
   async _runTarExtract(archivePath, extractDir) {
-    const tarCommand =
-      process.platform === "win32"
-        ? path.join(process.env.SystemRoot || "C:\\Windows", "System32", "tar.exe")
-        : "tar";
-    const isWindows = process.platform === "win32";
-    const tarArgs = isWindows
-      ? ["-xjf", path.basename(archivePath), "-C", path.basename(extractDir)]
-      : ["-xjf", archivePath, "-C", extractDir];
-    const spawnOptions = {
-      stdio: ["ignore", "pipe", "pipe"],
-      ...(isWindows ? { cwd: path.dirname(archivePath) } : {}),
-    };
     try {
-      await new Promise((resolve, reject) => {
-        const tarProcess = spawn(tarCommand, tarArgs, spawnOptions);
-
-        let stderr = "";
-
-        tarProcess.stderr.on("data", (data) => {
-          stderr += data.toString();
-        });
-
-        tarProcess.on("close", (code) => {
-          if (code === 0) {
-            resolve();
-          } else {
-            reject(new Error(`tar extraction failed with code ${code}: ${stderr}`));
-          }
-        });
-
-        tarProcess.on("error", (err) => {
-          reject(new Error(`Failed to start tar process: ${err.message}`));
-        });
-      });
+      await this._runSystemTar(archivePath, extractDir);
       return;
     } catch (err) {
       debugLogger.debug("System tar failed, falling back to JS extraction", {
@@ -478,6 +456,10 @@ class ParakeetManager {
     const unbzip2 = require("unbzip2-stream");
     const tar = require("tar");
     await pipeline(fs.createReadStream(archivePath), unbzip2(), tar.x({ cwd: extractDir }));
+  }
+
+  _runSystemTar(archivePath, extractDir) {
+    return runSystemTar(archivePath, extractDir);
   }
 
   async cancelDownload() {
@@ -606,8 +588,8 @@ class ParakeetManager {
       modelsDir: this.getModelsDir(),
       models: [],
     };
-
-    const binaryPath = this.serverManager.getBinaryPath();
+    const binaryPath =
+      this.serverManager.getBinaryPath("offline") || this.serverManager.getBinaryPath("online");
     if (binaryPath) {
       diagnostics.sherpaOnnx = { available: true, path: binaryPath };
     }
