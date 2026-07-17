@@ -89,6 +89,46 @@ npm run doctor:whisperx
 Full setup, privacy/retention, troubleshooting, and license details:
 `docs/whisperx-reliable-notes.md`. Live hotkey dictation is unaffected.
 
+## Personal Build Pipeline (WSL dev → Windows app)
+
+Code lives in the WSL clone; the app you actually run is the local packaged
+build in `C:\dev\openwhispr\dist\win-unpacked`, launched from the Start Menu
+shortcut (**OpenWhispr**). Two commands close the loop:
+
+1. **WSL — validate and ship** (tests, lint, typecheck, i18n, then push the
+   current branch to origin):
+
+   ```bash
+   npm run ship:local
+   ```
+
+2. **Native Windows PowerShell — pull and rebuild** (fast-forward pull,
+   `npm ci` only when `package-lock.json` changed, WhisperX runtime repair
+   only when `uv.lock` changed, `build:local:win`, Start Menu shortcut
+   verified, doctor summary; closes a running OpenWhispr first):
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File C:\dev\openwhispr\scripts\update-local-app.ps1
+   ```
+
+Notes:
+
+- Whisper/Parakeet/WhisperX models, the WhisperX runtime, recordings, and the
+  encrypted secret store all live under `%APPDATA%\OpenWhispr` and
+  `~/.cache/openwhispr` — rebuilds never touch them.
+- The Windows clone must stay clean (the script refuses to pull over local
+  changes) — all editing happens in WSL, per the dual-clone rules above.
+- Upstream **OpenWhispr** updates: run the existing Fork Sync Routine below,
+  then `npm run ship:local` + the Windows update script as usual.
+- **WhisperX / Python dependency updates**: on a dedicated branch in WSL run
+  `cd tools/whisperx-sidecar && uv lock --upgrade`, re-run
+  `uv run pytest` and `npm test`, then ship — the Windows script sees the
+  changed `uv.lock` and repairs the runtime automatically. Torch stays on the
+  cu128 index for Windows (see `[tool.uv.sources]` in the sidecar
+  `pyproject.toml`); keep that block intact when upgrading.
+- Node/Electron/npm dependency updates flow through `package-lock.json` the
+  same way — the Windows script runs `npm ci` automatically when it changes.
+
 ## Preferred Daily Mode
 
 - Use local Whisper/Parakeet as your default

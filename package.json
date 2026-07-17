@@ -69,6 +69,7 @@
     "download:diarization-models": "node scripts/download-diarization-models.js",
     "download:whisper-vad-model": "node scripts/download-whisper-vad-model.js",
     "doctor:local": "node scripts/local-doctor.js",
+    "ship:local": "bash scripts/ship-local.sh",
     "setup:whisperx": "node scripts/setup-whisperx.js",
     "doctor:whisperx": "node scripts/doctor-whisperx.js",
     "benchmark:whisperx": "node scripts/benchmark-whisperx.js",
