@@ -114,7 +114,7 @@ if ($lnk.TargetPath -ne $unpackedExe) {
 Step "doctor summary:"
 node scripts\doctor-whisperx.js 2>$null | Select-String -Pattern "PASS|FAIL|WARN"
 $head = (git log --oneline -1).Trim()
-Step "done. $Branch @ $head"
+Step ("done. {0} at {1}" -f $Branch, $head)
 if (Test-Path $unpackedExe) {
     $stamp = (Get-Item $unpackedExe).LastWriteTime
     Step "app: $unpackedExe (built $stamp) — launch it from the Start Menu (OpenWhispr)."

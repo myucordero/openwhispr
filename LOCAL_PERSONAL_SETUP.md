@@ -113,6 +113,10 @@ shortcut (**OpenWhispr**). Two commands close the loop:
 
 Notes:
 
+- **First time only**: the update script itself arrives via git, so bootstrap
+  the Windows clone once with
+  `git -C C:\dev\openwhispr pull --ff-only origin <branch>` before the first
+  script run (or let the script's clone-if-missing path create the clone).
 - Whisper/Parakeet/WhisperX models, the WhisperX runtime, recordings, and the
   encrypted secret store all live under `%APPDATA%\OpenWhispr` and
   `~/.cache/openwhispr` — rebuilds never touch them.
