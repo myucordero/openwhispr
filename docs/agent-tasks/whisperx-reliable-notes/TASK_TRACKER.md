@@ -191,54 +191,54 @@ i18n: whisperx.* namespaces complete in en + es (~150 keys each); remaining loca
 
 ## 6. Reliable Notes
 
-- [ ] Segment-aware chunker implemented
-- [ ] Structured extraction prompt implemented
-- [ ] Schema validation and retry implemented
-- [ ] Evidence ID validation implemented
-- [ ] Exact-quote validation implemented
-- [ ] Deterministic deduplication/merge implemented
-- [ ] Deterministic Markdown renderer implemented
-- [ ] Optional strict support-verification pass implemented
-- [ ] Notes saved separately from raw transcript
-- [ ] Notes can be regenerated without ASR
-- [ ] Clickable timestamps/audio review implemented
-- [ ] Speaker rename mapping implemented without identity inference
+- [x] Segment-aware chunker implemented (noteChunker.js: whole segments, overlap 2, oversized isolation — bug found by tests and fixed)
+- [x] Structured extraction prompt implemented (notePrompts.js evidence-extraction-v1, injection-hardened, per-profile emphasis, transcript fenced as data)
+- [x] Schema validation and retry implemented (per-chunk fragment gate + one retry with compact validation feedback; failed chunks isolated, others survive)
+- [x] Evidence ID validation implemented (noteEvidence.js: UNKNOWN_SEGMENT/MISSING_EVIDENCE errors block rendering)
+- [x] Exact-quote validation implemented (whitespace/punctuation-normalized matching incl. multi-segment spans; QUOTE_NOT_FOUND blocks)
+- [x] Deterministic deduplication/merge implemented (noteMerge.js: normalized dedupe, evidence union in transcript order, materially-different action items never merged, disagreement preserved, stable ids)
+- [x] Deterministic Markdown renderer implemented (noteRenderer.js: refuses uncited items, review markers, empty-section omission, owner names from manual mapping only; golden-string test)
+- [x] Optional strict support-verification pass implemented (evidence-support-verifier-v1; unsupported→dropped, partial/unclear→review marker; UI toggle defaults on for critical-interview)
+- [x] Notes saved separately from raw transcript (note-extraction.json + notes.md artifacts + note_generation_runs + OpenWhispr note row; canonical transcript immutable)
+- [x] Notes can be regenerated without ASR (generateNotes IPC; E2E-proven worker spawn count stays 1 across note retry)
+- [x] Clickable timestamps/audio review implemented (citations use openwhispr://recording/<job>/t/<segment> route; transcript timestamps seek the bounded jobId-keyed audio player)
+- [x] Speaker rename mapping implemented without identity inference (display mapping only; canonical transcript never mutated; UI copy states it)
 
 ## 7. Benchmarks and Diagnostics
 
-- [ ] Benchmark CLI/harness implemented
-- [ ] WER/CER and domain-error metrics implemented
-- [ ] Note-grounding metrics implemented
-- [ ] JSON/CSV/Markdown benchmark output implemented
-- [ ] Content-safe diagnostics bundle implemented
-- [ ] Performance/VRAM logging implemented
-- [ ] No transcript content in default logs verified
+- [x] Benchmark CLI/harness implemented (scripts/benchmark-whisperx.js; manifest-driven case×config matrix; runtime gate; errors recorded per run)
+- [x] WER/CER and domain-error metrics implemented (Levenshtein with sub/ins/del backtrace; domain-term hit rates; speaker attribution agreement; timestamp boundary error)
+- [x] Note-grounding metrics implemented (derived from validateEvidence issue codes; hard gate: zero evidence-free claims)
+- [x] JSON/CSV/Markdown benchmark output implemented (results.json/results.csv/report.md with environment header + explicit missing-metric reasons)
+- [x] Content-safe diagnostics implemented (doctor --json machine mode; all error strings redacted; bounded redacted stderr captures) — NOTE: no one-click "diagnostics bundle export" UI; doctor --json + redacted logs are the deliverable (FR-083 partial, documented)
+- [x] Performance logging implemented (per-stage timingsMs from worker + RTF in benchmark; real WSL run RTF 0.170) — NOTE: peak-VRAM sampling not implemented; benchmark marks it missing rather than inventing it
+- [x] No transcript content in default logs verified (redaction tests + stderr-noise integration test; real-run logs carried only job ids/stages/codes)
 
 ## 8. Documentation and Packaging
 
-- [ ] Local setup documentation updated
-- [ ] Hardening/doctor documentation updated
-- [ ] WhisperX setup and model terms documented
-- [ ] Troubleshooting documented
-- [ ] Privacy/retention documented
-- [ ] Windows local package stages required runtime assets
-- [ ] License/attribution inventory updated
-- [ ] Upgrade/uninstall instructions documented
+- [x] Local setup documentation updated (LOCAL_PERSONAL_SETUP.md WhisperX section)
+- [x] Hardening/doctor documentation updated (docs/whisperx-reliable-notes.md doctor/maintenance sections; doctor:whisperx --json)
+- [x] WhisperX setup and model terms documented (uv provisioning; HF token flow; pyannote terms; weights never redistributed)
+- [x] Troubleshooting documented (stable error-code table with actions)
+- [x] Privacy/retention documented (offline defaults, storage layout, what logs never contain, retention/delete semantics)
+- [x] Windows local package stages required runtime assets (electron-builder extraResources: whisperx-sidecar source+lock allowlist; ffmpeg via existing asarUnpack; packaged-build verification itself BLOCKED on WSL — requires Windows clone)
+- [x] License/attribution inventory updated (docs/whisperx-reliable-notes.md dependency/license table)
+- [x] Upgrade/uninstall instructions documented (setup --repair/--remove; NSIS uninstall removes runtime/model caches, preserves recording-jobs)
 
 ## 9. Validation
 
-- [ ] Existing tests pass or pre-existing failures remain unchanged
-- [ ] New JS/TS tests pass
-- [ ] Python tests pass
-- [ ] Lint/typecheck pass
-- [ ] Renderer/build pass
-- [ ] Local doctor passes
-- [ ] Fake-sidecar end-to-end path passes
-- [ ] CUDA WhisperX smoke test passes or is explicitly blocked
-- [ ] Diarization smoke test passes or is explicitly blocked
-- [ ] Offline rerun passes or is explicitly blocked
-- [ ] Windows packaged/unpacked build passes or is explicitly blocked
-- [ ] Acceptance checklist completed
+- [x] Existing tests pass or pre-existing failures remain unchanged (baseline 9/9 → suite 350/350; zero pre-existing failures at baseline; none introduced)
+- [x] New JS/TS tests pass (350 total incl. contracts, protocol, state machines, path confinement, redaction, profiles, repo, artifact store, GPU coordinator, process manager, job manager E2E, whisperxMain, note modules, noteFlow E2E, benchmark metrics)
+- [x] Python tests pass (77 pytest, offline, pydantic+pytest only; cross-language fixture agreement 7/7)
+- [x] Lint/typecheck pass (0 errors; typecheck clean)
+- [x] Renderer/build pass (vite build clean)
+- [x] Local doctor passes (doctor:local exit 0; doctor:whisperx all PASS + expected HF-token WARN after WSL provisioning)
+- [x] Fake-sidecar end-to-end path passes (success/OOM-ladder/crash/timeout/cancel-resistant-grandchild/hash-mismatch/invalid-transcript all covered)
+- [x] CUDA WhisperX smoke test PASS on WSL (real 14.5-min recording: large-v3-turbo float16 batch4 + alignment → transcript_complete; RTF 0.170 incl. model load, 0.032 warm; 239 segments; canonical transcript validates; artifacts finalized; three integration bugs found and fixed: ffprobe-less probe, per-job offline consent env, ffmpeg on worker PATH). NATIVE WINDOWS smoke BLOCKED in this WSL clone — run on the Windows clone: npm run setup:whisperx && npm run doctor:whisperx, then a real upload through the app.
+- [x] Diarization smoke test BLOCKED (no HF token/pyannote terms acceptance available in this environment; ASR+alignment proven; diarization path covered by mocked pipeline tests + fake worker)
+- [x] Offline rerun PASS on WSL (allowModelDownload=false, HF_HUB_OFFLINE=1, cached models → transcript_complete RTF 0.032)
+- [x] Windows packaged/unpacked build BLOCKED (WSL clone per dual-clone rule; command: npm run build:local:win on the Windows clone; extraResources staging config in place)
+- [x] Acceptance checklist completed (see final report)
 
 ## Final Notes
 
