@@ -1,0 +1,39 @@
+{
+  "protocolVersion": 1,
+  "requestId": "req-fixture-002",
+  "jobId": "job-fixture-002",
+  "source": {
+    "path": "/home/user/.cache/openwhispr/whisperx-jobs/job-fixture-002/source.wav",
+    "displayName": "Atlas planning sync.wav",
+    "expectedSha256": "3876f3d57dad68c1293f9458d7d15bf77c0fc8dacb4e40fabbfbb3ffafd2a789"
+  },
+  "output": {
+    "jobDirectory": "/home/user/.cache/openwhispr/whisperx-jobs/job-fixture-002",
+    "preserveNormalizedAudio": false,
+    "formats": ["raw-txt", "speaker-markdown"]
+  },
+  "profile": "meeting",
+  "language": "es",
+  "asr": {
+    "model": "large-v3-turbo",
+    "computeType": "float16",
+    "batchSize": 4,
+    "device": "cuda",
+    "hotwords": ["OpenWhispr", "Qdrant"],
+    "initialPrompt": "Reunion de planificacion del proyecto Atlas."
+  },
+  "alignment": {
+    "enabled": true
+  },
+  "diarization": {
+    "enabled": true,
+    "provider": "pyannote-community-1",
+    "exactSpeakers": 2,
+    "minSpeakers": 1
+  },
+  "runtime": {
+    "offline": true,
+    "modelCacheDirectory": "/home/user/.cache/openwhispr/whisperx-models",
+    "temporaryDirectory": "/home/user/.cache/openwhispr/whisperx-tmp"
+  }
+}

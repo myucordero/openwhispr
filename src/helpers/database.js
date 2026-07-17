@@ -4,6 +4,7 @@ const fs = require("fs");
 const { randomUUID } = require("crypto");
 const debugLogger = require("./debugLogger");
 const { app } = require("electron");
+const { applyRecordingJobsSchema, createRecordingJobsRepo } = require("./whisperx/recordingJobsRepo");
 
 class DatabaseManager {
   constructor() {
@@ -555,6 +556,9 @@ class DatabaseManager {
       this.db.exec(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_transcriptions_client_id ON transcriptions(client_transcription_id)"
       );
+
+      applyRecordingJobsSchema(this.db);
+      this.recordingJobs = createRecordingJobsRepo(this.db);
 
       return true;
     } catch (error) {

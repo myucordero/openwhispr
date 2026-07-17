@@ -119,15 +119,19 @@ Spec assumption corrections:
 
 ## 1. Contracts and Tests First
 
-- [ ] Versioned job request schema tests
-- [ ] JSONL event parser/state-machine tests
-- [ ] Transcript/artifact schema tests
-- [ ] Evidence-note schema tests
-- [ ] Path-confinement and redaction tests
-- [ ] Profile preset tests
-- [ ] Database migration tests
-- [ ] Deterministic note renderer tests
-- [ ] Fake sidecar integration fixture
+- [x] Versioned job request schema tests (src/helpers/whisperx/contracts.js + tests/whisperx/contracts.test.cjs; forbidden-credential-key scan included)
+- [x] JSONL event parser/state-machine tests (jsonlProtocol.js: byte-capped line reader, ready-first/terminal-once/monotonic-progress session; tests cover malformed JSON, oversized lines, unknown types, version mismatch, events-after-terminal)
+- [x] Transcript/artifact schema tests (canonical transcript validation: sorted segments, unique ids, speaker refs, ordered words, finite numbers, flags; artifact descriptor sha256/path checks)
+- [x] Evidence-note schema tests (structural: evidence non-empty, duplicate ids, owner/date null-unless-explicit shape, dueDateIso-requires-dueDateText; semantic evidence resolution lands in Phase 4 noteEvidence)
+- [x] Path-confinement and redaction tests (pathConfinement.js: traversal/absolute/UNC/device/ADS/reserved/trailing-dot-space rejection + symlink-resolving resolveInsideRoot; redaction.js: hf_ tokens, bearer, key=value, home paths, BoundedRedactedCapture)
+- [x] Profile preset tests (profiles.js: memo/meeting/critical defaults per spec 08, allowlisted overrides, hotword sanitization caps/dedupe, deterministic OOM ladders incl. critical disclosed downgrade)
+- [x] Database migration tests (src/helpers/whisperx/recordingJobsRepo.js — pure better-sqlite3 module: recording_jobs/recording_artifacts/note_generation_runs/recording_speaker_mappings/transcript_revisions + indexes + FK cascades; wired into database.js initDatabase; tests run on better-sqlite3 or node:sqlite adapter fallback because node_modules is Electron-ABI)
+- [ ] Deterministic note renderer tests (deferred to Phase 4 with the renderer implementation; golden fixtures valid-note-extraction.json / valid-transcript.json already in place)
+- [x] Fake sidecar integration fixture (tests/fixtures/whisperx-fake-worker.cjs: success, slow-success, malformed-json, stderr-noise, crash, timeout, oom-once-then-success, artifact-hash-mismatch, invalid-transcript, cancel-resistant-child; real files + real sha256; tests/whisperx/fakeWorker.test.cjs 9 integration tests through JsonlLineReader/ProtocolSession)
+
+Phase 1 exit evidence (2026-07-16): npm test 193/193 pass (baseline 9), lint 0 errors, typecheck clean.
+Job state machine (jobStateMachine.js) includes `interrupted` startup-recovery state; renderer types in src/types/whisperx.ts.
+Cross-language fixtures: tests/fixtures/whisperx-contracts/*.json (9 files) — Python side consumes the same files in Phase 2.
 
 ## 2. Managed Runtime and Provisioning
 

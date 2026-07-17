@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "jobId": "job-fixture-001",
+  "sourceTranscriptSha256": "3876f3d57dad68c1293f9458d7d15bf77c0fc8dacb4e40fabbfbb3ffafd2a789",
+  "promptVersion": "evidence-extraction-v1",
+  "generation": {
+    "provider": "local",
+    "model": "qwen3.5-9b",
+    "temperature": 0,
+    "thinkingDisabled": true,
+    "createdAt": "2026-07-16T14:35:10Z"
+  },
+  "summaryClaims": [
+    {
+      "id": "claim-0001",
+      "text": "The team met to plan the Atlas project, decided on SQLite as the database, and assigned a migration plan action item.",
+      "evidence": {
+        "segmentIds": [
+          "seg-0001",
+          "seg-0003",
+          "seg-0004"
+        ]
+      }
+    }
+  ],
+  "discussionPoints": [],
+  "decisions": [
+    {
+      "id": "decision-0001",
+      "text": "Use SQLite for the Atlas project to keep the implementation simple and portable.",
+      "evidence": {
+        "segmentIds": []
+      }
+    }
+  ],
+  "proposals": [],
+  "actionItems": [
+    {
+      "id": "action-0001",
+      "task": "Prepare a migration plan before next sprint.",
+      "ownerSpeakerId": "SPEAKER_01",
+      "dueDateText": null,
+      "dueDateIso": null,
+      "status": "explicit",
+      "evidence": {
+        "segmentIds": [
+          "seg-0004"
+        ]
+      }
+    }
+  ],
+  "followUps": [],
+  "openQuestions": [
+    {
+      "id": "question-0001",
+      "text": "What happens if the audio file is larger than expected?",
+      "evidence": {
+        "segmentIds": [
+          "seg-0004"
+        ]
+      }
+    }
+  ],
+  "risksOrBlockers": [],
+  "importantQuotes": [
+    {
+      "id": "quote-0001",
+      "quote": "Decidimos usar SQLite para mantener la implementacion simple y portable.",
+      "speakerId": "SPEAKER_00",
+      "evidence": {
+        "segmentIds": [
+          "seg-0003"
+        ]
+      }
+    }
+  ],
+  "unresolvedAmbiguities": []
+}
