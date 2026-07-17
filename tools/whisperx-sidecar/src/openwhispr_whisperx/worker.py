@@ -152,10 +152,15 @@ def main() -> None:
         )
         raise SystemExit(2)
 
-    # --- offline env must be set BEFORE loading any model backend (spec 07 §8) ---
+    # --- offline env must be set BOTH ways BEFORE loading any model backend
+    # (spec 07 §8): the request flag is authoritative for this job, even when
+    # the parent environment carries a stale HF_HUB_OFFLINE value.
     if request.runtime.offline:
         os.environ["HF_HUB_OFFLINE"] = "1"
         os.environ["TRANSFORMERS_OFFLINE"] = "1"
+    else:
+        os.environ["HF_HUB_OFFLINE"] = "0"
+        os.environ["TRANSFORMERS_OFFLINE"] = "0"
 
     # --- ready (before heavy imports) ---
     protocol.emit_ready(
@@ -193,6 +198,11 @@ def main() -> None:
 
     hf_token = os.environ.get("HF_TOKEN") or None
     ffmpeg_path = os.environ.get("OPENWHISPR_FFMPEG_PATH") or None
+    # whisperx.load_audio shells out to plain "ffmpeg" on PATH; make the
+    # trusted bundled binary win the lookup for this process tree.
+    if ffmpeg_path and os.path.isfile(ffmpeg_path):
+        ffmpeg_dir = os.path.dirname(ffmpeg_path)
+        os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
 
     exit_code = 0
     try:
@@ -225,9 +235,17 @@ def main() -> None:
         protocol.emit_error(exc.code, redact_text(exc.message), exc.details or None)
         exit_code = 3 if exc.code == "CUDA_OUT_OF_MEMORY" else 1
     except Exception as exc:  # noqa: BLE001
+        message = str(exc)
+        # Hugging Face hub raises a generic OSError/LocalEntryNotFoundError
+        # when a model is missing while offline — map it to the stable code.
+        offline_model_missing = (
+            "outgoing traffic has been disabled" in message
+            or "Cannot find an appropriate cached snapshot" in message
+            or "couldn't connect to 'https://huggingface.co'" in message.lower()
+        )
         protocol.emit_error(
-            "UNKNOWN_INTERNAL_ERROR",
-            redact_text(str(exc)) or "Unexpected worker error",
+            "MODEL_NOT_AVAILABLE_OFFLINE" if offline_model_missing else "UNKNOWN_INTERNAL_ERROR",
+            redact_text(message) or "Unexpected worker error",
         )
         exit_code = 1
     finally:

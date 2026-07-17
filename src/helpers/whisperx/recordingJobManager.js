@@ -235,7 +235,12 @@ class RecordingJobManager {
             hfToken,
             extraEnv: {
               ...(runtime.extraEnv || {}),
-              ...(this.offline ? { HF_HUB_OFFLINE: "1", TRANSFORMERS_OFFLINE: "1" } : {}),
+              // Per-job effective offline: allowModelDownload (explicit user
+              // consent) relaxes the offline env for this job only, matching
+              // the request's runtime.offline flag built in _buildRequest.
+              ...(this.offline && !settings.allowModelDownload
+                ? { HF_HUB_OFFLINE: "1", TRANSFORMERS_OFFLINE: "1" }
+                : { HF_HUB_OFFLINE: "0", TRANSFORMERS_OFFLINE: "0" }),
             },
             heartbeatTimeoutMs: this.heartbeatTimeoutMs,
             absoluteTimeoutMs: this.absoluteTimeoutMs,
