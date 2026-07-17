@@ -2631,6 +2631,20 @@ class IPCHandlers {
       return this.environmentManager.saveVertexApiKey(key);
     });
 
+    // Hugging Face token (WhisperX diarization) — status only, never the
+    // value, per spec 07 §4/§7: renderer must not be able to read it back.
+    ipcMain.handle("get-huggingface-token-status", async () => {
+      return { configured: Boolean(this.environmentManager.getHuggingFaceToken()) };
+    });
+    ipcMain.handle("save-huggingface-token", async (event, key) => {
+      this.environmentManager.saveHuggingFaceToken(key);
+      return { success: true };
+    });
+    ipcMain.handle("delete-huggingface-token", async () => {
+      this.environmentManager.saveHuggingFaceToken("");
+      return { success: true };
+    });
+
     // Enterprise provider test connection
     ipcMain.handle("test-enterprise-connection", async (event, provider, config) => {
       const {

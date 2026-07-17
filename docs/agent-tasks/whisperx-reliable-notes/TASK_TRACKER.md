@@ -135,28 +135,31 @@ Cross-language fixtures: tests/fixtures/whisperx-contracts/*.json (9 files) — 
 
 ## 2. Managed Runtime and Provisioning
 
-- [ ] Native Windows Python 3.12 strategy implemented
-- [ ] WhisperX dependency pinned and locked
-- [ ] Managed cache/runtime directories implemented
-- [ ] Setup/install/doctor command implemented
-- [ ] CUDA/runtime verification implemented
-- [ ] Hugging Face token secure storage implemented
-- [ ] Diarization model readiness flow implemented
-- [ ] Offline readiness check implemented
+- [x] Native Windows Python 3.12 strategy implemented (whisperxRuntimeManager.js: uv venv --python 3.12 + uv sync --frozen into app runtime dir; sentinel with lock hash; repair/remove; platform-aware pythonPath incl. Scripts/python.exe on win32; WSL clone validates cross-platform contract — native-Windows execution itself pending Windows-clone verification)
+- [x] WhisperX dependency pinned and locked (tools/whisperx-sidecar/pyproject.toml whisperx==3.8.6; uv.lock committed, 126 packages resolved)
+- [x] Managed cache/runtime directories implemented (runtimeRootDir + modelCacheDirectory/temporaryDirectory injected; job artifacts under jobs root)
+- [x] Setup/install/doctor command implemented (npm run setup:whisperx / doctor:whisperx, --json mode, --repair/--remove, local-doctor.js style output)
+- [x] CUDA/runtime verification implemented (checkCuda torch probe returning cuda/device/vramGb; doctor reports it)
+- [x] Hugging Face token secure storage implemented (HUGGINGFACE_TOKEN in SECRET_KEYS via safeStorage-backed per-key files; IPC exposes STATUS ONLY — renderer can never read the value; save/delete channels; preload wired)
+- [ ] Diarization model readiness flow implemented (readiness IPC + model presence checks land with Phase 3 integration)
+- [x] Offline readiness check implemented (doctor offline summary; job requests carry runtime.offline; worker sets HF_HUB_OFFLINE/TRANSFORMERS_OFFLINE)
 
 ## 3. Sidecar and Process Management
 
-- [ ] Python worker implemented
-- [ ] JSONL protocol implemented
-- [ ] Stages/progress implemented
-- [ ] Structured error codes implemented
-- [ ] Main-process sidecar manager implemented
-- [ ] Real process-tree cancellation implemented
-- [ ] Timeout/watchdog behavior implemented
-- [ ] Crash recovery implemented
-- [ ] GPU inference coordinator implemented
-- [ ] OOM fallback implemented
-- [ ] Transcript normalization/canonicalization implemented
+- [x] Python worker implemented (tools/whisperx-sidecar: worker.py single-request stdin, stdout hygiene swap, heartbeat thread, SIGTERM→JOB_CANCELLED exit 130; real_backends.py lazy whisperx/pyannote imports)
+- [x] JSONL protocol implemented (protocol.py emit helpers; JS JsonlLineReader/ProtocolSession consume; cross-language fixture agreement verified exactly — 7/7 fixtures)
+- [x] Stages/progress implemented (stage/progress/heartbeat/warning events; monotonic progress enforced JS-side)
+- [x] Structured error codes implemented (errors.py mirrors constants.js; classify_oom precise: torch OOM type/name/message only — ValueError NOT OOM, tested both sides)
+- [x] Main-process sidecar manager implemented (whisperxProcessManager.js: shell:false, env allowlist, HF token env-only, bounded redacted stderr)
+- [x] Real process-tree cancellation implemented (POSIX: group signal + ps-ppid-walk descendant kill — fixed BUG: detached/setsid grandchildren escaped the group signal, found by integration test, now covered; Windows: taskkill /PID /T /F)
+- [x] Timeout/watchdog behavior implemented (heartbeat timeout 90s default + absolute cap 3h; WORKER_TIMEOUT; tested with fake worker timeout mode)
+- [x] Crash recovery implemented (worker exit without terminal event → WORKER_CRASHED retryable; startup recovery marks active jobs interrupted + stale staging cleanup)
+- [x] GPU inference coordinator implemented (gpuInferenceCoordinator.js: exclusive FIFO lease, cancelPending, heartbeat-touch stale sweep, forceRelease; llama pause/resume integration lands in Phase 4 note wiring)
+- [x] OOM fallback implemented (deterministic ladders in profiles.js; job manager steps ladder on CUDA_OUT_OF_MEMORY only, records fallbackAttempts, emits OOM_FALLBACK_USED; capped by ladder length)
+- [x] Transcript normalization/canonicalization implemented (transcript.py: stable seg-#### ids, sorted segments/words, flags incl. low-confidence heuristics, no fabricated quality fields; validated on finalize JS-side + SOURCE_HASH_MISMATCH cross-check)
+
+Phase 2 exit evidence (2026-07-16): npm test 247/247; pytest 73/73 (pydantic+pytest only, offline); lint 0 errors; typecheck clean.
+Two real bugs found by the orchestration test agent and FIXED: (1) whisperxProcessManager POSIX tree-kill missed setsid'd grandchildren — now collects descendants via ps ppid-walk before signaling; (2) recordingJobManager flattened ArtifactStoreError codes to UNKNOWN_INTERNAL_ERROR — instanceof gate now includes ArtifactStoreError.
 
 ## 4. OpenWhispr Integration
 

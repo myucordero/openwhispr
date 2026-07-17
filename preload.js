@@ -185,6 +185,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getOpenAIKey: () => ipcRenderer.invoke("get-openai-key"),
   saveOpenAIKey: (key) => ipcRenderer.invoke("save-openai-key", key),
 
+  // Hugging Face token (WhisperX diarization) — status only, value never
+  // read back to the renderer.
+  getHuggingFaceTokenStatus: () => ipcRenderer.invoke("get-huggingface-token-status"),
+  saveHuggingFaceToken: (key) => ipcRenderer.invoke("save-huggingface-token", key),
+  deleteHuggingFaceToken: () => ipcRenderer.invoke("delete-huggingface-token"),
+
   // Clipboard functions
   checkAccessibilityPermission: (silent) =>
     ipcRenderer.invoke("check-accessibility-permission", silent),
