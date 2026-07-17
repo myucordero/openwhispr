@@ -2903,6 +2903,26 @@
         "low-confidence": "Baja confianza",
         "manual-review": "Requiere revisión"
       }
+    },
+
+    "notes": {
+      "tab": {
+        "transcript": "Transcripción",
+        "notes": "Notas"
+      },
+      "generate": "Generar notas",
+      "regenerate": "Regenerar notas",
+      "generating": "Generando notas…",
+      "strict": "Modo estricto",
+      "strictHint": "Descarta cualquier elemento cuya evidencia no pueda verificarse contra la transcripción.",
+      "noLocalModel": "Selecciona un modelo local de notas en Configuración para generar notas.",
+      "noneYet": "Aún no hay notas. Genera notas a partir de la transcripción para comenzar.",
+      "failed": "Falló la generación de notas.",
+      "retry": "Reintentar",
+      "droppedSummary": "{{dropped}} elementos descartados, {{issues}} problemas de validación",
+      "reviewLegend": "Los elementos marcados como «Needs review» no pudieron verificarse por completo contra la transcripción.",
+      "notesModelInfo": "Notas: generadas con {{model}}",
+      "notesModelNone": "Notas: sin modelo local configurado — solo transcripciones"
     }
   }
 }

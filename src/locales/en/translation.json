@@ -2903,6 +2903,26 @@
         "low-confidence": "Low confidence",
         "manual-review": "Needs review"
       }
+    },
+
+    "notes": {
+      "tab": {
+        "transcript": "Transcript",
+        "notes": "Notes"
+      },
+      "generate": "Generate notes",
+      "regenerate": "Regenerate notes",
+      "generating": "Generating notes…",
+      "strict": "Strict mode",
+      "strictHint": "Drop any item whose evidence can't be verified against the transcript.",
+      "noLocalModel": "Select a local note model in Settings to generate notes.",
+      "noneYet": "No notes yet. Generate notes from the transcript to get started.",
+      "failed": "Note generation failed.",
+      "retry": "Retry",
+      "droppedSummary": "{{dropped}} items dropped, {{issues}} validation issues",
+      "reviewLegend": "Items marked \"Needs review\" couldn't be fully verified against the transcript.",
+      "notesModelInfo": "Notes: generated with {{model}}",
+      "notesModelNone": "Notes: no local model configured — transcripts only"
     }
   }
 }

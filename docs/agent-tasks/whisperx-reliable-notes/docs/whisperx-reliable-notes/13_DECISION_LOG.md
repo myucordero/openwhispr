@@ -203,6 +203,41 @@ Use:
 **Evidence:** recon: no `response_format` support anywhere today; renderer-side ReasoningService registry exists but evidence validation must not live in UI (spec 02 §13).  
 **Consequences:** Deterministic validation/merge/render happen in main-process code with tests; llama idle auto-stop (5 min) is handled by the GPU coordinator holding/releasing the note-model lease.
 
+### D-107 — Source-audio playback via bounded jobId-keyed IPC
+
+**Date:** 2026-07-17  
+**Status:** accepted  
+**Decision:** FR-036 playback reads the external source through `whisperx-read-source-audio(jobId)`: main resolves the path from the job row (renderer never supplies paths), caps reads at 300 MB, returns a typed buffer rendered as a Blob URL. No new listening port, no custom protocol.  
+**Consequences:** Very large sources degrade to "audio preview unavailable" while the transcript stays fully usable.
+
+### D-108 — Reliable notes are local-only in v1
+
+**Date:** 2026-07-17  
+**Status:** accepted  
+**Decision:** The note compiler accepts only `provider: "local"` (llama.cpp route). The renderer resolves the existing `noteFormatting` scope at submit time and passes `{provider, model, disableThinking}` into the job; regeneration passes a fresh config. Jobs without a local config rest at `transcript_complete` (no failure). Cloud note generation is intentionally not wired (spec 00: cloud only by deliberate choice; deferred).  
+**Consequences:** `NOTE_MODEL_UNAVAILABLE` guides the user to pick a local model; `modelManagerBridge.runInference` gained a `maxTokens` pass-through (default 512 would truncate extraction output).
+
+### D-109 — GPU sequencing implementation
+
+**Date:** 2026-07-17  
+**Status:** accepted  
+**Decision:** The llama.cpp server is stopped before each WhisperX job (in the trusted `resolveRuntime` hook) and note generation holds the exclusive GPU lease with heartbeat touches per LLM call. Known limitation: the app's *other* llama consumers (dictation cleanup, chat) do not acquire the coordinator lease — they predate it; a concurrent manual cleanup during ASR could still contend. Documented as remaining risk, not silently claimed solved.  
+**Consequences:** Sequential heavy stages per spec 08 §4 for the recording pipeline itself.
+
+### D-110 — Notes surface as a regular OpenWhispr note row
+
+**Date:** 2026-07-17  
+**Status:** accepted  
+**Decision:** After rendering, notes.md is additionally saved via `databaseManager.saveNote(title, markdown, "whisperx-recording", sourceName)` and the note run records `note_id` — notes appear in the normal notes list while artifacts remain canonical in the job directory.  
+**Consequences:** Note-row failure downgrades to a warning; artifacts are the source of truth.
+
+### D-111 — Packaging: sidecar source + lock staged via extraResources
+
+**Date:** 2026-07-17  
+**Status:** accepted  
+**Decision:** `tools/whisperx-sidecar` (pyproject, uv.lock, src, README — excluding tests/venv/caches) is staged to `resources/whisperx-sidecar` through the electron-builder `extraResources` allowlist, matching `whisperxMain`'s packaged path. The Python runtime itself is provisioned on the user machine by pinned uv (never bundled). NSIS uninstall removes the managed runtime and model caches but preserves `recording-jobs`.  
+**Consequences:** A-006 resolved as "stage provisioner inputs, provision on demand"; packaged verification itself requires the Windows clone.
+
 ### D-106 — New tests go under tests/**/*.test.cjs
 
 **Date:** 2026-07-16  

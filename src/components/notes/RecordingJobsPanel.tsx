@@ -145,7 +145,13 @@ export default function RecordingJobsPanel() {
       {open && (
         <div className="mt-3">
           {selectedJob ? (
-            <RecordingTranscriptView job={selectedJob} onBack={() => setSelectedJobId(null)} />
+            <RecordingTranscriptView
+              job={selectedJob}
+              onBack={() => setSelectedJobId(null)}
+              initialTab={
+                selectedJob.status === "transcript_complete_note_failed" ? "notes" : "transcript"
+              }
+            />
           ) : jobs.length === 0 ? (
             <p className="text-xs text-foreground/35 text-center py-6">
               {t("whisperx.review.empty")}

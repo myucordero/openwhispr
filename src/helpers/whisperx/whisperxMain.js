@@ -78,12 +78,17 @@ class WhisperXMain {
     artifactStore,
     coordinator,
     jobManager,
+    runLocalInference,
   } = {}) {
     if (!app || typeof app.getPath !== "function") {
       throw new TypeError("WhisperXMain requires an injected electron `app`");
     }
     this.app = app;
+    this.databaseManager = databaseManager;
     this.environmentManager = environmentManager;
+    // Test override for the local LLM call; production lazily requires the
+    // modelManagerBridge (which needs electron) inside _runLocalInference.
+    this._runLocalInferenceOverride = runLocalInference || null;
     this.logger = logger;
     this._getWindows = typeof getWindows === "function" ? getWindows : () => [];
     this._now = typeof now === "function" ? now : () => new Date().toISOString();
@@ -121,6 +126,10 @@ class WhisperXMain {
         artifactStore: this.artifactStore,
         coordinator: this.coordinator,
         resolveRuntime: async () => {
+          // GPU sequencing (spec 08 §4): stop/unload the local llama.cpp
+          // server before ASR so WhisperX gets the VRAM. Note generation
+          // restarts it afterwards through the normal inference path.
+          await this._stopLocalLlmServer();
           try {
             return this.runtimeManager.resolveWorkerInvocation();
           } catch (error) {
@@ -144,6 +153,16 @@ class WhisperXMain {
       });
 
     this._readinessCache = null;
+
+    // Auto-run reliable notes after transcript completion (spec 02 §13).
+    // The hook must never throw: a note failure marks the job
+    // transcript_complete_note_failed and leaves the transcript usable.
+    // (Guarded: tests may inject a minimal fake job manager.)
+    if (typeof this.jobManager.setNoteCompiler === "function") {
+      this.jobManager.setNoteCompiler(async (jobId, { transcript, settings }) => {
+        await this._autoCompileNotes(jobId, transcript, settings);
+      });
+    }
   }
 
   // --------------------------------------------------------------- lifecycle
@@ -320,6 +339,7 @@ class WhisperXMain {
       overrides = {},
       customDictionary = [],
       allowModelDownload = false,
+      noteGeneration,
     } = payload || {};
 
     if (typeof sourcePath !== "string" || sourcePath.trim().length === 0) {
@@ -354,6 +374,19 @@ class WhisperXMain {
     if (typeof allowModelDownload !== "boolean") {
       throw new WhisperXMainError("WORKER_PROTOCOL_ERROR", "allowModelDownload must be a boolean");
     }
+    if (noteGeneration !== undefined && noteGeneration !== null) {
+      if (typeof noteGeneration !== "object" || Array.isArray(noteGeneration)) {
+        throw new WhisperXMainError("WORKER_PROTOCOL_ERROR", "noteGeneration must be an object");
+      }
+      for (const [key, value] of Object.entries(noteGeneration)) {
+        if (!["provider", "model", "disableThinking"].includes(key)) {
+          throw new WhisperXMainError("WORKER_PROTOCOL_ERROR", `Unknown noteGeneration key "${key}"`);
+        }
+        if (key === "disableThinking" ? typeof value !== "boolean" : typeof value !== "string") {
+          throw new WhisperXMainError("WORKER_PROTOCOL_ERROR", `Invalid noteGeneration.${key}`);
+        }
+      }
+    }
 
     const job = await this.jobManager.createJob({
       sourcePath,
@@ -362,6 +395,7 @@ class WhisperXMain {
       overrides,
       customDictionary,
       allowModelDownload,
+      noteGeneration: noteGeneration || undefined,
     });
     return { job };
   }
@@ -495,6 +529,299 @@ class WhisperXMain {
       audio: buffer,
       mimeType: MIME_BY_EXT[ext] || "application/octet-stream",
       bytes: buffer.length,
+    };
+  }
+
+  // ------------------------------------------------------------ note compiler
+
+  async _stopLocalLlmServer() {
+    if (this._runLocalInferenceOverride) return; // tests: nothing to stop
+    try {
+      const modelManager = require("../modelManagerBridge").default;
+      await modelManager.stopServer();
+    } catch (error) {
+      this._log("warn", "Could not stop local LLM server before ASR", {
+        error: error.message,
+      });
+    }
+  }
+
+  // Adapter from the compiler's messages contract to the repo's local
+  // llama.cpp bridge (system + single user turn; extra turns are folded into
+  // the user text). Returns raw response text.
+  _localLlm(llmConfig, lease) {
+    return async ({ messages, maxTokens }) => {
+      if (lease) lease.touch();
+      const systemPrompt = messages.find((m) => m.role === "system")?.content || "";
+      const userText = messages
+        .filter((m) => m.role !== "system")
+        .map((m) => m.content)
+        .join("\n\n");
+      if (this._runLocalInferenceOverride) {
+        return this._runLocalInferenceOverride({
+          model: llmConfig.model,
+          systemPrompt,
+          userText,
+          maxTokens,
+        });
+      }
+      const modelManager = require("../modelManagerBridge").default;
+      return modelManager.runInference(llmConfig.model, userText, {
+        systemPrompt,
+        maxTokens,
+        temperature: 0.1,
+        disableThinking: llmConfig.disableThinking !== false,
+      });
+    };
+  }
+
+  _loadTranscriptForNotes(jobId) {
+    const artifacts = this.repo.listArtifacts(jobId);
+    const descriptor = artifacts.find((a) => a.kind === "canonical-transcript");
+    if (!descriptor) {
+      throw new WhisperXMainError("TRANSCRIPT_SCHEMA_INVALID", "Job has no canonical transcript");
+    }
+    const buffer = this.artifactStore.readArtifact(jobId, descriptor.relativePath);
+    const transcript = JSON.parse(buffer.toString("utf8"));
+    transcript.__artifactSha256 = descriptor.sha256;
+    return transcript;
+  }
+
+  _validateNoteLlmConfig(llm) {
+    if (!llm || typeof llm !== "object") return null;
+    const { provider, model, disableThinking } = llm;
+    if (provider !== "local") return null; // v1: reliable notes are local-only
+    if (typeof model !== "string" || model.length === 0) return null;
+    return { provider, model, disableThinking: disableThinking !== false };
+  }
+
+  // Auto-run hook after transcript completion. Never throws.
+  async _autoCompileNotes(jobId, transcript, settings) {
+    const llmConfig = this._validateNoteLlmConfig(settings.noteGeneration);
+    if (!llmConfig) {
+      this._log("info", "No local note model configured; job rests at transcript_complete", {
+        jobId,
+      });
+      return;
+    }
+    try {
+      const artifacts = this.repo.listArtifacts(jobId);
+      const descriptor = artifacts.find((a) => a.kind === "canonical-transcript");
+      if (descriptor) transcript.__artifactSha256 = descriptor.sha256;
+      await this._compileNotes(jobId, transcript, settings, llmConfig, {
+        strict: Boolean(settings.strictNotes),
+      });
+    } catch (error) {
+      this._markNoteFailure(jobId, error);
+    }
+  }
+
+  // IPC entry: manual generation/regeneration without retranscription.
+  async generateNotes(jobId, { llm, strict } = {}) {
+    this._assertJobId(jobId);
+    const job = this.repo.getJob(jobId);
+    if (!job) throw new WhisperXMainError("UNKNOWN_INTERNAL_ERROR", "Job not found");
+    if (!["transcript_complete", "complete", "transcript_complete_note_failed"].includes(job.status)) {
+      throw new WhisperXMainError(
+        "NOTE_MODEL_UNAVAILABLE",
+        `Notes cannot be generated while the job is "${job.status}"`
+      );
+    }
+    const settings = JSON.parse(job.settingsJson);
+    const llmConfig = this._validateNoteLlmConfig(llm) || this._validateNoteLlmConfig(settings.noteGeneration);
+    if (!llmConfig) {
+      throw new WhisperXMainError(
+        "NOTE_MODEL_UNAVAILABLE",
+        "Select a local note model (noteFormatting scope) before generating notes"
+      );
+    }
+    const transcript = this._loadTranscriptForNotes(jobId);
+    try {
+      const result = await this._compileNotes(jobId, transcript, settings, llmConfig, {
+        strict: strict !== undefined ? Boolean(strict) : Boolean(settings.strictNotes),
+      });
+      return result;
+    } catch (error) {
+      this._markNoteFailure(jobId, error);
+      throw error;
+    }
+  }
+
+  listNoteRuns(jobId) {
+    this._assertJobId(jobId);
+    return { noteRuns: this.repo.listNoteRuns(jobId) };
+  }
+
+  _markNoteFailure(jobId, error) {
+    try {
+      const current = this.repo.getJob(jobId);
+      if (current && ["note_extracting", "note_validating", "note_rendering"].includes(current.status)) {
+        this.repo.updateJobStatus(jobId, "transcript_complete_note_failed", {
+          errorCode: error.code || "NOTE_SCHEMA_INVALID",
+        });
+      } else if (current && current.status === "transcript_complete") {
+        // Failed before entering the note pipeline (e.g. model unavailable).
+        this.repo.updateJobStatus(jobId, "note_extracting");
+        this.repo.updateJobStatus(jobId, "transcript_complete_note_failed", {
+          errorCode: error.code || "NOTE_MODEL_UNAVAILABLE",
+        });
+      }
+      const after = this.repo.getJob(jobId);
+      this._broadcast("whisperx-job-event", {
+        jobId,
+        status: after ? after.status : "transcript_complete_note_failed",
+        warning: { code: error.code || "NOTE_SCHEMA_INVALID", message: error.message },
+      });
+    } catch (markError) {
+      this._log("error", "Failed to record note failure", { jobId, error: markError.message });
+    }
+  }
+
+  async _compileNotes(jobId, transcript, settings, llmConfig, { strict }) {
+    const { compileNotes } = require("./noteCompiler");
+    const { EXTRACTION_PROMPT_VERSION } = require("./notePrompts");
+
+    const transitionTo = (to) => {
+      const current = this.repo.getJob(jobId).status;
+      if (current === to) return;
+      this.repo.updateJobStatus(jobId, to);
+      this._broadcast("whisperx-job-event", { jobId, status: to });
+    };
+
+    transitionTo("note_extracting");
+    const noteRunId = this._uuid();
+    this.repo.createNoteRun({
+      id: noteRunId,
+      jobId,
+      status: "running",
+      sourceTranscriptSha256: transcript.__artifactSha256 || "0".repeat(64),
+      promptVersion: EXTRACTION_PROMPT_VERSION,
+      provider: llmConfig.provider,
+      model: llmConfig.model,
+      createdAt: this._now(),
+    });
+
+    const speakerMappings = this.repo.getSpeakerMappings(jobId);
+    const lease = await this.coordinator.acquire(jobId, { label: `notes:${llmConfig.model}` });
+    let result;
+    try {
+      result = await compileNotes({
+        transcript,
+        jobId,
+        profile: settings.profile,
+        llm: this._localLlm(llmConfig, lease),
+        generation: {
+          provider: llmConfig.provider,
+          model: llmConfig.model,
+          temperature: 0.1,
+          thinkingDisabled: llmConfig.disableThinking !== false,
+        },
+        glossary: Array.isArray(settings.hotwords) ? settings.hotwords : [],
+        speakerMappings,
+        strictVerification: strict,
+        now: this._now,
+        onProgress: ({ stage, completed, total }) => {
+          if (stage === "note_validating" || stage === "note_rendering") transitionTo(stage);
+          this._broadcast("whisperx-job-event", {
+            jobId,
+            status: this.repo.getJob(jobId).status,
+            completed,
+            total,
+            unit: "segments",
+          });
+        },
+      });
+    } catch (error) {
+      this.repo.updateNoteRun(noteRunId, {
+        status: "failed",
+        error_code: error.code || "NOTE_SCHEMA_INVALID",
+        completed_at: this._now(),
+      });
+      throw error;
+    } finally {
+      lease.release();
+    }
+
+    // Persist artifacts into the finalized job directory (single-file atomic
+    // writes — the job dir itself was finalized after transcription).
+    const finalDir = this.artifactStore.finalDir(jobId);
+    const extractionDescriptor = this.artifactStore.writeFileAtomic(
+      finalDir,
+      "note-extraction.json",
+      JSON.stringify(result.extraction, null, 2)
+    );
+    const notesDescriptor = this.artifactStore.writeFileAtomic(finalDir, "notes.md", result.markdown);
+
+    const createdAt = this._now();
+    const existing = this.repo
+      .listArtifacts(jobId)
+      .filter((a) => !["note-extraction", "notes-markdown"].includes(a.kind));
+    this.repo.replaceArtifacts(jobId, [
+      ...existing.map((a) => ({
+        jobId,
+        kind: a.kind,
+        relativePath: a.relativePath,
+        sha256: a.sha256,
+        bytes: a.bytes,
+        schemaVersion: a.schemaVersion ?? null,
+        createdAt: a.createdAt,
+      })),
+      {
+        jobId,
+        kind: "note-extraction",
+        relativePath: extractionDescriptor.relativePath,
+        sha256: extractionDescriptor.sha256,
+        bytes: extractionDescriptor.bytes,
+        schemaVersion: result.extraction.schemaVersion,
+        createdAt,
+      },
+      {
+        jobId,
+        kind: "notes-markdown",
+        relativePath: notesDescriptor.relativePath,
+        sha256: notesDescriptor.sha256,
+        bytes: notesDescriptor.bytes,
+        schemaVersion: null,
+        createdAt,
+      },
+    ]);
+
+    // Surface the notes as a regular OpenWhispr note (spec pipeline tail).
+    let noteId = null;
+    try {
+      if (this.databaseManager && typeof this.databaseManager.saveNote === "function") {
+        const job = this.repo.getJob(jobId);
+        const saved = this.databaseManager.saveNote(
+          job.sourceDisplayName,
+          result.markdown,
+          "whisperx-recording",
+          job.sourceDisplayName
+        );
+        noteId = saved && (saved.id ?? saved.lastInsertRowid ?? null);
+      }
+    } catch (error) {
+      this._log("warn", "Notes rendered but note row creation failed", {
+        jobId,
+        error: error.message,
+      });
+    }
+
+    this.repo.updateNoteRun(noteRunId, {
+      status: "complete",
+      note_id: noteId,
+      extraction_relative_path: extractionDescriptor.relativePath,
+      notes_relative_path: notesDescriptor.relativePath,
+      completed_at: this._now(),
+    });
+
+    transitionTo("complete");
+    return {
+      noteRunId,
+      noteId,
+      markdown: result.markdown,
+      droppedItemIds: result.droppedItemIds,
+      issues: result.validation.issues,
+      failedChunks: result.failedChunks,
     };
   }
 

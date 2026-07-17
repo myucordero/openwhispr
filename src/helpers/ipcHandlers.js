@@ -1780,6 +1780,14 @@ class IPCHandlers {
       whisperxCall(event, () => this.whisperxMain.getStorageUsage())
     );
 
+    ipcMain.handle("whisperx-generate-notes", async (event, jobId, options) =>
+      whisperxCall(event, () => this.whisperxMain.generateNotes(jobId, options || {}))
+    );
+
+    ipcMain.handle("whisperx-list-note-runs", async (event, jobId) =>
+      whisperxCall(event, () => this.whisperxMain.listNoteRuns(jobId))
+    );
+
     ipcMain.handle("detect-gpu", async () => {
       const { detectNvidiaGpu } = require("../utils/gpuDetection");
       return detectNvidiaGpu();

@@ -71,6 +71,7 @@
     "doctor:local": "node scripts/local-doctor.js",
     "setup:whisperx": "node scripts/setup-whisperx.js",
     "doctor:whisperx": "node scripts/doctor-whisperx.js",
+    "benchmark:whisperx": "node scripts/benchmark-whisperx.js",
     "format:js": "eslint . --fix && cd src && eslint . --fix && prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
     "format": "npm run format:js",
     "format:check": "eslint . && cd src && eslint . && prettier --check \"**/*.{js,jsx,ts,tsx,json,css,md}\"",

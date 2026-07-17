@@ -9,6 +9,7 @@ import type {
   ArtifactDescriptor,
   TranscriptSegment,
   RecordingJobProgressEvent,
+  NoteValidationIssue,
 } from "./whisperx";
 
 export type LocalTranscriptionProvider = "whisper" | "nvidia" | "whisperx";
@@ -1861,6 +1862,11 @@ declare global {
         }>;
         customDictionary?: string[];
         allowModelDownload?: boolean;
+        noteGeneration?: {
+          provider: "local";
+          model: string;
+          disableThinking: boolean;
+        };
       }) => Promise<{
         success: boolean;
         job?: RecordingJobSummary;
@@ -1914,6 +1920,46 @@ declare global {
         bytes?: number;
         error?: string;
         code?: string;
+      }>;
+      // Manual note generation / regeneration without retranscription. Main
+      // returns { noteRunId, noteId, markdown, droppedItemIds, issues,
+      // failedChunks } spread over { success:true } (whisperxMain.generateNotes).
+      whisperxGenerateNotes?: (
+        jobId: string,
+        options?: {
+          llm?: { provider: string; model: string; disableThinking?: boolean };
+          strict?: boolean;
+        }
+      ) => Promise<{
+        success: boolean;
+        error?: string;
+        code?: string;
+        noteRunId?: string;
+        noteId?: number | null;
+        markdown?: string;
+        droppedItemIds?: string[];
+        issues?: NoteValidationIssue[];
+        failedChunks?: number;
+      }>;
+      whisperxListNoteRuns?: (jobId: string) => Promise<{
+        success: boolean;
+        error?: string;
+        noteRuns?: Array<{
+          id: string;
+          jobId: string;
+          noteId: number | null;
+          status: string;
+          sourceTranscriptSha256: string;
+          transcriptRevisionId: string | null;
+          promptVersion: string;
+          provider: string;
+          model: string;
+          extractionRelativePath: string | null;
+          notesRelativePath: string | null;
+          errorCode: string | null;
+          createdAt: string;
+          completedAt: string | null;
+        }>;
       }>;
       whisperxSaveSpeakerMapping?: (p: {
         jobId: string;

@@ -50,6 +50,8 @@ import { getAllReasoningModels } from "../../models/ModelRegistry";
 import {
   useSettingsStore,
   selectIsCloudCleanupMode,
+  selectResolvedNoteFormatting,
+  selectResolvedLLMConfig,
   getSettings,
 } from "../../stores/settingsStore";
 import { generateNoteTitle } from "../../utils/generateTitle";
@@ -112,6 +114,11 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
   // WhisperX job flow (multi-file). Only active when the local WhisperX provider
   // is selected; other providers keep the single-file state machine above.
   const whisperxModel = useSettingsStore((s) => s.whisperxModel);
+  // Resolved note-formatting scope, used to gate auto note generation. Reactive
+  // so the info line below reflects settings changes without a remount.
+  const noteFormattingProvider = useSettingsStore((s) => selectResolvedNoteFormatting(s).provider);
+  const noteFormattingModel = useSettingsStore((s) => selectResolvedNoteFormatting(s).model);
+  const hasLocalNoteModel = noteFormattingProvider === "local" && noteFormattingModel.length > 0;
   const startWhisperxJob = useRecordingJobsStore((s) => s.startJob);
   const attachWhisperxEvents = useRecordingJobsStore((s) => s.attachEvents);
   const [whisperxFiles, setWhisperxFiles] = useState<
@@ -379,7 +386,22 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
       }
     }
 
-    const customDictionary = useSettingsStore.getState().customDictionary;
+    const settingsState = useSettingsStore.getState();
+    const customDictionary = settingsState.customDictionary;
+
+    // Resolve the noteFormatting scope at submit time. Only a local model takes
+    // effect (main rejects non-local providers); otherwise the job rests at
+    // transcript_complete and notes can be generated later from the review UI.
+    const noteCfg = selectResolvedNoteFormatting(settingsState);
+    const noteGeneration =
+      noteCfg.provider === "local" && noteCfg.model
+        ? {
+            provider: "local" as const,
+            model: noteCfg.model,
+            disableThinking:
+              selectResolvedLLMConfig(settingsState, "noteFormatting").disableThinking !== false,
+          }
+        : undefined;
 
     setWhisperxSubmitting(true);
     try {
@@ -393,6 +415,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
           overrides,
           customDictionary,
           allowModelDownload,
+          ...(noteGeneration ? { noteGeneration } : {}),
         });
         if (res.success && res.job) {
           newIds.push(res.job.id);
@@ -772,6 +795,8 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
             isDragOver={isDragOver}
             setIsDragOver={setIsDragOver}
             getActiveModelLabel={getActiveModelLabel}
+            hasLocalNoteModel={hasLocalNoteModel}
+            noteModel={noteFormattingModel}
           />
         ) : (
           <div className="max-w-[320px] mx-auto">
@@ -927,6 +952,8 @@ interface WhisperXJobFlowProps {
   isDragOver: boolean;
   setIsDragOver: (v: boolean) => void;
   getActiveModelLabel: () => string;
+  hasLocalNoteModel: boolean;
+  noteModel: string;
 }
 
 function WhisperXJobFlow({
@@ -944,6 +971,8 @@ function WhisperXJobFlow({
   isDragOver,
   setIsDragOver,
   getActiveModelLabel,
+  hasLocalNoteModel,
+  noteModel,
 }: WhisperXJobFlowProps) {
   const canSubmit = files.length > 0 && !submitting && !validateWhisperXOptions(options);
 
@@ -1028,8 +1057,13 @@ function WhisperXJobFlow({
       )}
 
       {/* Options */}
-      <div className="rounded-lg border border-foreground/8 dark:border-white/6 bg-surface-1/40 dark:bg-white/[0.03] p-3">
+      <div className="rounded-lg border border-foreground/8 dark:border-white/6 bg-surface-1/40 dark:bg-white/[0.03] p-3 space-y-2.5">
         <WhisperXUploadOptions value={options} onChange={onOptionsChange} />
+        <p className="text-xs text-foreground/30 border-t border-foreground/6 dark:border-white/6 pt-2.5">
+          {hasLocalNoteModel
+            ? t("whisperx.notes.notesModelInfo", { model: noteModel })
+            : t("whisperx.notes.notesModelNone")}
+        </p>
       </div>
 
       {error && (

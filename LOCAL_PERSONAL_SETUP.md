@@ -76,6 +76,19 @@ The dev server listens on the odd port `5191` (see `.env`) and is only needed fo
 - Keep cloud disabled unless needed for reasoning or specific models
 - Confirm microphone and accessibility permissions on your OS
 
+## WhisperX Accurate Recordings (optional)
+
+For high-accuracy transcription of existing recordings with speaker labels and
+evidence-grounded notes, provision the WhisperX runtime once:
+
+```bash
+npm run setup:whisperx
+npm run doctor:whisperx
+```
+
+Full setup, privacy/retention, troubleshooting, and license details:
+`docs/whisperx-reliable-notes.md`. Live hotkey dictation is unaffected.
+
 ## Preferred Daily Mode
 
 - Use local Whisper/Parakeet as your default

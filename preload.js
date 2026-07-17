@@ -282,6 +282,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("whisperx-read-transcript-page", payload),
   whisperxReadArtifact: (payload) => ipcRenderer.invoke("whisperx-read-artifact", payload),
   whisperxReadSourceAudio: (jobId) => ipcRenderer.invoke("whisperx-read-source-audio", jobId),
+  whisperxGenerateNotes: (jobId, options) =>
+    ipcRenderer.invoke("whisperx-generate-notes", jobId, options),
+  whisperxListNoteRuns: (jobId) => ipcRenderer.invoke("whisperx-list-note-runs", jobId),
   whisperxSaveSpeakerMapping: (payload) =>
     ipcRenderer.invoke("whisperx-save-speaker-mapping", payload),
   whisperxGetSpeakerMappings: (jobId) =>

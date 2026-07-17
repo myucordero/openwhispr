@@ -113,6 +113,7 @@ class RecordingJobManager {
     overrides = {},
     customDictionary = [],
     allowModelDownload = false,
+    noteGeneration = null,
   }) {
     let stat;
     try {
@@ -130,6 +131,9 @@ class RecordingJobManager {
     // Per-job offline override: when the caller allows a model download, the
     // worker's offline env is relaxed for this job only (see _buildRequest).
     settings.allowModelDownload = Boolean(allowModelDownload);
+    // Resolved note-LLM config (renderer resolves the noteFormatting scope at
+    // submit time); consumed by the note-compiler hook after finalize.
+    if (noteGeneration) settings.noteGeneration = noteGeneration;
     const jobId = this.uuid();
     const createdAt = this.now();
 

@@ -29,6 +29,28 @@ export interface StartJobPayload {
   }>;
   customDictionary?: string[];
   allowModelDownload?: boolean;
+  noteGeneration?: {
+    provider: "local";
+    model: string;
+    disableThinking: boolean;
+  };
+}
+
+export interface GenerateNotesOptions {
+  llm?: { provider: string; model: string; disableThinking?: boolean };
+  strict?: boolean;
+}
+
+export interface GenerateNotesResult {
+  success: boolean;
+  error?: string;
+  code?: string;
+  noteRunId?: string;
+  noteId?: number | null;
+  markdown?: string;
+  droppedItemIds?: string[];
+  issues?: import("../types/whisperx").NoteValidationIssue[];
+  failedChunks?: number;
 }
 
 interface RecordingJobsStoreState {
@@ -43,6 +65,7 @@ interface RecordingJobsStoreState {
   cancelJob: (jobId: string) => Promise<{ success: boolean; error?: string }>;
   retryJob: (jobId: string) => Promise<{ success: boolean; error?: string }>;
   deleteJob: (jobId: string) => Promise<{ success: boolean; error?: string }>;
+  generateNotes: (jobId: string, opts?: GenerateNotesOptions) => Promise<GenerateNotesResult>;
   attachEvents: () => void;
 }
 
@@ -156,6 +179,22 @@ export const useRecordingJobsStore = create<RecordingJobsStoreState>()(() => ({
       await useRecordingJobsStore.getState().refreshJob(jobId);
     }
     return res;
+  },
+
+  generateNotes: async (jobId, opts) => {
+    try {
+      const res = await window.electronAPI?.whisperxGenerateNotes?.(jobId, opts);
+      if (!res) {
+        return { success: false, error: "WhisperX is unavailable", code: "WORKER_UNAVAILABLE" };
+      }
+      await useRecordingJobsStore.getState().refreshJob(jobId);
+      return res;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to generate notes";
+      logger.warn("Failed to generate WhisperX notes", { jobId, error: message }, "whisperx");
+      await useRecordingJobsStore.getState().refreshJob(jobId);
+      return { success: false, error: message };
+    }
   },
 
   attachEvents: () => {

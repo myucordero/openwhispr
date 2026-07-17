@@ -400,6 +400,7 @@ class ModelManager {
     try {
       const result = await this.serverManager.inference(messages, {
         temperature: options.temperature ?? 0.7,
+        ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
         disableThinking,
       });
 

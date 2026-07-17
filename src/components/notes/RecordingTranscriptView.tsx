@@ -16,6 +16,7 @@ import RecordingAudioPlayer, {
   AUDIO_PLAYBACK_AVAILABLE,
   type RecordingAudioPlayerHandle,
 } from "./RecordingAudioPlayer";
+import RecordingNotesView from "./RecordingNotesView";
 
 const PAGE_SIZE = 200;
 
@@ -55,14 +56,23 @@ interface Provenance {
   createdAt: string | null;
 }
 
+type ReviewTab = "transcript" | "notes";
+
 interface RecordingTranscriptViewProps {
   job: RecordingJobSummary;
   onBack: () => void;
+  initialTab?: ReviewTab;
 }
 
-export default function RecordingTranscriptView({ job, onBack }: RecordingTranscriptViewProps) {
+export default function RecordingTranscriptView({
+  job,
+  onBack,
+  initialTab = "transcript",
+}: RecordingTranscriptViewProps) {
   const { t } = useTranslation();
   const jobId = job.id;
+
+  const [tab, setTab] = useState<ReviewTab>(initialTab);
 
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [total, setTotal] = useState(0);
@@ -302,6 +312,30 @@ export default function RecordingTranscriptView({ job, onBack }: RecordingTransc
         </p>
       </div>
 
+      {/* Transcript | Notes tabs */}
+      <div className="flex items-center rounded-md border border-foreground/6 dark:border-white/6 bg-surface-1/30 dark:bg-white/[0.02] p-0.5">
+        {(["transcript", "notes"] as const).map((key) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            aria-pressed={tab === key}
+            className={cn(
+              "flex-1 h-7 rounded text-xs font-medium transition-colors duration-150",
+              tab === key
+                ? "bg-foreground/[0.06] dark:bg-white/8 text-foreground/70"
+                : "text-foreground/30 hover:text-foreground/50"
+            )}
+          >
+            {t(`whisperx.notes.tab.${key}`)}
+          </button>
+        ))}
+      </div>
+
+      {tab === "notes" ? (
+        <RecordingNotesView job={job} />
+      ) : (
+        <>
       {/* Audio player (graceful degradation when playback is unavailable) */}
       <RecordingAudioPlayer ref={audioRef} jobId={job.id} sourcePath={job.sourcePath} />
 
@@ -500,6 +534,8 @@ export default function RecordingTranscriptView({ job, onBack }: RecordingTransc
             </div>
           )}
         </div>
+      )}
+        </>
       )}
     </div>
   );
