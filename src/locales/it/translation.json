@@ -2647,6 +2647,235 @@
       "others": "Altri"
     }
   },
+  "whisperx": {
+    "provider": {
+      "name": "WhisperX",
+      "tab": "WhisperX",
+      "description": "Trascrizione locale ad alta precisione con timestamp per parola ed etichettatura dei parlanti."
+    },
+    "readiness": {
+      "title": "Stato di WhisperX",
+      "recheck": "Verifica di nuovo",
+      "runtime": "Runtime",
+      "cuda": "CUDA",
+      "cpuOnly": "Solo CPU",
+      "models": "Modelli",
+      "token": "Token HF",
+      "setupHint": "Il runtime di WhisperX non è ancora installato. Configuralo per trascrivere localmente.",
+      "setUp": "Configura WhisperX",
+      "settingUp": "Configurazione in corso…",
+      "unavailable": "WhisperX non è disponibile in questa versione."
+    },
+    "upload": {
+      "title": "Trascrivi con WhisperX",
+      "dropOrBrowse": "Trascina i file audio o fai clic per sfogliare",
+      "removeFile": "Rimuovi file",
+      "transcribe": "Trascrivi",
+      "transcribeCount": "Trascrivi {{count}} file",
+      "submitting": "Accodamento…",
+      "profile": "Profilo",
+      "language": "Lingua",
+      "languages": {
+        "auto": "Rilevamento automatico",
+        "en": "Inglese",
+        "es": "Spagnolo"
+      },
+      "diarization": "Diarizzazione dei parlanti",
+      "diarizationHint": "Identifica ed etichetta chi sta parlando.",
+      "model": "Modello",
+      "models": {
+        "large-v3-turbo": {
+          "name": "Large v3 Turbo",
+          "size": "~1,6 GB"
+        },
+        "large-v3": {
+          "name": "Large v3",
+          "size": "~3 GB"
+        }
+      },
+      "computeType": "Tipo di calcolo",
+      "computeTypes": {
+        "float16": "float16 (GPU)",
+        "int8": "int8 (poca memoria)"
+      },
+      "batchSize": "Dimensione del batch",
+      "advanced": "Avanzate",
+      "speakers": {
+        "label": "Numero di parlanti",
+        "auto": "Automatico",
+        "exact": "Esatto",
+        "range": "Intervallo",
+        "exactLabel": "Parlanti",
+        "min": "Min.",
+        "max": "Max.",
+        "rangeError": "Il numero di parlanti deve essere compreso tra 1 e 32.",
+        "minMaxError": "Il minimo non può essere maggiore del massimo."
+      },
+      "downloadModelsTitle": "Scaricare i modelli di WhisperX?",
+      "downloadModelsDescription": "I modelli necessari non sono ancora stati scaricati. Verranno scaricati ora (~1,6–3 GB) prima dell'inizio della trascrizione.",
+      "downloadModelsConfirm": "Scarica e continua"
+    },
+    "profiles": {
+      "memo": {
+        "name": "Promemoria",
+        "description": "Trascrizione rapida a un solo parlante per note vocali veloci."
+      },
+      "meeting": {
+        "name": "Riunione",
+        "description": "Trascrizione multi-parlante con diarizzazione per le riunioni."
+      },
+      "critical-interview": {
+        "name": "Intervista critica",
+        "description": "Massima precisione con allineamento e diarizzazione per interviste in cui non puoi sbagliare."
+      }
+    },
+    "progress": {
+      "sessionJobs": "Questa sessione",
+      "cancel": "Annulla",
+      "retry": "Riprova",
+      "estimated": "stimato",
+      "countOfTotal": "{{completed}} di {{total}} {{unit}}",
+      "unit": {
+        "seconds": "secondi",
+        "segments": "segmenti",
+        "percent": "percento",
+        "files": "file"
+      }
+    },
+    "status": {
+      "created": "Creato",
+      "queued": "In coda",
+      "validating": "Convalida in corso",
+      "preparing": "Preparazione in corso",
+      "transcribing": "Trascrizione in corso",
+      "aligning": "Allineamento in corso",
+      "diarizing": "Identificazione dei parlanti",
+      "canonicalizing": "Finalizzazione della trascrizione",
+      "persisting": "Salvataggio in corso",
+      "transcript_complete": "Trascrizione pronta",
+      "note_extracting": "Estrazione delle note",
+      "note_validating": "Convalida delle note",
+      "note_rendering": "Generazione delle note",
+      "complete": "Completato",
+      "cancelled": "Annullato",
+      "failed": "Non riuscito",
+      "interrupted": "Interrotto",
+      "transcript_complete_note_failed": "Trascrizione pronta, generazione note non riuscita"
+    },
+    "stages": {
+      "starting": "Avvio in corso",
+      "probing-audio": "Analisi dell'audio",
+      "normalizing-audio": "Normalizzazione dell'audio",
+      "loading-asr": "Caricamento del modello di trascrizione",
+      "transcribing": "Trascrizione in corso",
+      "unloading-asr": "Scaricamento del modello di trascrizione",
+      "loading-alignment": "Caricamento del modello di allineamento",
+      "aligning": "Allineamento delle parole",
+      "unloading-alignment": "Scaricamento del modello di allineamento",
+      "loading-diarization": "Caricamento del modello di diarizzazione",
+      "diarizing": "Identificazione dei parlanti",
+      "unloading-diarization": "Scaricamento del modello di diarizzazione",
+      "canonicalizing": "Finalizzazione della trascrizione",
+      "writing-artifacts": "Scrittura dei file",
+      "complete": "Completato"
+    },
+    "warnings": {
+      "OOM_FALLBACK_USED": "Memoria GPU insufficiente — è stata usata un'alternativa più lenta.",
+      "DIARIZATION_UNAVAILABLE": "La diarizzazione dei parlanti non era disponibile ed è stata saltata.",
+      "ALIGNMENT_PARTIAL": "L'allineamento delle parole è stato completato solo parzialmente.",
+      "CPU_FALLBACK_USED": "Nessuna GPU disponibile — eseguito su CPU (più lento)."
+    },
+    "errors": {
+      "RUNTIME_NOT_INSTALLED": "Il runtime di WhisperX non è installato.",
+      "CUDA_UNAVAILABLE": "Non è stata trovata nessuna GPU NVIDIA / CUDA compatibile.",
+      "CUDA_OUT_OF_MEMORY": "La GPU ha esaurito la memoria. Prova una dimensione del batch inferiore o int8.",
+      "HF_TOKEN_REQUIRED": "È richiesto un token Hugging Face per la diarizzazione dei parlanti.",
+      "AUDIO_UNREADABLE": "Impossibile leggere il file audio.",
+      "AUDIO_UNSUPPORTED_FORMAT": "Questo formato audio non è supportato.",
+      "AUDIO_TOO_LONG": "Il file audio è troppo lungo da elaborare.",
+      "AUDIO_NO_SPEECH": "Non è stato rilevato alcun parlato nell'audio.",
+      "AUDIO_CORRUPT": "Il file audio sembra danneggiato.",
+      "DISK_SPACE_INSUFFICIENT": "Spazio su disco insufficiente per completare l'attività.",
+      "WORKER_CRASHED": "Il processo di trascrizione si è bloccato.",
+      "WORKER_TIMEOUT": "Il processo di trascrizione ha superato il tempo limite.",
+      "WORKER_UNAVAILABLE": "Il processo di trascrizione non è disponibile.",
+      "JOB_CANCELLED": "L'attività è stata annullata.",
+      "generic": "Trascrizione non riuscita ({{code}}).",
+      "unknown": "Si è verificato un errore sconosciuto."
+    },
+    "review": {
+      "recordings": "Registrazioni",
+      "empty": "Ancora nessuna registrazione.",
+      "storageUsed": "{{size}} usati dai file gestiti",
+      "open": "Apri",
+      "retry": "Riprova",
+      "delete": "Elimina",
+      "cancel": "Annulla",
+      "deleteTitle": "Eliminare questa registrazione?",
+      "deleteDescription": "Questa azione rimuove definitivamente la trascrizione, i nomi dei parlanti, le modifiche e tutte le note ed esportazioni generate per questa registrazione. Il file di registrazione originale viene conservato: rimane esattamente dove si trova sul tuo computer.",
+      "deleteConfirm": "Elimina",
+      "back": "Torna alle registrazioni",
+      "loadMore": "Carica altro",
+      "loadMoreError": "Impossibile caricare altre parti della trascrizione.",
+      "loadingTranscript": "Caricamento della trascrizione…",
+      "noTranscript": "Nessuna trascrizione disponibile per questa registrazione.",
+      "segmentCount": "Visualizzazione di {{loaded}} su {{total}} segmenti",
+      "audioUnavailable": "Anteprima audio non disponibile",
+      "audioPlayerAria": "Lettore audio della registrazione",
+      "unknownSpeaker": "Parlante sconosciuto",
+      "provenance": {
+        "summary": "{{model}} · {{language}}",
+        "modelUnknown": "Modello sconosciuto",
+        "languageUnknown": "Lingua sconosciuta"
+      },
+      "speakers": "Parlanti",
+      "speakerNamePlaceholder": "Nome visualizzato",
+      "speakerNameAria": "Nome visualizzato per {{speaker}}",
+      "speakerMappingNote": "Rinominare modifica solo le etichette mostrate qui: il testo della trascrizione non viene mai modificato.",
+      "speakerSaveError": "Impossibile salvare il nome del parlante.",
+      "edit": "Modifica",
+      "save": "Salva",
+      "edited": "modificato",
+      "originalLabel": "Originale: {{text}}",
+      "editPlaceholder": "Modifica il testo della trascrizione",
+      "saveRevisionError": "Impossibile salvare la modifica.",
+      "exports": "Esporta",
+      "export": {
+        "raw": "Testo (.txt)",
+        "speaker": "Parlanti (.md)",
+        "srt": "Sottotitoli (.srt)",
+        "vtt": "Sottotitoli (.vtt)"
+      },
+      "exportError": "Impossibile esportare il file.",
+      "flags": {
+        "unaligned": "Non allineato",
+        "partial-alignment": "Allineamento parziale",
+        "possible-overlap": "Possibile sovrapposizione",
+        "possible-hallucination": "Possibile allucinazione",
+        "low-confidence": "Bassa confidenza",
+        "manual-review": "Richiede revisione"
+      }
+    },
+    "notes": {
+      "tab": {
+        "transcript": "Trascrizione",
+        "notes": "Note"
+      },
+      "generate": "Genera note",
+      "regenerate": "Rigenera note",
+      "generating": "Generazione delle note…",
+      "strict": "Modalità rigorosa",
+      "strictHint": "Scarta qualsiasi elemento la cui prova non può essere verificata rispetto alla trascrizione.",
+      "noLocalModel": "Seleziona un modello locale per le note nelle Impostazioni per generare le note.",
+      "noneYet": "Ancora nessuna nota. Genera le note dalla trascrizione per iniziare.",
+      "failed": "Generazione delle note non riuscita.",
+      "retry": "Riprova",
+      "droppedSummary": "{{dropped}} elementi scartati, {{issues}} problemi di convalida",
+      "reviewLegend": "Gli elementi contrassegnati come \"Richiede revisione\" non hanno potuto essere completamente verificati rispetto alla trascrizione.",
+      "notesModelInfo": "Note: generate con {{model}}",
+      "notesModelNone": "Note: nessun modello locale configurato — solo trascrizioni"
+    }
+  },
   "workspaces": {
     "switcher": {
       "personal": "Personnel",

@@ -2647,6 +2647,235 @@
       "others": "Outros"
     }
   },
+  "whisperx": {
+    "provider": {
+      "name": "WhisperX",
+      "tab": "WhisperX",
+      "description": "Transcrição local de alta precisão com marcações de tempo por palavra e identificação de locutores."
+    },
+    "readiness": {
+      "title": "Status do WhisperX",
+      "recheck": "Verificar novamente",
+      "runtime": "Ambiente de execução",
+      "cuda": "CUDA",
+      "cpuOnly": "Somente CPU",
+      "models": "Modelos",
+      "token": "Token do HF",
+      "setupHint": "O ambiente do WhisperX ainda não está instalado. Configure-o para transcrever localmente.",
+      "setUp": "Configurar WhisperX",
+      "settingUp": "Configurando…",
+      "unavailable": "O WhisperX não está disponível nesta versão."
+    },
+    "upload": {
+      "title": "Transcrever com WhisperX",
+      "dropOrBrowse": "Solte arquivos de áudio ou clique para procurar",
+      "removeFile": "Remover arquivo",
+      "transcribe": "Transcrever",
+      "transcribeCount": "Transcrever {{count}} arquivos",
+      "submitting": "Enfileirando…",
+      "profile": "Perfil",
+      "language": "Idioma",
+      "languages": {
+        "auto": "Detecção automática",
+        "en": "Inglês",
+        "es": "Espanhol"
+      },
+      "diarization": "Identificação de locutores",
+      "diarizationHint": "Identifica e rotula quem está falando.",
+      "model": "Modelo",
+      "models": {
+        "large-v3-turbo": {
+          "name": "Large v3 Turbo",
+          "size": "~1,6 GB"
+        },
+        "large-v3": {
+          "name": "Large v3",
+          "size": "~3 GB"
+        }
+      },
+      "computeType": "Tipo de processamento",
+      "computeTypes": {
+        "float16": "float16 (GPU)",
+        "int8": "int8 (pouca memória)"
+      },
+      "batchSize": "Tamanho do lote",
+      "advanced": "Avançado",
+      "speakers": {
+        "label": "Número de locutores",
+        "auto": "Automático",
+        "exact": "Exato",
+        "range": "Intervalo",
+        "exactLabel": "Locutores",
+        "min": "Mín.",
+        "max": "Máx.",
+        "rangeError": "O número de locutores deve estar entre 1 e 32.",
+        "minMaxError": "O mínimo não pode ser maior que o máximo."
+      },
+      "downloadModelsTitle": "Baixar os modelos do WhisperX?",
+      "downloadModelsDescription": "Os modelos necessários ainda não foram baixados. Eles serão baixados agora (~1,6–3 GB) antes de a transcrição começar.",
+      "downloadModelsConfirm": "Baixar e continuar"
+    },
+    "profiles": {
+      "memo": {
+        "name": "Nota de voz",
+        "description": "Transcrição rápida de um único locutor para notas de voz rápidas."
+      },
+      "meeting": {
+        "name": "Reunião",
+        "description": "Transcrição com múltiplos locutores e identificação de falantes para reuniões."
+      },
+      "critical-interview": {
+        "name": "Entrevista crítica",
+        "description": "Máxima precisão com alinhamento e identificação de locutores para entrevistas que você não pode errar."
+      }
+    },
+    "progress": {
+      "sessionJobs": "Nesta sessão",
+      "cancel": "Cancelar",
+      "retry": "Tentar novamente",
+      "estimated": "estimado",
+      "countOfTotal": "{{completed}} de {{total}} {{unit}}",
+      "unit": {
+        "seconds": "segundos",
+        "segments": "segmentos",
+        "percent": "por cento",
+        "files": "arquivos"
+      }
+    },
+    "status": {
+      "created": "Criado",
+      "queued": "Na fila",
+      "validating": "Validando",
+      "preparing": "Preparando",
+      "transcribing": "Transcrevendo",
+      "aligning": "Alinhando",
+      "diarizing": "Identificando locutores",
+      "canonicalizing": "Finalizando a transcrição",
+      "persisting": "Salvando",
+      "transcript_complete": "Transcrição pronta",
+      "note_extracting": "Extraindo notas",
+      "note_validating": "Validando notas",
+      "note_rendering": "Gerando notas",
+      "complete": "Concluído",
+      "cancelled": "Cancelado",
+      "failed": "Falhou",
+      "interrupted": "Interrompido",
+      "transcript_complete_note_failed": "Transcrição pronta, as notas falharam"
+    },
+    "stages": {
+      "starting": "Iniciando",
+      "probing-audio": "Analisando áudio",
+      "normalizing-audio": "Normalizando áudio",
+      "loading-asr": "Carregando modelo de transcrição",
+      "transcribing": "Transcrevendo",
+      "unloading-asr": "Descarregando modelo de transcrição",
+      "loading-alignment": "Carregando modelo de alinhamento",
+      "aligning": "Alinhando palavras",
+      "unloading-alignment": "Descarregando modelo de alinhamento",
+      "loading-diarization": "Carregando modelo de identificação de locutores",
+      "diarizing": "Identificando locutores",
+      "unloading-diarization": "Descarregando modelo de identificação de locutores",
+      "canonicalizing": "Finalizando a transcrição",
+      "writing-artifacts": "Gravando arquivos",
+      "complete": "Concluído"
+    },
+    "warnings": {
+      "OOM_FALLBACK_USED": "Memória da GPU insuficiente — foi usada uma alternativa mais lenta.",
+      "DIARIZATION_UNAVAILABLE": "A identificação de locutores não estava disponível e foi ignorada.",
+      "ALIGNMENT_PARTIAL": "O alinhamento de palavras foi concluído apenas parcialmente.",
+      "CPU_FALLBACK_USED": "Nenhuma GPU disponível — executado na CPU (mais lento)."
+    },
+    "errors": {
+      "RUNTIME_NOT_INSTALLED": "O ambiente do WhisperX não está instalado.",
+      "CUDA_UNAVAILABLE": "Nenhuma GPU NVIDIA / CUDA compatível foi encontrada.",
+      "CUDA_OUT_OF_MEMORY": "A GPU ficou sem memória. Tente um tamanho de lote menor ou int8.",
+      "HF_TOKEN_REQUIRED": "É necessário um token do Hugging Face para a identificação de locutores.",
+      "AUDIO_UNREADABLE": "Não foi possível ler o arquivo de áudio.",
+      "AUDIO_UNSUPPORTED_FORMAT": "Este formato de áudio não é compatível.",
+      "AUDIO_TOO_LONG": "O arquivo de áudio é longo demais para ser processado.",
+      "AUDIO_NO_SPEECH": "Nenhuma fala foi detectada no áudio.",
+      "AUDIO_CORRUPT": "O arquivo de áudio parece estar corrompido.",
+      "DISK_SPACE_INSUFFICIENT": "Espaço em disco insuficiente para concluir a tarefa.",
+      "WORKER_CRASHED": "O processo de transcrição travou.",
+      "WORKER_TIMEOUT": "O processo de transcrição expirou.",
+      "WORKER_UNAVAILABLE": "O processo de transcrição não está disponível.",
+      "JOB_CANCELLED": "A tarefa foi cancelada.",
+      "generic": "A transcrição falhou ({{code}}).",
+      "unknown": "Ocorreu um erro desconhecido."
+    },
+    "review": {
+      "recordings": "Gravações",
+      "empty": "Ainda não há gravações.",
+      "storageUsed": "{{size}} usados por arquivos gerenciados",
+      "open": "Abrir",
+      "retry": "Tentar novamente",
+      "delete": "Excluir",
+      "cancel": "Cancelar",
+      "deleteTitle": "Excluir esta gravação?",
+      "deleteDescription": "Isso remove permanentemente a transcrição, os nomes dos locutores, as edições e quaisquer notas e exportações geradas para esta gravação. O arquivo original da gravação é mantido — ele permanece exatamente onde está no seu computador.",
+      "deleteConfirm": "Excluir",
+      "back": "Voltar para as gravações",
+      "loadMore": "Carregar mais",
+      "loadMoreError": "Não foi possível carregar mais da transcrição.",
+      "loadingTranscript": "Carregando transcrição…",
+      "noTranscript": "Não há transcrição disponível para esta gravação.",
+      "segmentCount": "Mostrando {{loaded}} de {{total}} segmentos",
+      "audioUnavailable": "Pré-visualização de áudio indisponível",
+      "audioPlayerAria": "Player de áudio da gravação",
+      "unknownSpeaker": "Locutor desconhecido",
+      "provenance": {
+        "summary": "{{model}} · {{language}}",
+        "modelUnknown": "Modelo desconhecido",
+        "languageUnknown": "Idioma desconhecido"
+      },
+      "speakers": "Locutores",
+      "speakerNamePlaceholder": "Nome de exibição",
+      "speakerNameAria": "Nome de exibição de {{speaker}}",
+      "speakerMappingNote": "Renomear altera apenas os rótulos exibidos aqui — o texto da transcrição em si nunca é editado.",
+      "speakerSaveError": "Não foi possível salvar o nome do locutor.",
+      "edit": "Editar",
+      "save": "Salvar",
+      "edited": "editado",
+      "originalLabel": "Original: {{text}}",
+      "editPlaceholder": "Editar o texto da transcrição",
+      "saveRevisionError": "Não foi possível salvar sua edição.",
+      "exports": "Exportar",
+      "export": {
+        "raw": "Texto (.txt)",
+        "speaker": "Locutores (.md)",
+        "srt": "Legendas (.srt)",
+        "vtt": "Legendas (.vtt)"
+      },
+      "exportError": "Não foi possível exportar o arquivo.",
+      "flags": {
+        "unaligned": "Não alinhado",
+        "partial-alignment": "Alinhamento parcial",
+        "possible-overlap": "Possível sobreposição",
+        "possible-hallucination": "Possível alucinação",
+        "low-confidence": "Baixa confiança",
+        "manual-review": "Requer revisão"
+      }
+    },
+    "notes": {
+      "tab": {
+        "transcript": "Transcrição",
+        "notes": "Notas"
+      },
+      "generate": "Gerar notas",
+      "regenerate": "Regerar notas",
+      "generating": "Gerando notas…",
+      "strict": "Modo estrito",
+      "strictHint": "Descarta qualquer item cuja evidência não possa ser verificada com base na transcrição.",
+      "noLocalModel": "Selecione um modelo local de notas nas Configurações para gerar notas.",
+      "noneYet": "Ainda não há notas. Gere notas a partir da transcrição para começar.",
+      "failed": "A geração de notas falhou.",
+      "retry": "Tentar novamente",
+      "droppedSummary": "{{dropped}} itens descartados, {{issues}} problemas de validação",
+      "reviewLegend": "Os itens marcados como \"Requer revisão\" não puderam ser totalmente verificados com base na transcrição.",
+      "notesModelInfo": "Notas: geradas com {{model}}",
+      "notesModelNone": "Notas: nenhum modelo local configurado — somente transcrições"
+    }
+  },
   "workspaces": {
     "switcher": {
       "personal": "Personal",

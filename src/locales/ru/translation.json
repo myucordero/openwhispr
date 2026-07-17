@@ -2649,6 +2649,235 @@
       "others": "Другие"
     }
   },
+  "whisperx": {
+    "provider": {
+      "name": "WhisperX",
+      "tab": "WhisperX",
+      "description": "Высокоточная локальная транскрипция с временными метками по словам и разметкой говорящих."
+    },
+    "readiness": {
+      "title": "Статус WhisperX",
+      "recheck": "Проверить снова",
+      "runtime": "Среда выполнения",
+      "cuda": "CUDA",
+      "cpuOnly": "Только CPU",
+      "models": "Модели",
+      "token": "Токен HF",
+      "setupHint": "Среда выполнения WhisperX ещё не установлена. Настройте её для локальной транскрипции.",
+      "setUp": "Настроить WhisperX",
+      "settingUp": "Настройка…",
+      "unavailable": "WhisperX недоступен в этой сборке."
+    },
+    "upload": {
+      "title": "Транскрибировать с помощью WhisperX",
+      "dropOrBrowse": "Перетащите аудиофайлы или нажмите для выбора",
+      "removeFile": "Удалить файл",
+      "transcribe": "Транскрибировать",
+      "transcribeCount": "Транскрибировать файлов: {{count}}",
+      "submitting": "Постановка в очередь…",
+      "profile": "Профиль",
+      "language": "Язык",
+      "languages": {
+        "auto": "Автоопределение",
+        "en": "Английский",
+        "es": "Испанский"
+      },
+      "diarization": "Разметка говорящих",
+      "diarizationHint": "Определяет и помечает, кто говорит.",
+      "model": "Модель",
+      "models": {
+        "large-v3-turbo": {
+          "name": "Large v3 Turbo",
+          "size": "~1,6 ГБ"
+        },
+        "large-v3": {
+          "name": "Large v3",
+          "size": "~3 ГБ"
+        }
+      },
+      "computeType": "Тип вычислений",
+      "computeTypes": {
+        "float16": "float16 (GPU)",
+        "int8": "int8 (мало памяти)"
+      },
+      "batchSize": "Размер пакета",
+      "advanced": "Дополнительно",
+      "speakers": {
+        "label": "Количество говорящих",
+        "auto": "Автоматически",
+        "exact": "Точно",
+        "range": "Диапазон",
+        "exactLabel": "Говорящие",
+        "min": "Мин.",
+        "max": "Макс.",
+        "rangeError": "Количество говорящих должно быть от 1 до 32.",
+        "minMaxError": "Минимум не может быть больше максимума."
+      },
+      "downloadModelsTitle": "Скачать модели WhisperX?",
+      "downloadModelsDescription": "Необходимые модели ещё не загружены. Они будут загружены сейчас (~1,6–3 ГБ) перед началом транскрипции.",
+      "downloadModelsConfirm": "Скачать и продолжить"
+    },
+    "profiles": {
+      "memo": {
+        "name": "Заметка",
+        "description": "Быстрая транскрипция одного говорящего для коротких голосовых заметок."
+      },
+      "meeting": {
+        "name": "Встреча",
+        "description": "Транскрипция нескольких говорящих с разметкой для встреч."
+      },
+      "critical-interview": {
+        "name": "Важное интервью",
+        "description": "Максимальная точность с выравниванием и разметкой говорящих для интервью, где нельзя ошибиться."
+      }
+    },
+    "progress": {
+      "sessionJobs": "Эта сессия",
+      "cancel": "Отмена",
+      "retry": "Повторить",
+      "estimated": "оценка",
+      "countOfTotal": "{{completed}} из {{total}} {{unit}}",
+      "unit": {
+        "seconds": "секунд",
+        "segments": "сегментов",
+        "percent": "процентов",
+        "files": "файлов"
+      }
+    },
+    "status": {
+      "created": "Создано",
+      "queued": "В очереди",
+      "validating": "Проверка",
+      "preparing": "Подготовка",
+      "transcribing": "Транскрибирование",
+      "aligning": "Выравнивание",
+      "diarizing": "Определение говорящих",
+      "canonicalizing": "Завершение транскрипта",
+      "persisting": "Сохранение",
+      "transcript_complete": "Транскрипт готов",
+      "note_extracting": "Извлечение заметок",
+      "note_validating": "Проверка заметок",
+      "note_rendering": "Формирование заметок",
+      "complete": "Готово",
+      "cancelled": "Отменено",
+      "failed": "Ошибка",
+      "interrupted": "Прервано",
+      "transcript_complete_note_failed": "Транскрипт готов, заметки не созданы"
+    },
+    "stages": {
+      "starting": "Запуск",
+      "probing-audio": "Анализ аудио",
+      "normalizing-audio": "Нормализация аудио",
+      "loading-asr": "Загрузка модели транскрипции",
+      "transcribing": "Транскрибирование",
+      "unloading-asr": "Выгрузка модели транскрипции",
+      "loading-alignment": "Загрузка модели выравнивания",
+      "aligning": "Выравнивание слов",
+      "unloading-alignment": "Выгрузка модели выравнивания",
+      "loading-diarization": "Загрузка модели разметки говорящих",
+      "diarizing": "Определение говорящих",
+      "unloading-diarization": "Выгрузка модели разметки говорящих",
+      "canonicalizing": "Завершение транскрипта",
+      "writing-artifacts": "Запись файлов",
+      "complete": "Готово"
+    },
+    "warnings": {
+      "OOM_FALLBACK_USED": "Не хватило памяти GPU — использован более медленный запасной вариант.",
+      "DIARIZATION_UNAVAILABLE": "Разметка говорящих была недоступна и пропущена.",
+      "ALIGNMENT_PARTIAL": "Выравнивание слов выполнено лишь частично.",
+      "CPU_FALLBACK_USED": "GPU недоступен — выполнено на CPU (медленнее)."
+    },
+    "errors": {
+      "RUNTIME_NOT_INSTALLED": "Среда выполнения WhisperX не установлена.",
+      "CUDA_UNAVAILABLE": "Не найден совместимый GPU NVIDIA / CUDA.",
+      "CUDA_OUT_OF_MEMORY": "На GPU закончилась память. Попробуйте меньший размер пакета или int8.",
+      "HF_TOKEN_REQUIRED": "Для разметки говорящих требуется токен Hugging Face.",
+      "AUDIO_UNREADABLE": "Не удалось прочитать аудиофайл.",
+      "AUDIO_UNSUPPORTED_FORMAT": "Этот формат аудио не поддерживается.",
+      "AUDIO_TOO_LONG": "Аудиофайл слишком длинный для обработки.",
+      "AUDIO_NO_SPEECH": "В аудио не обнаружена речь.",
+      "AUDIO_CORRUPT": "Аудиофайл, похоже, повреждён.",
+      "DISK_SPACE_INSUFFICIENT": "Недостаточно места на диске для завершения задачи.",
+      "WORKER_CRASHED": "Процесс транскрипции завершился аварийно.",
+      "WORKER_TIMEOUT": "Истекло время ожидания процесса транскрипции.",
+      "WORKER_UNAVAILABLE": "Процесс транскрипции недоступен.",
+      "JOB_CANCELLED": "Задача была отменена.",
+      "generic": "Ошибка транскрипции ({{code}}).",
+      "unknown": "Произошла неизвестная ошибка."
+    },
+    "review": {
+      "recordings": "Записи",
+      "empty": "Пока нет записей.",
+      "storageUsed": "{{size}} занято управляемыми файлами",
+      "open": "Открыть",
+      "retry": "Повторить",
+      "delete": "Удалить",
+      "cancel": "Отмена",
+      "deleteTitle": "Удалить эту запись?",
+      "deleteDescription": "Это навсегда удалит транскрипт, имена говорящих, правки, а также все созданные заметки и экспортированные файлы для этой записи. Исходный файл записи сохранится — он останется точно там же на вашем компьютере.",
+      "deleteConfirm": "Удалить",
+      "back": "Назад к записям",
+      "loadMore": "Загрузить ещё",
+      "loadMoreError": "Не удалось загрузить остальную часть транскрипта.",
+      "loadingTranscript": "Загрузка транскрипта…",
+      "noTranscript": "Для этой записи транскрипт недоступен.",
+      "segmentCount": "Показано {{loaded}} из {{total}} сегментов",
+      "audioUnavailable": "Предпросмотр аудио недоступен",
+      "audioPlayerAria": "Аудиоплеер записи",
+      "unknownSpeaker": "Неизвестный говорящий",
+      "provenance": {
+        "summary": "{{model}} · {{language}}",
+        "modelUnknown": "Неизвестная модель",
+        "languageUnknown": "Язык неизвестен"
+      },
+      "speakers": "Говорящие",
+      "speakerNamePlaceholder": "Отображаемое имя",
+      "speakerNameAria": "Отображаемое имя для {{speaker}}",
+      "speakerMappingNote": "Переименование меняет только отображаемые здесь метки — сам текст транскрипта никогда не редактируется.",
+      "speakerSaveError": "Не удалось сохранить имя говорящего.",
+      "edit": "Редактировать",
+      "save": "Сохранить",
+      "edited": "отредактировано",
+      "originalLabel": "Оригинал: {{text}}",
+      "editPlaceholder": "Редактировать текст транскрипта",
+      "saveRevisionError": "Не удалось сохранить вашу правку.",
+      "exports": "Экспорт",
+      "export": {
+        "raw": "Текст (.txt)",
+        "speaker": "Говорящие (.md)",
+        "srt": "Субтитры (.srt)",
+        "vtt": "Субтитры (.vtt)"
+      },
+      "exportError": "Не удалось экспортировать файл.",
+      "flags": {
+        "unaligned": "Не выровнено",
+        "partial-alignment": "Частичное выравнивание",
+        "possible-overlap": "Возможное наложение",
+        "possible-hallucination": "Возможная галлюцинация",
+        "low-confidence": "Низкая уверенность",
+        "manual-review": "Требует проверки"
+      }
+    },
+    "notes": {
+      "tab": {
+        "transcript": "Транскрипт",
+        "notes": "Заметки"
+      },
+      "generate": "Создать заметки",
+      "regenerate": "Пересоздать заметки",
+      "generating": "Создание заметок…",
+      "strict": "Строгий режим",
+      "strictHint": "Отбрасывает любой пункт, доказательства которого нельзя подтвердить по транскрипту.",
+      "noLocalModel": "Выберите локальную модель для заметок в настройках, чтобы создавать заметки.",
+      "noneYet": "Заметок пока нет. Создайте заметки из транскрипта, чтобы начать.",
+      "failed": "Не удалось создать заметки.",
+      "retry": "Повторить",
+      "droppedSummary": "Отброшено пунктов: {{dropped}}, проблем валидации: {{issues}}",
+      "reviewLegend": "Пункты, помеченные как «Требует проверки», не удалось полностью подтвердить по транскрипту.",
+      "notesModelInfo": "Заметки: созданы с помощью {{model}}",
+      "notesModelNone": "Заметки: локальная модель не настроена — только транскрипты"
+    }
+  },
   "workspaces": {
     "switcher": {
       "personal": "Persönlich",

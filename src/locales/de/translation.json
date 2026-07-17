@@ -2647,6 +2647,235 @@
       "others": "Andere"
     }
   },
+  "whisperx": {
+    "provider": {
+      "name": "WhisperX",
+      "tab": "WhisperX",
+      "description": "Hochpräzise lokale Transkription mit wortgenauen Zeitstempeln und Sprecherkennzeichnung."
+    },
+    "readiness": {
+      "title": "WhisperX-Status",
+      "recheck": "Erneut prüfen",
+      "runtime": "Laufzeitumgebung",
+      "cuda": "CUDA",
+      "cpuOnly": "Nur CPU",
+      "models": "Modelle",
+      "token": "HF-Token",
+      "setupHint": "Die WhisperX-Laufzeitumgebung ist noch nicht installiert. Richten Sie sie ein, um lokal zu transkribieren.",
+      "setUp": "WhisperX einrichten",
+      "settingUp": "Wird eingerichtet…",
+      "unavailable": "WhisperX ist in dieser Version nicht verfügbar."
+    },
+    "upload": {
+      "title": "Mit WhisperX transkribieren",
+      "dropOrBrowse": "Audiodateien hier ablegen oder klicken zum Durchsuchen",
+      "removeFile": "Datei entfernen",
+      "transcribe": "Transkribieren",
+      "transcribeCount": "{{count}} Dateien transkribieren",
+      "submitting": "Wird eingereiht…",
+      "profile": "Profil",
+      "language": "Sprache",
+      "languages": {
+        "auto": "Automatische Erkennung",
+        "en": "Englisch",
+        "es": "Spanisch"
+      },
+      "diarization": "Sprechererkennung",
+      "diarizationHint": "Erkennt und kennzeichnet, wer spricht.",
+      "model": "Modell",
+      "models": {
+        "large-v3-turbo": {
+          "name": "Large v3 Turbo",
+          "size": "~1,6 GB"
+        },
+        "large-v3": {
+          "name": "Large v3",
+          "size": "~3 GB"
+        }
+      },
+      "computeType": "Rechentyp",
+      "computeTypes": {
+        "float16": "float16 (GPU)",
+        "int8": "int8 (wenig Speicher)"
+      },
+      "batchSize": "Batch-Größe",
+      "advanced": "Erweitert",
+      "speakers": {
+        "label": "Anzahl der Sprecher",
+        "auto": "Automatisch",
+        "exact": "Exakt",
+        "range": "Bereich",
+        "exactLabel": "Sprecher",
+        "min": "Min.",
+        "max": "Max.",
+        "rangeError": "Die Sprecheranzahl muss zwischen 1 und 32 liegen.",
+        "minMaxError": "Das Minimum darf nicht größer als das Maximum sein."
+      },
+      "downloadModelsTitle": "WhisperX-Modelle herunterladen?",
+      "downloadModelsDescription": "Die benötigten Modelle sind noch nicht heruntergeladen. Sie werden jetzt heruntergeladen (~1,6–3 GB), bevor die Transkription beginnt.",
+      "downloadModelsConfirm": "Herunterladen und fortfahren"
+    },
+    "profiles": {
+      "memo": {
+        "name": "Notiz",
+        "description": "Schnelle Einzelsprecher-Transkription für kurze Sprachnotizen."
+      },
+      "meeting": {
+        "name": "Besprechung",
+        "description": "Mehrsprecher-Transkription mit Sprechererkennung für Besprechungen."
+      },
+      "critical-interview": {
+        "name": "Kritisches Interview",
+        "description": "Höchste Genauigkeit mit Ausrichtung und Sprechererkennung für Interviews, bei denen kein Fehler passieren darf."
+      }
+    },
+    "progress": {
+      "sessionJobs": "Diese Sitzung",
+      "cancel": "Abbrechen",
+      "retry": "Wiederholen",
+      "estimated": "geschätzt",
+      "countOfTotal": "{{completed}} von {{total}} {{unit}}",
+      "unit": {
+        "seconds": "Sekunden",
+        "segments": "Segmente",
+        "percent": "Prozent",
+        "files": "Dateien"
+      }
+    },
+    "status": {
+      "created": "Erstellt",
+      "queued": "In Warteschlange",
+      "validating": "Wird validiert",
+      "preparing": "Wird vorbereitet",
+      "transcribing": "Wird transkribiert",
+      "aligning": "Wird ausgerichtet",
+      "diarizing": "Sprecher werden erkannt",
+      "canonicalizing": "Transkript wird finalisiert",
+      "persisting": "Wird gespeichert",
+      "transcript_complete": "Transkript fertig",
+      "note_extracting": "Notizen werden extrahiert",
+      "note_validating": "Notizen werden validiert",
+      "note_rendering": "Notizen werden erstellt",
+      "complete": "Abgeschlossen",
+      "cancelled": "Abgebrochen",
+      "failed": "Fehlgeschlagen",
+      "interrupted": "Unterbrochen",
+      "transcript_complete_note_failed": "Transkript fertig, Notizen fehlgeschlagen"
+    },
+    "stages": {
+      "starting": "Wird gestartet",
+      "probing-audio": "Audio wird analysiert",
+      "normalizing-audio": "Audio wird normalisiert",
+      "loading-asr": "Transkriptionsmodell wird geladen",
+      "transcribing": "Wird transkribiert",
+      "unloading-asr": "Transkriptionsmodell wird entladen",
+      "loading-alignment": "Ausrichtungsmodell wird geladen",
+      "aligning": "Wörter werden ausgerichtet",
+      "unloading-alignment": "Ausrichtungsmodell wird entladen",
+      "loading-diarization": "Sprechererkennungsmodell wird geladen",
+      "diarizing": "Sprecher werden erkannt",
+      "unloading-diarization": "Sprechererkennungsmodell wird entladen",
+      "canonicalizing": "Transkript wird finalisiert",
+      "writing-artifacts": "Dateien werden geschrieben",
+      "complete": "Abgeschlossen"
+    },
+    "warnings": {
+      "OOM_FALLBACK_USED": "Zu wenig GPU-Speicher — es wurde eine langsamere Alternative verwendet.",
+      "DIARIZATION_UNAVAILABLE": "Die Sprechererkennung war nicht verfügbar und wurde übersprungen.",
+      "ALIGNMENT_PARTIAL": "Die Wortausrichtung wurde nur teilweise abgeschlossen.",
+      "CPU_FALLBACK_USED": "Keine GPU verfügbar — Ausführung auf der CPU (langsamer)."
+    },
+    "errors": {
+      "RUNTIME_NOT_INSTALLED": "Die WhisperX-Laufzeitumgebung ist nicht installiert.",
+      "CUDA_UNAVAILABLE": "Keine kompatible NVIDIA-GPU / CUDA gefunden.",
+      "CUDA_OUT_OF_MEMORY": "Der GPU-Speicher ist erschöpft. Versuchen Sie eine kleinere Batch-Größe oder int8.",
+      "HF_TOKEN_REQUIRED": "Für die Sprechererkennung ist ein Hugging-Face-Token erforderlich.",
+      "AUDIO_UNREADABLE": "Die Audiodatei konnte nicht gelesen werden.",
+      "AUDIO_UNSUPPORTED_FORMAT": "Dieses Audioformat wird nicht unterstützt.",
+      "AUDIO_TOO_LONG": "Die Audiodatei ist zu lang für die Verarbeitung.",
+      "AUDIO_NO_SPEECH": "In der Audiodatei wurde keine Sprache erkannt.",
+      "AUDIO_CORRUPT": "Die Audiodatei scheint beschädigt zu sein.",
+      "DISK_SPACE_INSUFFICIENT": "Nicht genügend Speicherplatz, um den Auftrag abzuschließen.",
+      "WORKER_CRASHED": "Der Transkriptions-Worker ist abgestürzt.",
+      "WORKER_TIMEOUT": "Zeitüberschreitung beim Transkriptions-Worker.",
+      "WORKER_UNAVAILABLE": "Der Transkriptions-Worker ist nicht verfügbar.",
+      "JOB_CANCELLED": "Der Auftrag wurde abgebrochen.",
+      "generic": "Transkription fehlgeschlagen ({{code}}).",
+      "unknown": "Ein unbekannter Fehler ist aufgetreten."
+    },
+    "review": {
+      "recordings": "Aufnahmen",
+      "empty": "Noch keine Aufnahmen.",
+      "storageUsed": "{{size}} durch verwaltete Dateien belegt",
+      "open": "Öffnen",
+      "retry": "Wiederholen",
+      "delete": "Löschen",
+      "cancel": "Abbrechen",
+      "deleteTitle": "Diese Aufnahme löschen?",
+      "deleteDescription": "Dadurch werden das Transkript, die Sprechernamen, Änderungen sowie alle generierten Notizen und Exporte für diese Aufnahme dauerhaft entfernt. Ihre ursprüngliche Aufnahmedatei bleibt erhalten — sie verbleibt genau dort, wo sie sich auf Ihrem Computer befindet.",
+      "deleteConfirm": "Löschen",
+      "back": "Zurück zu den Aufnahmen",
+      "loadMore": "Mehr laden",
+      "loadMoreError": "Es konnte nicht mehr vom Transkript geladen werden.",
+      "loadingTranscript": "Transkript wird geladen…",
+      "noTranscript": "Für diese Aufnahme ist kein Transkript verfügbar.",
+      "segmentCount": "{{loaded}} von {{total}} Segmenten werden angezeigt",
+      "audioUnavailable": "Audiovorschau nicht verfügbar",
+      "audioPlayerAria": "Audioplayer für die Aufnahme",
+      "unknownSpeaker": "Unbekannter Sprecher",
+      "provenance": {
+        "summary": "{{model}} · {{language}}",
+        "modelUnknown": "Unbekanntes Modell",
+        "languageUnknown": "Unbekannte Sprache"
+      },
+      "speakers": "Sprecher",
+      "speakerNamePlaceholder": "Anzeigename",
+      "speakerNameAria": "Anzeigename für {{speaker}}",
+      "speakerMappingNote": "Das Umbenennen ändert nur die hier angezeigten Bezeichnungen — der Transkripttext selbst wird nie bearbeitet.",
+      "speakerSaveError": "Der Sprechername konnte nicht gespeichert werden.",
+      "edit": "Bearbeiten",
+      "save": "Speichern",
+      "edited": "bearbeitet",
+      "originalLabel": "Original: {{text}}",
+      "editPlaceholder": "Transkripttext bearbeiten",
+      "saveRevisionError": "Ihre Bearbeitung konnte nicht gespeichert werden.",
+      "exports": "Exportieren",
+      "export": {
+        "raw": "Text (.txt)",
+        "speaker": "Sprecher (.md)",
+        "srt": "Untertitel (.srt)",
+        "vtt": "Untertitel (.vtt)"
+      },
+      "exportError": "Die Datei konnte nicht exportiert werden.",
+      "flags": {
+        "unaligned": "Nicht ausgerichtet",
+        "partial-alignment": "Teilweise ausgerichtet",
+        "possible-overlap": "Mögliche Überschneidung",
+        "possible-hallucination": "Mögliche Halluzination",
+        "low-confidence": "Geringe Konfidenz",
+        "manual-review": "Überprüfung erforderlich"
+      }
+    },
+    "notes": {
+      "tab": {
+        "transcript": "Transkript",
+        "notes": "Notizen"
+      },
+      "generate": "Notizen erstellen",
+      "regenerate": "Notizen neu erstellen",
+      "generating": "Notizen werden erstellt…",
+      "strict": "Strenger Modus",
+      "strictHint": "Verwirft jeden Eintrag, dessen Beleg nicht anhand des Transkripts verifiziert werden kann.",
+      "noLocalModel": "Wählen Sie in den Einstellungen ein lokales Notizmodell aus, um Notizen zu erstellen.",
+      "noneYet": "Noch keine Notizen. Erstellen Sie Notizen aus dem Transkript, um zu beginnen.",
+      "failed": "Erstellen der Notizen fehlgeschlagen.",
+      "retry": "Wiederholen",
+      "droppedSummary": "{{dropped}} Einträge verworfen, {{issues}} Validierungsprobleme",
+      "reviewLegend": "Als „Überprüfung erforderlich“ markierte Einträge konnten nicht vollständig anhand des Transkripts verifiziert werden.",
+      "notesModelInfo": "Notizen: erstellt mit {{model}}",
+      "notesModelNone": "Notizen: kein lokales Modell konfiguriert — nur Transkripte"
+    }
+  },
   "workspaces": {
     "switcher": {
       "personal": "Persönlich",

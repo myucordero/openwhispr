@@ -2642,6 +2642,235 @@
       "others": "其他人"
     }
   },
+  "whisperx": {
+    "provider": {
+      "name": "WhisperX",
+      "tab": "WhisperX",
+      "description": "高精度本地转录，支持逐词时间戳和说话人标注。"
+    },
+    "readiness": {
+      "title": "WhisperX 状态",
+      "recheck": "重新检查",
+      "runtime": "运行环境",
+      "cuda": "CUDA",
+      "cpuOnly": "仅 CPU",
+      "models": "模型",
+      "token": "HF 令牌",
+      "setupHint": "WhisperX 运行环境尚未安装。请设置后进行本地转录。",
+      "setUp": "设置 WhisperX",
+      "settingUp": "正在设置…",
+      "unavailable": "此版本中 WhisperX 不可用。"
+    },
+    "upload": {
+      "title": "使用 WhisperX 转录",
+      "dropOrBrowse": "拖放音频文件，或点击浏览",
+      "removeFile": "移除文件",
+      "transcribe": "转录",
+      "transcribeCount": "转录 {{count}} 个文件",
+      "submitting": "正在排队…",
+      "profile": "配置文件",
+      "language": "语言",
+      "languages": {
+        "auto": "自动检测",
+        "en": "英语",
+        "es": "西班牙语"
+      },
+      "diarization": "说话人分离",
+      "diarizationHint": "识别并标注说话人。",
+      "model": "模型",
+      "models": {
+        "large-v3-turbo": {
+          "name": "Large v3 Turbo",
+          "size": "约 1.6 GB"
+        },
+        "large-v3": {
+          "name": "Large v3",
+          "size": "约 3 GB"
+        }
+      },
+      "computeType": "计算类型",
+      "computeTypes": {
+        "float16": "float16（GPU）",
+        "int8": "int8（低内存）"
+      },
+      "batchSize": "批处理大小",
+      "advanced": "高级",
+      "speakers": {
+        "label": "说话人数量",
+        "auto": "自动",
+        "exact": "精确",
+        "range": "范围",
+        "exactLabel": "说话人",
+        "min": "最小值",
+        "max": "最大值",
+        "rangeError": "说话人数量必须在 1 到 32 之间。",
+        "minMaxError": "最小值不能大于最大值。"
+      },
+      "downloadModelsTitle": "下载 WhisperX 模型？",
+      "downloadModelsDescription": "所需模型尚未下载。转录开始前将立即下载（约 1.6–3 GB）。",
+      "downloadModelsConfirm": "下载并继续"
+    },
+    "profiles": {
+      "memo": {
+        "name": "备忘录",
+        "description": "适用于快速语音笔记的单说话人快速转录。"
+      },
+      "meeting": {
+        "name": "会议",
+        "description": "适用于会议的多说话人分离转录。"
+      },
+      "critical-interview": {
+        "name": "关键访谈",
+        "description": "为不容有失的访谈提供最高精度的对齐与说话人分离。"
+      }
+    },
+    "progress": {
+      "sessionJobs": "本次会话",
+      "cancel": "取消",
+      "retry": "重试",
+      "estimated": "预计",
+      "countOfTotal": "{{completed}} / {{total}} {{unit}}",
+      "unit": {
+        "seconds": "秒",
+        "segments": "个片段",
+        "percent": "百分比",
+        "files": "个文件"
+      }
+    },
+    "status": {
+      "created": "已创建",
+      "queued": "排队中",
+      "validating": "正在验证",
+      "preparing": "正在准备",
+      "transcribing": "正在转录",
+      "aligning": "正在对齐",
+      "diarizing": "正在识别说话人",
+      "canonicalizing": "正在完成转录",
+      "persisting": "正在保存",
+      "transcript_complete": "转录已完成",
+      "note_extracting": "正在提取笔记",
+      "note_validating": "正在验证笔记",
+      "note_rendering": "正在生成笔记",
+      "complete": "已完成",
+      "cancelled": "已取消",
+      "failed": "失败",
+      "interrupted": "已中断",
+      "transcript_complete_note_failed": "转录已完成，笔记生成失败"
+    },
+    "stages": {
+      "starting": "正在启动",
+      "probing-audio": "正在分析音频",
+      "normalizing-audio": "正在规范化音频",
+      "loading-asr": "正在加载转录模型",
+      "transcribing": "正在转录",
+      "unloading-asr": "正在卸载转录模型",
+      "loading-alignment": "正在加载对齐模型",
+      "aligning": "正在对齐单词",
+      "unloading-alignment": "正在卸载对齐模型",
+      "loading-diarization": "正在加载说话人分离模型",
+      "diarizing": "正在识别说话人",
+      "unloading-diarization": "正在卸载说话人分离模型",
+      "canonicalizing": "正在完成转录",
+      "writing-artifacts": "正在写入文件",
+      "complete": "已完成"
+    },
+    "warnings": {
+      "OOM_FALLBACK_USED": "GPU 内存不足 — 已使用较慢的备用方案。",
+      "DIARIZATION_UNAVAILABLE": "说话人分离不可用，已跳过。",
+      "ALIGNMENT_PARTIAL": "单词对齐仅部分完成。",
+      "CPU_FALLBACK_USED": "没有可用的 GPU — 已在 CPU 上运行（较慢）。"
+    },
+    "errors": {
+      "RUNTIME_NOT_INSTALLED": "WhisperX 运行环境未安装。",
+      "CUDA_UNAVAILABLE": "未找到兼容的 NVIDIA GPU / CUDA。",
+      "CUDA_OUT_OF_MEMORY": "GPU 内存不足。请尝试更小的批处理大小或 int8。",
+      "HF_TOKEN_REQUIRED": "说话人分离需要 Hugging Face 令牌。",
+      "AUDIO_UNREADABLE": "无法读取音频文件。",
+      "AUDIO_UNSUPPORTED_FORMAT": "不支持此音频格式。",
+      "AUDIO_TOO_LONG": "音频文件过长，无法处理。",
+      "AUDIO_NO_SPEECH": "音频中未检测到语音。",
+      "AUDIO_CORRUPT": "该音频文件似乎已损坏。",
+      "DISK_SPACE_INSUFFICIENT": "磁盘空间不足，无法完成任务。",
+      "WORKER_CRASHED": "转录工作进程已崩溃。",
+      "WORKER_TIMEOUT": "转录工作进程超时。",
+      "WORKER_UNAVAILABLE": "转录工作进程不可用。",
+      "JOB_CANCELLED": "任务已取消。",
+      "generic": "转录失败（{{code}}）。",
+      "unknown": "发生未知错误。"
+    },
+    "review": {
+      "recordings": "录音",
+      "empty": "暂无录音。",
+      "storageUsed": "受管理文件已占用 {{size}}",
+      "open": "打开",
+      "retry": "重试",
+      "delete": "删除",
+      "cancel": "取消",
+      "deleteTitle": "删除此录音？",
+      "deleteDescription": "此操作将永久删除该录音的转录内容、说话人姓名、编辑记录以及所有生成的笔记和导出文件。原始录音文件将被保留 — 它会原封不动地留在你的电脑上。",
+      "deleteConfirm": "删除",
+      "back": "返回录音列表",
+      "loadMore": "加载更多",
+      "loadMoreError": "无法加载更多转录内容。",
+      "loadingTranscript": "正在加载转录内容…",
+      "noTranscript": "此录音暂无可用的转录内容。",
+      "segmentCount": "已显示 {{total}} 个片段中的 {{loaded}} 个",
+      "audioUnavailable": "音频预览不可用",
+      "audioPlayerAria": "录音音频播放器",
+      "unknownSpeaker": "未知说话人",
+      "provenance": {
+        "summary": "{{model}} · {{language}}",
+        "modelUnknown": "未知模型",
+        "languageUnknown": "未知语言"
+      },
+      "speakers": "说话人",
+      "speakerNamePlaceholder": "显示名称",
+      "speakerNameAria": "{{speaker}} 的显示名称",
+      "speakerMappingNote": "重命名只会更改此处显示的标签 — 转录文本本身永远不会被修改。",
+      "speakerSaveError": "无法保存说话人姓名。",
+      "edit": "编辑",
+      "save": "保存",
+      "edited": "已编辑",
+      "originalLabel": "原文：{{text}}",
+      "editPlaceholder": "编辑转录文本",
+      "saveRevisionError": "无法保存你的编辑。",
+      "exports": "导出",
+      "export": {
+        "raw": "文本 (.txt)",
+        "speaker": "说话人 (.md)",
+        "srt": "字幕 (.srt)",
+        "vtt": "字幕 (.vtt)"
+      },
+      "exportError": "无法导出文件。",
+      "flags": {
+        "unaligned": "未对齐",
+        "partial-alignment": "部分对齐",
+        "possible-overlap": "可能重叠",
+        "possible-hallucination": "可能存在幻觉",
+        "low-confidence": "置信度低",
+        "manual-review": "需要审核"
+      }
+    },
+    "notes": {
+      "tab": {
+        "transcript": "转录",
+        "notes": "笔记"
+      },
+      "generate": "生成笔记",
+      "regenerate": "重新生成笔记",
+      "generating": "正在生成笔记…",
+      "strict": "严格模式",
+      "strictHint": "丢弃任何证据无法根据转录内容验证的条目。",
+      "noLocalModel": "请在设置中选择本地笔记模型以生成笔记。",
+      "noneYet": "暂无笔记。从转录内容生成笔记即可开始。",
+      "failed": "笔记生成失败。",
+      "retry": "重试",
+      "droppedSummary": "已丢弃 {{dropped}} 项，{{issues}} 个验证问题",
+      "reviewLegend": "标记为“需要审核”的条目未能根据转录内容完全验证。",
+      "notesModelInfo": "笔记：使用 {{model}} 生成",
+      "notesModelNone": "笔记：未配置本地模型 — 仅提供转录内容"
+    }
+  },
   "workspaces": {
     "switcher": {
       "personal": "Personal",

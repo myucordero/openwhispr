@@ -64,6 +64,22 @@ function freeDiskBytesFor(dir) {
   }
 }
 
+// Trusted ffmpeg for the worker's probe/normalization. ffmpeg-static bundles
+// only ffmpeg (no ffprobe); in packaged apps the module resolves inside asar
+// and the real binary lives in app.asar.unpacked.
+function resolveFfmpegPath() {
+  try {
+    let ffmpegPath = require("ffmpeg-static");
+    if (typeof ffmpegPath !== "string" || ffmpegPath.length === 0) return null;
+    if (ffmpegPath.includes("app.asar")) {
+      ffmpegPath = ffmpegPath.replace("app.asar", "app.asar.unpacked");
+    }
+    return fs.existsSync(ffmpegPath) ? ffmpegPath : null;
+  } catch {
+    return null; // worker falls back to ffmpeg/ffprobe on PATH
+  }
+}
+
 class WhisperXMain {
   constructor({
     app,
@@ -131,7 +147,15 @@ class WhisperXMain {
           // restarts it afterwards through the normal inference path.
           await this._stopLocalLlmServer();
           try {
-            return this.runtimeManager.resolveWorkerInvocation();
+            const invocation = this.runtimeManager.resolveWorkerInvocation();
+            const ffmpegPath = resolveFfmpegPath();
+            return {
+              ...invocation,
+              extraEnv: {
+                ...(invocation.extraEnv || {}),
+                ...(ffmpegPath ? { OPENWHISPR_FFMPEG_PATH: ffmpegPath } : {}),
+              },
+            };
           } catch (error) {
             // Map the runtime manager's typed throw into a RecordingJobError so
             // the job manager's failure handler preserves RUNTIME_NOT_INSTALLED.
