@@ -243,10 +243,34 @@ i18n: whisperx.* namespaces complete in en + es (~150 keys each); remaining loca
 ## Final Notes
 
 ```text
-Changed files:
-Tests:
-Manual verification:
-Blocked checks:
+Changed files: 136 files, +30815/-72 across 9 local commits on
+  feat/whisperx-reliable-notes (188ef07a..062f4d8f, base dev@b901c390).
+Tests: 351/351 JS (node --test; stable across repeated runs), 81/81 Python
+  (pytest, offline), cross-language fixture agreement 7/7, lint 0 errors,
+  typecheck clean, build:renderer clean, i18n:check consistent (10 locales).
+Manual verification (WSL CUDA — NOT native-Windows acceptance):
+  - runtime provisioned via npm run setup:whisperx (uv, 7.1 GB venv,
+    torch 2.8.0+cu128); doctor:whisperx all PASS (+expected token WARN).
+  - real 14.5-min recording: memo profile, large-v3-turbo float16 batch4 +
+    alignment -> transcript_complete; RTF 0.170 cold / 0.032 warm; 239
+    segments; canonical transcript validates; artifacts finalized; external
+    source untouched. Offline rerun (HF_HUB_OFFLINE=1, cached models) PASS.
+  - three integration bugs found by the real run and fixed (ffprobe-less
+    probe fallback, per-job offline consent env, ffmpeg on worker PATH).
+Review gate: two fresh high-stakes Claude reviews (security-adversarial +
+  correctness); verdicts SHIP-WITH-FIXES; every validated finding fixed
+  (recovery mapping HIGH, readSourceAudio gate MED, foreign_keys pragma MED,
+  cancel semantics MED, 5 LOWs) — commit 062f4d8f.
+Blocked checks (environment, exact commands in final report):
+  - native-Windows runtime/app smoke (dual-clone rule; WSL clone codes/tests)
+  - Windows packaged/unpacked build (npm run build:local:win on Windows)
+  - pyannote diarization real-model smoke (HF token/terms not available)
 Remaining risks:
-No commit/push/release/security scan status:
+  - app's other llama.cpp consumers do not use the GPU lease (D-109)
+  - evidence layer validates citations, not semantic support; strict
+    verifier is opt-in (documented limitation, spec-accepted tradeoff)
+  - note generation is local-provider-only in v1 (D-108)
+No commit/push/release/security scan status: 9 LOCAL commits created as
+  explicitly authorized; NO push, NO PR, NO release/tag, NO broad security
+  scan performed.
 ```
