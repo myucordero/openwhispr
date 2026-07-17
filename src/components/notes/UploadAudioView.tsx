@@ -77,6 +77,14 @@ import { getBaseLanguageCode } from "../../utils/languageSupport";
 type UploadState = "idle" | "selected" | "downloading" | "transcribing" | "complete" | "error";
 
 const SUPPORTED_EXTENSIONS = ["mp3", "wav", "m4a", "webm", "ogg", "oga", "flac", "aac"];
+// MP4 video is accepted too: every transcription path routes the file through
+// ffmpeg (convertToWav / the WhisperX worker's decode), which extracts the audio
+// track automatically, so an MP4 uploads and processes like audio. Scoped to the
+// MP4 family — it's the one container cloud providers accept and that Chromium's
+// <audio> review player can decode (as audio/mp4); other video containers would
+// transcribe but break BYOK transcription and playback, so they're excluded.
+const SUPPORTED_VIDEO_EXTENSIONS = ["mp4", "m4v"];
+const ACCEPTED_UPLOAD_EXTENSIONS = [...SUPPORTED_EXTENSIONS, ...SUPPORTED_VIDEO_EXTENSIONS];
 
 const BYOK_MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB — hard limit for bring-your-own-key
 const CLOUD_FREE_MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB — free plan cloud limit
@@ -494,7 +502,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
     const collected: Array<{ name: string; path: string; sizeBytes: number }> = [];
     for (const f of Array.from(e.dataTransfer.files)) {
       const ext = f.name.split(".").pop()?.toLowerCase() || "";
-      if (!SUPPORTED_EXTENSIONS.includes(ext)) continue;
+      if (!ACCEPTED_UPLOAD_EXTENSIONS.includes(ext)) continue;
       const filePath = window.electronAPI.getPathForFile(f);
       if (!filePath) continue;
       collected.push({ name: f.name, path: filePath, sizeBytes: f.size });
@@ -736,7 +744,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
       const ext = f.name.split(".").pop()?.toLowerCase() || "";
-      if (SUPPORTED_EXTENSIONS.includes(ext)) {
+      if (ACCEPTED_UPLOAD_EXTENSIONS.includes(ext)) {
         const filePath = window.electronAPI.getPathForFile(f);
         if (filePath) {
           validFiles.push({ name: f.name, path: filePath, sizeBytes: f.size });
@@ -1172,7 +1180,9 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
                       <rect width="28" height="20" rx="4" fill="#FF0000" />
                       <polygon points="11,4 11,16 21,10" fill="white" />
                     </svg>
-                  ) : /\.(mp3|wav|m4a|ogg|flac|aac|webm|opus)(\?|$)/i.test(urlInput) ? (
+                  ) : /\.(mp3|wav|m4a|ogg|oga|flac|aac|webm|opus|mp4|m4v)(\?|$)/i.test(
+                      urlInput
+                    ) ? (
                     <FileAudio
                       size={13}
                       className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground/20 z-10 pointer-events-none"
@@ -1816,7 +1826,7 @@ function IdleView({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".mp3,.wav,.m4a,.webm,.ogg,.oga,.flac,.aac"
+        accept={ACCEPTED_UPLOAD_EXTENSIONS.map((ext) => `.${ext}`).join(",")}
         onChange={handleFileInputChange}
         className="sr-only"
         tabIndex={-1}

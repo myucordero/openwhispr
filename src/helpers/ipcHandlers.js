@@ -134,6 +134,10 @@ const AUDIO_MIME_TYPES = {
   oga: "audio/ogg",
   flac: "audio/flac",
   aac: "audio/aac",
+  // MP4 video uploads: cloud providers accept mp4 and key off the filename; the
+  // audio/mp4 content-type keeps the BYOK multipart request honest.
+  mp4: "audio/mp4",
+  m4v: "audio/mp4",
 };
 
 const CLOUD_INLINE_LIMIT = 4 * 1024 * 1024;
@@ -1744,8 +1748,21 @@ class IPCHandlers {
         properties,
         filters: [
           {
-            name: "Audio Files",
-            extensions: ["mp3", "wav", "m4a", "webm", "ogg", "oga", "flac", "aac"],
+            // MP4 video is accepted too — transcription extracts the audio track
+            // via ffmpeg, so it processes like an audio upload.
+            name: "Audio & Video",
+            extensions: [
+              "mp3",
+              "wav",
+              "m4a",
+              "webm",
+              "ogg",
+              "oga",
+              "flac",
+              "aac",
+              "mp4",
+              "m4v",
+            ],
           },
         ],
       });

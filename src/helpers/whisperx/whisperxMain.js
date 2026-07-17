@@ -556,6 +556,11 @@ class WhisperXMain {
       ".oga": "audio/ogg",
       ".flac": "audio/flac",
       ".aac": "audio/aac",
+      // MP4 video sources: served as audio/mp4 so the review player's <audio>
+      // element decodes the AAC audio track (the file was validated by the
+      // worker's ffmpeg decode before the job reached a playable status).
+      ".mp4": "audio/mp4",
+      ".m4v": "audio/mp4",
     };
     const ext = path.extname(job.sourcePath).toLowerCase();
     const buffer = await fs.promises.readFile(job.sourcePath);
