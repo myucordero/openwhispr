@@ -20,6 +20,15 @@ const { getTinfoilChatModels } = require("./tinfoilCatalog");
 const { transcribeWithTinfoil } = require("./tinfoilTranscription");
 const AudioStorageManager = require("./audioStorage");
 
+// Local-only builds (VITE_LOCAL_ONLY, loaded from the bundled .env into
+// process.env) must never run cloud inference in the main process, even though
+// the renderer already hides/gates every cloud entry point. Defense-in-depth
+// backstop for the main-process enterprise (Bedrock/Azure/Vertex) paths.
+function isLocalOnlyBuild() {
+  const v = process.env.VITE_LOCAL_ONLY;
+  return v === "1" || v === "true";
+}
+
 // Tinfoil's only realtime STT model — fallback when the renderer omits one.
 const TINFOIL_REALTIME_MODEL = "voxtral-mini-4b-realtime";
 const liveSpeakerIdentifier = require("./liveSpeakerIdentifier");
@@ -40,6 +49,7 @@ const {
 } = require("./speakerAssignmentPolicy");
 const { downsample24kTo16k, pcm16ToWav } = require("../utils/audioUtils");
 const postMigrationDetector = require("./postMigrationDetector");
+const { redactText } = require("./whisperx/redaction");
 const {
   DEFAULT_EXPECTED_SPEAKER_COUNT,
   MAX_SPEAKER_COUNT,
@@ -124,6 +134,10 @@ const AUDIO_MIME_TYPES = {
   oga: "audio/ogg",
   flac: "audio/flac",
   aac: "audio/aac",
+  // MP4 video uploads: cloud providers accept mp4 and key off the filename; the
+  // audio/mp4 content-type keeps the BYOK multipart request honest.
+  mp4: "audio/mp4",
+  m4v: "audio/mp4",
 };
 
 const CLOUD_INLINE_LIMIT = 4 * 1024 * 1024;
@@ -177,6 +191,35 @@ function resolveAllowedAudioPath(filePath) {
     return real;
   }
   return null;
+}
+
+function serializeError(error) {
+  if (!error) {
+    return { message: "Unknown error" };
+  }
+
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      cause:
+        error.cause instanceof Error
+          ? { name: error.cause.name, message: error.cause.message }
+          : error.cause,
+    };
+  }
+
+  if (typeof error === "object") {
+    try {
+      return JSON.parse(JSON.stringify(error));
+    } catch {
+      return { message: String(error) };
+    }
+  }
+
+  return { message: String(error) };
 }
 
 function buildMultipartBody(fileBuffer, fileName, contentType, fields = {}) {
@@ -412,6 +455,7 @@ class IPCHandlers {
     this.linuxPortalAudioManager = managers.linuxPortalAudioManager;
     this.windowsLoopbackAudioManager = managers.windowsLoopbackAudioManager;
     this.meetingAecManager = managers.meetingAecManager;
+    this.whisperxMain = managers.whisperxMain;
     this.oauthProtocolRegistered = managers.oauthProtocolRegistered === true;
     this.oauthProtocol = managers.oauthProtocol || "openwhispr";
     this.sessionId = crypto.randomUUID();
@@ -1704,8 +1748,21 @@ class IPCHandlers {
         properties,
         filters: [
           {
-            name: "Audio Files",
-            extensions: ["mp3", "wav", "m4a", "webm", "ogg", "oga", "flac", "aac"],
+            // MP4 video is accepted too — transcription extracts the audio track
+            // via ffmpeg, so it processes like an audio upload.
+            name: "Audio & Video",
+            extensions: [
+              "mp3",
+              "wav",
+              "m4a",
+              "webm",
+              "ogg",
+              "oga",
+              "flac",
+              "aac",
+              "mp4",
+              "m4v",
+            ],
           },
         ],
       });
@@ -2070,6 +2127,103 @@ class IPCHandlers {
     ipcMain.handle("whisper-server-status", async () => {
       return this.whisperManager.getServerStatus();
     });
+
+    // WhisperX recording job handlers
+    const whisperxCall = async (event, fn) => {
+      try {
+        const result = await fn();
+        return { success: true, ...(result || {}) };
+      } catch (error) {
+        return {
+          success: false,
+          error: redactText(error?.message || "Unknown error"),
+          code: error?.code || "UNKNOWN_INTERNAL_ERROR",
+        };
+      }
+    };
+
+    ipcMain.handle("whisperx-get-readiness", async (event) =>
+      whisperxCall(event, async () => ({ readiness: await this.whisperxMain.getReadiness() }))
+    );
+
+    ipcMain.handle("whisperx-provision-runtime", async (event) =>
+      whisperxCall(event, () =>
+        this.whisperxMain.provisionRuntime({
+          onProgress: (progress) => {
+            if (!event.sender.isDestroyed()) {
+              event.sender.send("whisperx-provision-progress", {
+                step: progress?.step,
+                message: progress?.message,
+              });
+            }
+          },
+        })
+      )
+    );
+
+    ipcMain.handle("whisperx-start-job", async (event, payload) =>
+      whisperxCall(event, () => this.whisperxMain.startJob(payload))
+    );
+
+    ipcMain.handle("whisperx-cancel-job", async (event, jobId) =>
+      whisperxCall(event, () => this.whisperxMain.cancelJob(jobId))
+    );
+
+    ipcMain.handle("whisperx-retry-job", async (event, jobId) =>
+      whisperxCall(event, () => this.whisperxMain.retryJob(jobId))
+    );
+
+    ipcMain.handle("whisperx-delete-job", async (event, jobId) =>
+      whisperxCall(event, () => this.whisperxMain.deleteJob(jobId))
+    );
+
+    ipcMain.handle("whisperx-get-job", async (event, jobId) =>
+      whisperxCall(event, () => this.whisperxMain.getJob(jobId))
+    );
+
+    ipcMain.handle("whisperx-list-jobs", async (event, query) =>
+      whisperxCall(event, () => this.whisperxMain.listJobs(query))
+    );
+
+    ipcMain.handle("whisperx-read-transcript-page", async (event, payload) =>
+      whisperxCall(event, () => this.whisperxMain.readTranscriptPage(payload))
+    );
+
+    ipcMain.handle("whisperx-read-artifact", async (event, payload) =>
+      whisperxCall(event, () => this.whisperxMain.readArtifactText(payload))
+    );
+
+    ipcMain.handle("whisperx-read-source-audio", async (event, jobId) =>
+      whisperxCall(event, () => this.whisperxMain.readSourceAudio(jobId))
+    );
+
+    ipcMain.handle("whisperx-save-speaker-mapping", async (event, payload) =>
+      whisperxCall(event, () => this.whisperxMain.saveSpeakerMapping(payload))
+    );
+
+    ipcMain.handle("whisperx-get-speaker-mappings", async (event, jobId) =>
+      whisperxCall(event, () => this.whisperxMain.getSpeakerMappings(jobId))
+    );
+
+    ipcMain.handle("whisperx-save-transcript-revision", async (event, payload) =>
+      whisperxCall(event, () => this.whisperxMain.saveTranscriptRevision(payload))
+    );
+
+    ipcMain.handle("whisperx-list-transcript-revisions", async (event, jobId) =>
+      whisperxCall(event, () => this.whisperxMain.listTranscriptRevisions(jobId))
+    );
+
+    ipcMain.handle("whisperx-storage-usage", async (event) =>
+      whisperxCall(event, () => this.whisperxMain.getStorageUsage())
+    );
+
+    ipcMain.handle("whisperx-generate-notes", async (event, jobId, options) =>
+      whisperxCall(event, () => this.whisperxMain.generateNotes(jobId, options || {}))
+    );
+
+    ipcMain.handle("whisperx-list-note-runs", async (event, jobId) =>
+      whisperxCall(event, () => this.whisperxMain.listNoteRuns(jobId))
+    );
 
     ipcMain.handle("detect-gpu", async () => {
       const { detectNvidiaGpu } = require("../utils/gpuDetection");
@@ -3181,8 +3335,25 @@ class IPCHandlers {
       return this.environmentManager.saveVertexApiKey(key);
     });
 
+    // Hugging Face token (WhisperX diarization) — status only, never the
+    // value, per spec 07 §4/§7: renderer must not be able to read it back.
+    ipcMain.handle("get-huggingface-token-status", async () => {
+      return { configured: Boolean(this.environmentManager.getHuggingFaceToken()) };
+    });
+    ipcMain.handle("save-huggingface-token", async (event, key) => {
+      this.environmentManager.saveHuggingFaceToken(key);
+      return { success: true };
+    });
+    ipcMain.handle("delete-huggingface-token", async () => {
+      this.environmentManager.saveHuggingFaceToken("");
+      return { success: true };
+    });
+
     // Enterprise provider test connection
     ipcMain.handle("test-enterprise-connection", async (event, provider, config) => {
+      if (isLocalOnlyBuild()) {
+        return { success: false, error: "Cloud inference is disabled in this local-only build" };
+      }
       const {
         mapEnterpriseError,
         pickEnterpriseConfig,
@@ -3223,6 +3394,9 @@ class IPCHandlers {
     ipcMain.handle(
       "process-enterprise-reasoning",
       async (event, text, modelId, _agentName, config) => {
+        if (isLocalOnlyBuild()) {
+          return { success: false, error: "Cloud inference is disabled in this local-only build" };
+        }
         const {
           isEnterpriseProvider,
           mapEnterpriseError,
@@ -3549,6 +3723,18 @@ class IPCHandlers {
       } catch (error) {
         return { success: false, error: error.message };
       }
+    });
+
+    // Local CLI inference bridge (claude/codex via the user's subscription).
+    // Text-in/text-out; used for note formatting + dictation agent when the
+    // user opts into the CLI backend. Runs on-device but calls Anthropic/OpenAI.
+    ipcMain.handle("cli-inference", async (event, params) => {
+      const { runCliInference } = require("./cliInference");
+      return runCliInference(params || {});
+    });
+    ipcMain.handle("cli-inference-available", async (event, cli) => {
+      const { checkCliAvailable } = require("./cliInference");
+      return checkCliAvailable(cli);
     });
 
     ipcMain.handle(
@@ -7155,12 +7341,18 @@ class IPCHandlers {
     });
 
     ipcMain.handle("get-stt-config", async (event) => {
+      const apiUrl = getApiUrl();
       try {
-        const apiUrl = getApiUrl();
-        if (!apiUrl) throw new Error("OpenWhispr API URL not configured");
+        if (!apiUrl) {
+          debugLogger.debug("STT config unavailable: API URL not configured", {}, "stt");
+          return null;
+        }
 
         const authHeader = await getAuthHeader(event);
-        if (!Object.keys(authHeader).length) throw new Error("Not authenticated");
+        if (!Object.keys(authHeader).length) {
+          debugLogger.debug("STT config unavailable: not authenticated", {}, "stt");
+          return null;
+        }
 
         const response = await proxyFetch(`${apiUrl}/api/stt-config`, {
           headers: authHeader,
@@ -7168,7 +7360,8 @@ class IPCHandlers {
 
         if (!response.ok) {
           if (response.status === 401) {
-            return { success: false, error: "Session expired", code: "AUTH_EXPIRED" };
+            debugLogger.info("STT config unavailable: session expired", { status: 401 }, "stt");
+            return null;
           }
           if (response.status === 503) {
             return { success: false, error: "Request timed out", code: "SERVER_ERROR" };
@@ -7179,7 +7372,14 @@ class IPCHandlers {
         const data = await response.json();
         return { success: true, ...data };
       } catch (error) {
-        debugLogger.error("STT config fetch error:", error);
+        debugLogger.warn(
+          "STT config fetch failed",
+          {
+            apiUrl,
+            ...serializeError(error),
+          },
+          "stt"
+        );
         return null;
       }
     });

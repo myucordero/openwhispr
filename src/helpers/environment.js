@@ -20,6 +20,7 @@ const SECRET_KEYS = [
   "BEDROCK_SESSION_TOKEN",
   "AZURE_OPENAI_API_KEY",
   "VERTEX_API_KEY",
+  "HUGGINGFACE_TOKEN",
 ];
 
 const SECRET_KEY_SET = new Set(SECRET_KEYS);
@@ -33,6 +34,13 @@ const PERSISTED_KEYS = [
   "LOCAL_CLEANUP_MODEL",
   "DICTATION_AGENT_PROVIDER",
   "LOCAL_DICTATION_AGENT_MODEL",
+  "LOCAL_AUTO_ENABLE_GPU",
+  "LOCAL_LLM_THREADS",
+  "LOCAL_LLM_GPU_LAYERS",
+  "PARAKEET_THREADS",
+  "LOCAL_GPU_VRAM_MB",
+  "REASONING_PROVIDER",
+  "LOCAL_REASONING_MODEL",
   "LLAMA_GPU_BACKEND",
   "LLAMA_VULKAN_ENABLED",
   "DICTATION_KEY",
@@ -389,6 +397,17 @@ class EnvironmentManager {
   }
   saveVertexApiKey(key) {
     return this._saveKey("VERTEX_API_KEY", key);
+  }
+
+  // Hugging Face token — read-only PAT used only for token-gated pyannote
+  // diarization model provisioning (WhisperX reliable-notes pipeline).
+  // Renderer must never read the value back; only configured/not status.
+  getHuggingFaceToken() {
+    return this._getKey("HUGGINGFACE_TOKEN");
+  }
+
+  saveHuggingFaceToken(key) {
+    return this._saveKey("HUGGINGFACE_TOKEN", key);
   }
 
   getDictationKey() {

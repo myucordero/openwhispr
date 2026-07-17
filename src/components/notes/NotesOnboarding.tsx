@@ -15,6 +15,7 @@ import { notesInputClass, notesTextareaClass } from "./shared";
 import { useDialogs } from "../../hooks/useDialogs";
 import { AlertDialog } from "../ui/dialog";
 import ReasoningModelSelector from "../ReasoningModelSelector";
+import { LOCAL_ONLY_MODE } from "../../lib/features";
 import { useSystemAudioPermission } from "../../hooks/useSystemAudioPermission";
 import { canManageSystemAudioInApp } from "../../utils/systemAudioAccess";
 
@@ -168,6 +169,7 @@ export default function NotesOnboarding({ onComplete }: NotesOnboardingProps) {
                   customReasoningApiKey={cleanupCustomApiKey}
                   setCustomReasoningApiKey={setCleanupCustomApiKey}
                   setReasoningMode={setCleanupMode}
+                  {...(LOCAL_ONLY_MODE ? { mode: "local" as const } : {})}
                 />
               </div>
             )}

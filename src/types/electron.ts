@@ -1,6 +1,19 @@
+import type {
+  WhisperXReadiness,
+  RecordingProfile,
+  RecordingLanguage,
+  WhisperXModel,
+  ComputeType,
+  DiarizationProvider,
+  RecordingJobSummary,
+  ArtifactDescriptor,
+  TranscriptSegment,
+  RecordingJobProgressEvent,
+  NoteValidationIssue,
+} from "./whisperx";
 import type { TinfoilCatalogModel } from "../models/tinfoilModels";
 
-export type LocalTranscriptionProvider = "whisper" | "nvidia";
+export type LocalTranscriptionProvider = "whisper" | "nvidia" | "whisperx";
 
 export type InferenceMode = "openwhispr" | "providers" | "local" | "self-hosted" | "enterprise";
 
@@ -914,6 +927,16 @@ declare global {
       ) => Promise<{ success: boolean; text?: string; error?: string }>;
       checkLocalReasoningAvailable: () => Promise<boolean>;
 
+      // Local CLI inference bridge (claude/codex via the user's subscription).
+      cliInference: (params: {
+        cli: "claude" | "codex";
+        prompt: string;
+        systemPrompt?: string;
+      }) => Promise<{ success: boolean; text?: string; error?: string; code?: string }>;
+      cliInferenceAvailable: (
+        cli: "claude" | "codex"
+      ) => Promise<{ available: boolean; version?: string }>;
+
       // Anthropic reasoning
       processAnthropicReasoning: (
         text: string,
@@ -1015,7 +1038,6 @@ declare global {
       onUpdateDownloaded: (callback: (event: any, info: any) => void) => () => void;
       onUpdateDownloadProgress: (callback: (event: any, progressObj: any) => void) => () => void;
       onUpdateError: (callback: (event: any, error: any) => void) => () => void;
-
       openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
 
       // Hotkey management
@@ -2027,6 +2049,182 @@ declare global {
       getPendingTranscriptionDeletes?: () => Promise<TranscriptionItem[]>;
       hardDeleteTranscription?: (id: number) => Promise<{ success: boolean; id: number }>;
 
+      // WhisperX reliable-notes pipeline (main-process side wired concurrently;
+      // all methods optional so the renderer degrades gracefully when absent)
+      whisperxGetReadiness?: () => Promise<
+        { success: boolean; error?: string; code?: string } & Partial<WhisperXReadiness>
+      >;
+      whisperxProvisionRuntime?: () => Promise<{ success: boolean; error?: string }>;
+      whisperxStartJob?: (payload: {
+        sourcePath: string;
+        displayName?: string;
+        profile: RecordingProfile;
+        overrides?: Partial<{
+          language: RecordingLanguage;
+          model: WhisperXModel;
+          computeType: ComputeType;
+          batchSize: number;
+          alignment: boolean;
+          diarization: boolean;
+          diarizationProvider: DiarizationProvider;
+          exactSpeakers: number;
+          minSpeakers: number;
+          maxSpeakers: number;
+        }>;
+        customDictionary?: string[];
+        allowModelDownload?: boolean;
+        noteGeneration?: {
+          provider: "local" | "claude-cli" | "codex-cli";
+          model: string;
+          disableThinking: boolean;
+        };
+      }) => Promise<{
+        success: boolean;
+        job?: RecordingJobSummary;
+        error?: string;
+        code?: string;
+      }>;
+      whisperxCancelJob?: (jobId: string) => Promise<{ success: boolean; error?: string }>;
+      whisperxRetryJob?: (jobId: string) => Promise<{ success: boolean; error?: string }>;
+      whisperxDeleteJob?: (jobId: string) => Promise<{ success: boolean; error?: string }>;
+      whisperxGetJob?: (jobId: string) => Promise<{
+        success: boolean;
+        job?: RecordingJobSummary;
+        artifacts?: ArtifactDescriptor[];
+        speakerMappings?: Record<string, string>;
+      }>;
+      whisperxListJobs?: (query?: {
+        status?: string;
+        limit?: number;
+        offset?: number;
+      }) => Promise<{ success: boolean; jobs?: RecordingJobSummary[] }>;
+      whisperxReadTranscriptPage?: (p: {
+        jobId: string;
+        offset?: number;
+        limit?: number;
+      }) => Promise<{
+        success: boolean;
+        error?: string;
+        code?: string;
+        segments?: TranscriptSegment[];
+        total?: number;
+        speakers?: Array<{ id: string; displayName?: string }>;
+        warnings?: Array<{ code: string; message: string }>;
+        provenance?: {
+          model: string | null;
+          languageDetected: string | null;
+          createdAt: string | null;
+        };
+      }>;
+      // Main returns { text, bytes } from readArtifactText (whisperxMain.js),
+      // spread verbatim by the IPC layer — not { content }.
+      whisperxReadArtifact?: (p: {
+        jobId: string;
+        relativePath: string;
+      }) => Promise<{ success: boolean; text?: string; bytes?: number; error?: string }>;
+      // Hugging Face token for pyannote diarization: status-only readback —
+      // the renderer can never retrieve the stored value.
+      getHuggingFaceTokenStatus?: () => Promise<{ configured: boolean }>;
+      saveHuggingFaceToken?: (key: string) => Promise<{ success: boolean }>;
+      deleteHuggingFaceToken?: () => Promise<{ success: boolean }>;
+      // Bounded (300 MB) source-audio read keyed by job id; Buffer arrives as
+      // Uint8Array/ArrayBuffer over IPC.
+      whisperxReadSourceAudio?: (jobId: string) => Promise<{
+        success: boolean;
+        audio?: ArrayBuffer | Uint8Array;
+        mimeType?: string;
+        bytes?: number;
+        error?: string;
+        code?: string;
+      }>;
+      // Manual note generation / regeneration without retranscription. Main
+      // returns { noteRunId, noteId, markdown, droppedItemIds, issues,
+      // failedChunks } spread over { success:true } (whisperxMain.generateNotes).
+      whisperxGenerateNotes?: (
+        jobId: string,
+        options?: {
+          llm?: { provider: string; model: string; disableThinking?: boolean };
+          strict?: boolean;
+        }
+      ) => Promise<{
+        success: boolean;
+        error?: string;
+        code?: string;
+        noteRunId?: string;
+        noteId?: number | null;
+        markdown?: string;
+        droppedItemIds?: string[];
+        issues?: NoteValidationIssue[];
+        failedChunks?: number;
+      }>;
+      whisperxListNoteRuns?: (jobId: string) => Promise<{
+        success: boolean;
+        error?: string;
+        noteRuns?: Array<{
+          id: string;
+          jobId: string;
+          noteId: number | null;
+          status: string;
+          sourceTranscriptSha256: string;
+          transcriptRevisionId: string | null;
+          promptVersion: string;
+          provider: string;
+          model: string;
+          extractionRelativePath: string | null;
+          notesRelativePath: string | null;
+          errorCode: string | null;
+          createdAt: string;
+          completedAt: string | null;
+        }>;
+      }>;
+      whisperxSaveSpeakerMapping?: (p: {
+        jobId: string;
+        speakerId: string;
+        displayName: string;
+      }) => Promise<{
+        success: boolean;
+        speakerMappings?: Record<string, string>;
+        error?: string;
+      }>;
+      whisperxGetSpeakerMappings?: (
+        jobId: string
+      ) => Promise<{ success: boolean; speakerMappings?: Record<string, string>; error?: string }>;
+      whisperxSaveTranscriptRevision?: (p: {
+        jobId: string;
+        segmentId: string;
+        oldText: string;
+        newText: string;
+      }) => Promise<{
+        success: boolean;
+        revision?: {
+          segmentId: string;
+          oldText: string;
+          newText: string;
+          createdAt: string;
+        };
+        error?: string;
+      }>;
+      whisperxListTranscriptRevisions?: (jobId: string) => Promise<{
+        success: boolean;
+        revisions?: Array<{
+          segmentId: string;
+          oldText: string;
+          newText: string;
+          createdAt: string;
+        }>;
+        error?: string;
+      }>;
+      // Main returns { jobs, total } from getStorageUsage (whisperxMain.js) — the
+      // aggregate field is `total`, not `totalBytes`.
+      whisperxGetStorageUsage?: () => Promise<{
+        success: boolean;
+        jobs?: Array<{ jobId: string; bytes: number }>;
+        total?: number;
+      }>;
+      onWhisperxJobEvent?: (cb: (e: RecordingJobProgressEvent) => void) => () => void;
+      onWhisperxProvisionProgress?: (
+        cb: (p: { step: string; message: string }) => void
+      ) => () => void;
       getPendingDictionary?: () => Promise<DictionaryEntryItem[]>;
       getPendingDictionaryDeletes?: () => Promise<DictionaryEntryItem[]>;
       getDictionaryByClientId?: (clientDictId: string) => Promise<DictionaryEntryItem | null>;

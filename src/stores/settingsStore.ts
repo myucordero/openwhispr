@@ -1,11 +1,13 @@
 import { create } from "zustand";
 import { API_ENDPOINTS } from "../config/constants";
-import i18n, { normalizeUiLanguage } from "../i18n";
+import i18n, { ensureLocaleResources, normalizeUiLanguage } from "../i18n";
 import { ensureAgentNameInDictionary } from "../utils/agentName";
 import { useStreamingProvidersStore } from "./streamingProvidersStore";
 import logger from "../utils/logger";
+import { LOCAL_ONLY_MODE } from "../lib/features";
 import whisperVadConstants from "../constants/whisperVad.json";
 import type { LocalTranscriptionProvider, InferenceMode, SelfHostedType } from "../types/electron";
+import type { WhisperXModel } from "../types/whisperx";
 import type { GoogleCalendarAccount } from "../types/calendar";
 import { PROMPT_KIND_LIST, type PromptKind } from "../config/prompts/registry";
 import { deriveReasoningMode, buildReasoningScopePatches } from "../helpers/reasoningRouting";
@@ -260,6 +262,60 @@ function migrateProviderSettings() {
 
 migrateProviderSettings();
 
+// Local-only builds ship a ready-to-use local configuration so the user never
+// has to pick models in-app: local Whisper for live dictation, WhisperX for
+// uploaded-recording notes, a local GGUF for fast/private dictation cleanup,
+// and the Claude CLI (subscription) for note formatting + the dictation agent.
+// Runs once (versioned marker) before the store reads its initial values, so
+// the seeded localStorage is what the store hydrates from. Bumping
+// LOCAL_ONLY_SEED_VERSION re-applies on the next launch (e.g. after a pipeline
+// change); the user's later manual tweaks are preserved between bumps.
+const LOCAL_ONLY_SEED_VERSION = "3";
+function seedLocalOnlyDefaults() {
+  if (!isBrowser || !LOCAL_ONLY_MODE) return;
+  if (localStorage.getItem("localOnlyDefaultsSeeded") === LOCAL_ONLY_SEED_VERSION) return;
+  const seed: Record<string, string> = {
+    // Live hotkey dictation: local Whisper large-v3-turbo. whisper.cpp's id for
+    // that model is "turbo" (ggml-large-v3-turbo.bin); "large-v3-turbo" is the
+    // WhisperX id and is invalid for whisper.cpp.
+    useLocalWhisper: "true",
+    localTranscriptionProvider: "whisper",
+    whisperModel: "turbo",
+    // Uploaded-recording notes: WhisperX (its own model id space).
+    uploadUseLocalWhisper: "true",
+    uploadLocalTranscriptionProvider: "whisperx",
+    whisperxModel: "large-v3-turbo",
+    // Dictation cleanup: fast, private local GGUF.
+    useCleanupModel: "true",
+    cleanupMode: "local",
+    cleanupProvider: "qwen",
+    cleanupModel: "qwen3.5-2b-q4_k_m",
+    // Note formatting + dictation agent: Claude CLI (subscription). Empty model
+    // → the CLI's account default. Mode "local" keeps it off the cloud path;
+    // the provider id routes to the CLI bridge.
+    noteFormattingMode: "local",
+    noteFormattingProvider: "claude-cli",
+    noteFormattingModel: "",
+    dictationAgentMode: "local",
+    dictationAgentProvider: "claude-cli",
+    dictationAgentModel: "",
+    // Chat agent stays on the local GGUF so its note-search tools keep working.
+    chatAgentMode: "local",
+    chatAgentProvider: "qwen",
+    chatAgentModel: "qwen3.5-2b-q4_k_m",
+    // Skip onboarding — everything is pre-configured — and mark auth as
+    // skipped so AppRouter doesn't show a re-auth prompt (no cloud account).
+    onboardingCompleted: "true",
+    authenticationSkipped: "true",
+  };
+  for (const [key, value] of Object.entries(seed)) {
+    localStorage.setItem(key, value);
+  }
+  localStorage.setItem("localOnlyDefaultsSeeded", LOCAL_ONLY_SEED_VERSION);
+}
+// NB: invoked after ALL migrations below (they would otherwise clobber the
+// seeded scope/upload keys); see the seedLocalOnlyDefaults() call further down.
+
 // One-time seed of the dedicated audio-upload transcription settings. Runs
 // after migrateProviderSettings() so the `transcriptionMode` it derives and
 // persists is available to copy. Before this context existed the upload page
@@ -395,6 +451,9 @@ function migrateLLMScopeKeys() {
 }
 
 migrateLLMScopeKeys();
+
+// Runs last so no migration above can overwrite the seeded local-only config.
+seedLocalOnlyDefaults();
 
 export interface SettingsState
   extends
@@ -567,10 +626,12 @@ export interface SettingsState
   setNoteFormattingDisableThinking: (value: boolean) => void;
   setChatAgentDisableThinking: (value: boolean) => void;
 
+  whisperxModel: WhisperXModel;
   setUseLocalWhisper: (value: boolean) => void;
   setWhisperModel: (value: string) => void;
   setLocalTranscriptionProvider: (value: LocalTranscriptionProvider) => void;
   setParakeetModel: (value: string) => void;
+  setWhisperxModel: (value: WhisperXModel) => void;
   setAllowOpenAIFallback: (value: boolean) => void;
   setAllowLocalFallback: (value: boolean) => void;
   setFallbackWhisperModel: (value: string) => void;
@@ -902,12 +963,16 @@ export const MAX_TRANSLATION_TARGETS = 5;
 
 export const useSettingsStore = create<SettingsState>()((set, get) => ({
   uiLanguage: normalizeUiLanguage(isBrowser ? localStorage.getItem("uiLanguage") : null),
-  useLocalWhisper: readBoolean("useLocalWhisper", false),
+  useLocalWhisper: LOCAL_ONLY_MODE ? true : readBoolean("useLocalWhisper", true),
   whisperModel: readString("whisperModel", "base"),
-  localTranscriptionProvider: (readString("localTranscriptionProvider", "whisper") === "nvidia"
-    ? "nvidia"
-    : "whisper") as LocalTranscriptionProvider,
+  localTranscriptionProvider: ((): LocalTranscriptionProvider => {
+    const v = readString("localTranscriptionProvider", "whisper");
+    return v === "nvidia" || v === "whisperx" ? v : "whisper";
+  })(),
   parakeetModel: readString("parakeetModel", ""),
+  whisperxModel: (readString("whisperxModel", "large-v3-turbo") === "large-v3"
+    ? "large-v3"
+    : "large-v3-turbo") as WhisperXModel,
   allowOpenAIFallback: readBoolean("allowOpenAIFallback", false),
   allowLocalFallback: readBoolean("allowLocalFallback", false),
   fallbackWhisperModel: readString("fallbackWhisperModel", "base"),
@@ -1096,10 +1161,10 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
   })(),
   meetingUseLocalWhisper: readBoolean("meetingUseLocalWhisper", false),
   meetingWhisperModel: readString("meetingWhisperModel", ""),
-  meetingLocalTranscriptionProvider: (readString("meetingLocalTranscriptionProvider", "whisper") ===
-  "nvidia"
-    ? "nvidia"
-    : "whisper") as LocalTranscriptionProvider,
+  meetingLocalTranscriptionProvider: ((): LocalTranscriptionProvider => {
+    const v = readString("meetingLocalTranscriptionProvider", "whisper");
+    return v === "nvidia" || v === "whisperx" ? v : "whisper";
+  })(),
   meetingParakeetModel: readString("meetingParakeetModel", ""),
   meetingCloudTranscriptionProvider: readString("meetingCloudTranscriptionProvider", ""),
   meetingCloudTranscriptionModel: readString("meetingCloudTranscriptionModel", ""),
@@ -1322,6 +1387,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
     set({ localTranscriptionProvider: value });
   },
   setParakeetModel: createStringSetter("parakeetModel"),
+  setWhisperxModel: createStringSetter("whisperxModel") as (value: WhisperXModel) => void,
   setAllowOpenAIFallback: createBooleanSetter("allowOpenAIFallback"),
   setAllowLocalFallback: createBooleanSetter("allowLocalFallback"),
   setFallbackWhisperModel: createStringSetter("fallbackWhisperModel"),
@@ -1393,7 +1459,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
     const normalized = normalizeUiLanguage(language);
     if (isBrowser) localStorage.setItem("uiLanguage", normalized);
     set({ uiLanguage: normalized });
-    void i18n.changeLanguage(normalized);
+    void ensureLocaleResources(normalized).then((resolved) => i18n.changeLanguage(resolved));
     if (isBrowser && window.electronAPI?.setUiLanguage) {
       window.electronAPI.setUiLanguage(normalized).catch((err) => {
         logger.warn(
@@ -2019,6 +2085,14 @@ export interface ResolvedLLMConfig {
   disableThinking: boolean;
 }
 
+// In local-only builds, any cloud inference mode resolves to bundled local
+// inference. Keeps stale localStorage (mode: "openwhispr"/"providers"/
+// "enterprise") from routing to the cloud once the cloud UI is hidden.
+const LOCAL_ONLY_CLOUD_MODES = new Set<InferenceMode>(["openwhispr", "providers", "enterprise"]);
+function coerceLocalOnlyMode(mode: InferenceMode): InferenceMode {
+  return LOCAL_ONLY_MODE && LOCAL_ONLY_CLOUD_MODES.has(mode) ? "local" : mode;
+}
+
 export const selectResolvedLLMConfig = (
   state: SettingsState,
   scope: InferenceScope
@@ -2039,7 +2113,7 @@ export const selectResolvedLLMConfig = (
 
   return {
     scope,
-    mode: state[def.storeKeys.mode] as InferenceMode,
+    mode: coerceLocalOnlyMode(state[def.storeKeys.mode] as InferenceMode),
     provider: read("provider") || fallback?.provider || "",
     model: read("model") || fallback?.model || "",
     cloudMode: read("cloudMode") || fallback?.cloudMode,
@@ -2307,6 +2381,7 @@ export async function initializeSettings(): Promise<void> {
         if (isBrowser) localStorage.setItem("uiLanguage", resolved);
         useSettingsStore.setState({ uiLanguage: resolved });
       }
+      await ensureLocaleResources(resolved);
       await i18n.changeLanguage(resolved);
     } catch (err) {
       logger.warn(
@@ -2314,7 +2389,8 @@ export async function initializeSettings(): Promise<void> {
         { error: (err as Error).message },
         "settings"
       );
-      void i18n.changeLanguage(normalizeUiLanguage(state.uiLanguage));
+      const resolved = normalizeUiLanguage(state.uiLanguage);
+      void ensureLocaleResources(resolved).then((language) => i18n.changeLanguage(language));
     }
 
     const migratedLang = isBrowser ? localStorage.getItem("preferredLanguage") : null;
@@ -2496,7 +2572,7 @@ export async function initializeSettings(): Promise<void> {
     }
 
     if (key === "uiLanguage" && typeof value === "string") {
-      void i18n.changeLanguage(value);
+      void ensureLocaleResources(value).then((language) => i18n.changeLanguage(language));
     }
   });
 

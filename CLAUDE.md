@@ -125,6 +125,8 @@ OpenWhispr is an Electron-based desktop dictation application that uses whisper.
 - **windowManager.js**: Window creation and lifecycle management
 - **cliBridge.js**: Loopback HTTP server on ports 8200–8219, bearer-token auth (token at `~/.openwhispr/cli-bridge.json`), 127.0.0.1-only. Used by the unified CLI to talk to a running desktop app.
 - **postMigrationDetector.js**: Detects users returning from the pre-Gizmo bundle ID via a `.bundle-migrated` sentinel in userData; consumed by `ipcHandlers.js` to drive the `PostMigrationOnboarding` modal
+- **whisperx/** (fork feature): WhisperX reliable-notes pipeline — `whisperxMain.js` (orchestration, ffmpeg normalization, source playback), `recordingJobManager.js`, `jobStateMachine.js`, `recordingJobsRepo.js`, `contracts.js`, `noteChunker.js`, `noteCompiler.js`. See §18
+- **cliInference.js** (fork feature): main-process bridge that runs the local `claude`/`codex` CLI as a reasoning backend (subscription auth). See §20
 
 ### React Components (src/components/)
 
@@ -154,7 +156,7 @@ OpenWhispr is an Electron-based desktop dictation application that uses whisper.
 
 - **ReasoningService.ts**: AI processing for agent-addressed commands
   - Detects when user addresses their named agent and removes the agent name from final output
-  - Provider implementations live in a registry at `src/services/ai/inferenceProviders/index.ts` covering 8 providers (`anthropic`, `enterprise`, `gemini`, `groq`, `lan`, `local`, `openai`, `openwhispr`), each implementing the `InferenceProvider` interface from `types.ts`
+  - Provider implementations live in a registry at `src/services/ai/inferenceProviders/index.ts`: 8 upstream providers (`anthropic`, `enterprise`, `gemini`, `groq`, `lan`, `local`, `openai`, `openwhispr`) plus the fork's 2 CLI providers (`claude-cli`, `codex-cli` — see §20), each implementing the `InferenceProvider` interface from `types.ts`
   - Per-scope LLM config: 4 scopes (`dictationCleanup`, `dictationAgent`, `noteFormatting`, `chatIntelligence`) defined in `src/config/inferenceScopes.ts`
   - `selectResolvedLLMConfig(state, scope)` in `settingsStore.ts` resolves provider/model per scope with fallback chains
 
@@ -618,6 +620,99 @@ A dedicated global hotkey that starts a dictation whose transcript is sent strai
 
 **Tests**: `test/helpers/dictationRouting.test.js` (run with `node --test`)
 
+### 18. WhisperX Accurate Recordings & Reliable Notes (fork feature)
+
+Local-first pipeline that turns an uploaded/existing recording into a
+timestamped, word-aligned transcript and evidence-grounded Markdown notes.
+Complements live hotkey dictation (whisper.cpp / Parakeet) — never replaces it.
+Full spec: `docs/whisperx-reliable-notes.md`.
+
+- **Runtime**: managed Python 3.12 venv via `uv` (pinned by
+  `tools/whisperx-sidecar/uv.lock`), provisioned by `scripts/setup-whisperx.js`
+  and verified by `scripts/doctor-whisperx.js`. WhisperX 3.8.x + faster-whisper
+  `large-v3-turbo`/`large-v3`, CUDA float16 by default (explicit CPU mode
+  available). Provisioned runtime runs offline (`HF_HUB_OFFLINE=1`).
+- **Main-process orchestration** (`src/helpers/whisperx/`): `whisperxMain.js`
+  (job lifecycle, readiness/probe, ffmpeg normalization, source-audio
+  playback), `recordingJobManager.js` / `jobStateMachine.js` /
+  `recordingJobsRepo.js` (cancellable, retryable jobs that survive restarts),
+  `contracts.js` (structural validation), `noteChunker.js` / `noteCompiler.js`
+  (evidence-grounded note extraction + deterministic merge/render).
+- **Reliable notes**: a schema-constrained LLM extraction where every
+  substantive claim must cite transcript segment IDs; claims without valid
+  evidence are dropped, never rendered. The note LLM is pluggable — a local
+  GGUF model (llama.cpp) OR the Claude/Codex CLI bridge (see §20).
+- **Uploads**: the WhisperX upload provider (`uploadLocalTranscriptionProvider=whisperx`)
+  accepts audio and MP4 video (see §21). The original recording is never
+  copied/modified/deleted; managed artifacts live under
+  `<userData>/recording-jobs/<job-id>/`.
+- **UI**: `src/components/notes/*` (UploadAudioView, RecordingJob*,
+  RecordingAudioPlayer, WhisperXUploadOptions). Store: `recordingJobsStore.ts`.
+- **Tests**: `tests/whisperx/*` (contracts/orchestration/notes) plus
+  `tools/whisperx-sidecar` `uv run pytest`.
+
+### 19. Local-Only Build Mode (`VITE_LOCAL_ONLY`) (fork feature)
+
+Build-time flag (`src/lib/features.ts` → `LOCAL_ONLY_MODE`, baked by Vite from
+the repo-root `.env`) that produces a fully offline, no-account build. When on:
+
+- **All cloud surfaces hidden**: sign-in/account (`src/lib/auth.ts` forces
+  `AUTH_URL=""` and returns `authClient = null` so better-auth never
+  constructs — an empty baseURL would throw and white-screen the renderer),
+  Account/Plans in `SettingsModal`, the upgrade banner in `ControlPanelSidebar`,
+  the onboarding welcome/auth step, cloud transcription (`useLocalWhisper`
+  forced true), and cloud reasoning modes (`InferenceConfigEditor` filtered to
+  local/self-hosted).
+- **Fail-closed backstop**: `ReasoningService.assertLocalOnlyProviderAllowed`
+  throws on any cloud provider across `processText` + streaming paths
+  (`LOCAL_ONLY_ALLOWED_PROVIDERS = {local, lan, claude-cli, codex-cli}`);
+  `settingsStore.coerceLocalOnlyMode` coerces stale cloud modes → local.
+- **Auto-seeder**: `settingsStore.seedLocalOnlyDefaults` (versioned marker,
+  runs after all migrations before store `create()`) writes a ready-to-use
+  local config once — live dictation Whisper `turbo`, WhisperX uploads
+  (`large-v3-turbo`), local Qwen cleanup + chat agent, Claude-CLI note
+  formatting + dictation agent, `onboardingCompleted=true`. Touches only
+  localStorage, never secrets. Bump the seed-version const to re-seed.
+- Verify: with the flag ON, `auth.openwhispr.com` is dead-code-eliminated from
+  `src/dist/assets`. Contract tests: `tests/contracts/local-first-defaults.test.cjs`.
+
+### 20. Claude/Codex CLI Inference Bridge (fork feature)
+
+Runs the user's local `claude`/`codex` CLI (subscription auth) as a reasoning
+backend. On-device but calls the vendor cloud → an intentional, opt-in
+exception to local-only (allow-listed in §19).
+
+- `src/helpers/cliInference.js` — main-process spawn: static argv only, ALL
+  untrusted text via stdin (the system prompt is prepended to stdin, not passed
+  as an arg), `shell:true` on Windows to launch `.cmd`/`.exe`, `taskkill /T` on
+  timeout. The CLI model is never forwarded — always the account default.
+- `src/services/ai/inferenceProviders/cliProvider.ts` — `claude-cli` /
+  `codex-cli` providers (registered in `index.ts`).
+- IPC `cli-inference` / `cli-inference-available` (preload +
+  `src/types/electron.ts`); `src/hooks/useCliNoteReady.ts` preflight gates the
+  note UI. WhisperX notes: `whisperxMain._cliLlm` / `_validateNoteLlmConfig`
+  accept the CLI providers and skip the GPU lease.
+
+### 21. MP4 / Video Upload
+
+The notes Upload screen accepts `.mp4`/`.m4v` alongside audio. No dedicated
+conversion step is needed: every transcription path already routes input
+through ffmpeg (`ffmpegUtils.convertToWav` for whisper.cpp/Parakeet/diarization;
+the WhisperX worker's own decode), which extracts the audio track from the
+container and discards video. Gating lives in the UI/dialog only:
+
+- `src/components/notes/UploadAudioView.tsx`: `ACCEPTED_UPLOAD_EXTENSIONS`
+  (= audio + `SUPPORTED_VIDEO_EXTENSIONS = ["mp4","m4v"]`) drives both drop
+  zones and the `accept` attribute.
+- `ipcHandlers.js`: the `select-audio-file` dialog filter; `AUDIO_MIME_TYPES`
+  maps `mp4`/`m4v` → `audio/mp4` for the correct BYOK multipart content-type.
+- `whisperx/whisperxMain.js`: `readSourceAudio` serves mp4 as `audio/mp4` so the
+  review player's `<audio>` element decodes the AAC track.
+
+Scoped to the MP4 family — the one video container cloud providers accept and
+Chromium's `<audio>` can decode. Other containers would transcribe but break
+BYOK transcription and playback, so they're excluded.
+
 ## Development Guidelines
 
 ### Internationalization (i18n) — REQUIRED
@@ -675,6 +770,10 @@ const { t } = useTranslation();
 - [ ] Create a note about "quarterly revenue projections", search via agent for "financial forecast" — should match semantically
 - [ ] Verify Qdrant starts on app launch (check debug logs for "qdrant started successfully")
 - [ ] Kill Qdrant process manually — verify FTS5 keyword search still works as fallback
+- [ ] (WhisperX §18) Upload a recording, confirm a job runs to a timestamped transcript and evidence-grounded notes; cancel/retry a job; restart mid-job and confirm it doesn't show complete
+- [ ] (MP4 §21) Drop an `.mp4` into the Upload screen — confirm it transcribes like audio and the review player plays the audio track
+- [ ] (Local-only §19) Build with `VITE_LOCAL_ONLY=1` — no sign-in/account/cloud surfaces render, no white screen, and the seeder applies local models on first launch
+- [ ] (CLI bridge §20) With `claude`/`codex` on PATH, confirm note formatting / dictation agent route through the CLI provider (account default model)
 
 ### Common Issues and Solutions
 
@@ -809,5 +908,6 @@ const { t } = useTranslation();
 - Custom wake word detection
 - ~~Multi-language UI~~ (implemented — 9 languages via react-i18next)
 - Cloud model selection
-- Batch transcription
+- ~~Batch transcription~~ (implemented — batch upload queue + WhisperX jobs, §18)
+- ~~Reliable notes from recordings~~ (implemented — WhisperX reliable-notes, §18)
 - Export formats beyond clipboard

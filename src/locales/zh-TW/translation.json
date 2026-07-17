@@ -2142,7 +2142,7 @@
       "title": "上傳音訊",
       "using": "使用 {{model}}",
       "dropOrBrowse": "拖放音訊檔案或點擊瀏覽",
-      "supportedFormats": "MP3、WAV、M4A、WebM、OGG、FLAC、AAC",
+      "supportedFormats": "MP3、WAV、M4A、MP4、WebM、OGG、FLAC、AAC",
       "dropToUpload": "拖放以上傳",
       "transcribe": "轉錄",
       "cancel": "取消",
@@ -2930,6 +2930,243 @@
     "speaker": {
       "you": "你",
       "others": "其他人"
+    }
+  },
+  "whisperx": {
+    "diarization": {
+      "title": "說話者分離（Hugging Face 權杖）",
+      "configured": "權杖已設定",
+      "hint": "說話者標籤使用 pyannote community-1，需在接受模型條款後建立免費的 Hugging Face 唯讀權杖。沒有它也能正常轉錄。",
+      "placeholder": "hf_... 唯讀權杖",
+      "save": "儲存權杖",
+      "remove": "移除權杖"
+    },
+    "provider": {
+      "name": "WhisperX",
+      "tab": "WhisperX",
+      "description": "高精確度本機轉錄，支援逐字時間戳記與講者標記。"
+    },
+    "readiness": {
+      "title": "WhisperX 狀態",
+      "recheck": "重新檢查",
+      "runtime": "執行環境",
+      "cuda": "CUDA",
+      "cpuOnly": "僅 CPU",
+      "models": "模型",
+      "token": "HF 權杖",
+      "setupHint": "WhisperX 執行環境尚未安裝。請先設定才能進行本機轉錄。",
+      "setUp": "設定 WhisperX",
+      "settingUp": "設定中…",
+      "unavailable": "此版本中 WhisperX 無法使用。"
+    },
+    "upload": {
+      "title": "使用 WhisperX 轉錄",
+      "dropOrBrowse": "拖曳音訊檔案，或點擊瀏覽",
+      "removeFile": "移除檔案",
+      "transcribe": "轉錄",
+      "transcribeCount": "轉錄 {{count}} 個檔案",
+      "submitting": "排入佇列中…",
+      "profile": "設定檔",
+      "language": "語言",
+      "languages": {
+        "auto": "自動偵測",
+        "en": "英文",
+        "es": "西班牙文"
+      },
+      "diarization": "講者分離",
+      "diarizationHint": "識別並標記說話者。",
+      "model": "模型",
+      "models": {
+        "large-v3-turbo": {
+          "name": "Large v3 Turbo",
+          "size": "約 1.6 GB"
+        },
+        "large-v3": {
+          "name": "Large v3",
+          "size": "約 3 GB"
+        }
+      },
+      "computeType": "運算類型",
+      "computeTypes": {
+        "float16": "float16（GPU）",
+        "int8": "int8（低記憶體）"
+      },
+      "batchSize": "批次大小",
+      "advanced": "進階",
+      "speakers": {
+        "label": "講者人數",
+        "auto": "自動",
+        "exact": "精確",
+        "range": "範圍",
+        "exactLabel": "講者",
+        "min": "最小值",
+        "max": "最大值",
+        "rangeError": "講者人數必須介於 1 到 32 之間。",
+        "minMaxError": "最小值不能大於最大值。"
+      },
+      "downloadModelsTitle": "下載 WhisperX 模型？",
+      "downloadModelsDescription": "所需的模型尚未下載。轉錄開始前將立即下載（約 1.6–3 GB）。",
+      "downloadModelsConfirm": "下載並繼續"
+    },
+    "profiles": {
+      "memo": {
+        "name": "備忘錄",
+        "description": "適合快速語音筆記的單一講者快速轉錄。"
+      },
+      "meeting": {
+        "name": "會議",
+        "description": "適合會議的多講者分離轉錄。"
+      },
+      "critical-interview": {
+        "name": "重要訪談",
+        "description": "為不容有失的訪談提供對齊與講者分離的最高精確度。"
+      }
+    },
+    "progress": {
+      "sessionJobs": "本次工作階段",
+      "cancel": "取消",
+      "retry": "重試",
+      "estimated": "預估",
+      "countOfTotal": "{{completed}} / {{total}} {{unit}}",
+      "unit": {
+        "seconds": "秒",
+        "segments": "個片段",
+        "percent": "百分比",
+        "files": "個檔案"
+      }
+    },
+    "status": {
+      "created": "已建立",
+      "queued": "排隊中",
+      "validating": "驗證中",
+      "preparing": "準備中",
+      "transcribing": "轉錄中",
+      "aligning": "對齊中",
+      "diarizing": "正在識別講者",
+      "canonicalizing": "正在完成轉錄",
+      "persisting": "儲存中",
+      "transcript_complete": "轉錄已完成",
+      "note_extracting": "正在擷取筆記",
+      "note_validating": "正在驗證筆記",
+      "note_rendering": "正在產生筆記",
+      "complete": "已完成",
+      "cancelled": "已取消",
+      "failed": "失敗",
+      "interrupted": "已中斷",
+      "transcript_complete_note_failed": "轉錄已完成，筆記產生失敗"
+    },
+    "stages": {
+      "starting": "啟動中",
+      "probing-audio": "正在分析音訊",
+      "normalizing-audio": "正在正規化音訊",
+      "loading-asr": "正在載入轉錄模型",
+      "transcribing": "轉錄中",
+      "unloading-asr": "正在卸載轉錄模型",
+      "loading-alignment": "正在載入對齊模型",
+      "aligning": "正在對齊文字",
+      "unloading-alignment": "正在卸載對齊模型",
+      "loading-diarization": "正在載入講者分離模型",
+      "diarizing": "正在識別講者",
+      "unloading-diarization": "正在卸載講者分離模型",
+      "canonicalizing": "正在完成轉錄",
+      "writing-artifacts": "正在寫入檔案",
+      "complete": "已完成"
+    },
+    "warnings": {
+      "OOM_FALLBACK_USED": "GPU 記憶體不足 — 已改用較慢的備援方案。",
+      "DIARIZATION_UNAVAILABLE": "講者分離無法使用，已略過。",
+      "ALIGNMENT_PARTIAL": "文字對齊僅部分完成。",
+      "CPU_FALLBACK_USED": "沒有可用的 GPU — 已改用 CPU 執行（較慢）。"
+    },
+    "errors": {
+      "RUNTIME_NOT_INSTALLED": "WhisperX 執行環境尚未安裝。",
+      "CUDA_UNAVAILABLE": "找不到相容的 NVIDIA GPU / CUDA。",
+      "CUDA_OUT_OF_MEMORY": "GPU 記憶體不足。請嘗試較小的批次大小或 int8。",
+      "HF_TOKEN_REQUIRED": "講者分離需要 Hugging Face 權杖。",
+      "AUDIO_UNREADABLE": "無法讀取音訊檔案。",
+      "AUDIO_UNSUPPORTED_FORMAT": "不支援此音訊格式。",
+      "AUDIO_TOO_LONG": "音訊檔案過長，無法處理。",
+      "AUDIO_NO_SPEECH": "音訊中未偵測到語音。",
+      "AUDIO_CORRUPT": "此音訊檔案似乎已損毀。",
+      "DISK_SPACE_INSUFFICIENT": "磁碟空間不足，無法完成工作。",
+      "WORKER_CRASHED": "轉錄工作處理程序已當機。",
+      "WORKER_TIMEOUT": "轉錄工作處理程序逾時。",
+      "WORKER_UNAVAILABLE": "轉錄工作處理程序無法使用。",
+      "JOB_CANCELLED": "工作已取消。",
+      "generic": "轉錄失敗（{{code}}）。",
+      "unknown": "發生未知錯誤。"
+    },
+    "review": {
+      "recordings": "錄音",
+      "empty": "目前尚無錄音。",
+      "storageUsed": "受管理檔案已使用 {{size}}",
+      "open": "開啟",
+      "retry": "重試",
+      "delete": "刪除",
+      "cancel": "取消",
+      "deleteTitle": "要刪除這則錄音嗎？",
+      "deleteDescription": "這會永久刪除此錄音的轉錄內容、講者姓名、編輯紀錄，以及所有已產生的筆記與匯出檔案。原始錄音檔案會保留 — 它會原封不動地留在你的電腦上。",
+      "deleteConfirm": "刪除",
+      "back": "返回錄音列表",
+      "loadMore": "載入更多",
+      "loadMoreError": "無法載入更多轉錄內容。",
+      "loadingTranscript": "正在載入轉錄內容…",
+      "noTranscript": "此錄音沒有可用的轉錄內容。",
+      "segmentCount": "已顯示 {{total}} 個片段中的 {{loaded}} 個",
+      "audioUnavailable": "無法預覽音訊",
+      "audioPlayerAria": "錄音音訊播放器",
+      "unknownSpeaker": "未知講者",
+      "provenance": {
+        "summary": "{{model}} · {{language}}",
+        "modelUnknown": "未知模型",
+        "languageUnknown": "未知語言"
+      },
+      "speakers": "講者",
+      "speakerNamePlaceholder": "顯示名稱",
+      "speakerNameAria": "{{speaker}} 的顯示名稱",
+      "speakerMappingNote": "重新命名只會變更此處顯示的標籤 — 轉錄文字本身永遠不會被修改。",
+      "speakerSaveError": "無法儲存講者姓名。",
+      "edit": "編輯",
+      "save": "儲存",
+      "edited": "已編輯",
+      "originalLabel": "原始內容：{{text}}",
+      "editPlaceholder": "編輯轉錄文字",
+      "saveRevisionError": "無法儲存你的編輯內容。",
+      "exports": "匯出",
+      "export": {
+        "raw": "文字 (.txt)",
+        "speaker": "講者 (.md)",
+        "srt": "字幕 (.srt)",
+        "vtt": "字幕 (.vtt)"
+      },
+      "exportError": "無法匯出檔案。",
+      "flags": {
+        "unaligned": "未對齊",
+        "partial-alignment": "部分對齊",
+        "possible-overlap": "可能重疊",
+        "possible-hallucination": "可能出現幻覺",
+        "low-confidence": "信心度低",
+        "manual-review": "需要審核"
+      }
+    },
+    "notes": {
+      "tab": {
+        "transcript": "轉錄",
+        "notes": "筆記"
+      },
+      "generate": "產生筆記",
+      "regenerate": "重新產生筆記",
+      "generating": "正在產生筆記…",
+      "strict": "嚴格模式",
+      "strictHint": "捨棄任何無法依轉錄內容驗證證據的項目。",
+      "noLocalModel": "請在設定中選擇本機筆記模型以產生筆記。",
+      "noneYet": "目前尚無筆記。從轉錄內容產生筆記即可開始。",
+      "failed": "筆記產生失敗。",
+      "retry": "重試",
+      "droppedSummary": "已捨棄 {{dropped}} 項，{{issues}} 個驗證問題",
+      "reviewLegend": "標記為「需要審核」的項目未能完全依轉錄內容驗證。",
+      "notesModelInfo": "筆記：使用 {{model}} 產生",
+      "notesModelNone": "筆記：未設定本機模型 — 僅提供轉錄內容"
     }
   },
   "workspaces": {

@@ -2195,7 +2195,7 @@
       "title": "Subir audio",
       "using": "Usando {{model}}",
       "dropOrBrowse": "Arrastra un archivo de audio o haz clic para explorar",
-      "supportedFormats": "MP3, WAV, M4A, WebM, OGG, FLAC, AAC",
+      "supportedFormats": "MP3, WAV, M4A, MP4, WebM, OGG, FLAC, AAC",
       "dropToUpload": "Suelta para subir",
       "transcribe": "Transcribir",
       "cancel": "Cancelar",
@@ -2983,6 +2983,244 @@
       "successTitle": "Te uniste",
       "successDescription": "Bienvenido a {{name}}.",
       "errorTitle": "No se pudo aceptar la invitación"
+    }
+  },
+  "whisperx": {
+    "diarization": {
+      "title": "Diarización de hablantes (token de Hugging Face)",
+      "configured": "Token configurado",
+      "hint": "Las etiquetas de hablantes usan pyannote community-1, que requiere un token gratuito de solo lectura de Hugging Face tras aceptar los términos del modelo. La transcripción funciona sin él.",
+      "placeholder": "Token de solo lectura hf_...",
+      "save": "Guardar token",
+      "remove": "Eliminar token"
+    },
+    "provider": {
+      "name": "WhisperX",
+      "tab": "WhisperX",
+      "description": "Transcripción local de alta precisión con marcas de tiempo por palabra y etiquetas de hablante."
+    },
+    "readiness": {
+      "title": "Estado de WhisperX",
+      "recheck": "Volver a verificar",
+      "runtime": "Entorno",
+      "cuda": "CUDA",
+      "cpuOnly": "Solo CPU",
+      "models": "Modelos",
+      "token": "Token de HF",
+      "setupHint": "El entorno de WhisperX aún no está instalado. Configúralo para transcribir localmente.",
+      "setUp": "Configurar WhisperX",
+      "settingUp": "Configurando…",
+      "unavailable": "WhisperX no está disponible en esta versión."
+    },
+    "upload": {
+      "title": "Transcribir con WhisperX",
+      "dropOrBrowse": "Arrastra archivos de audio o haz clic para buscar",
+      "removeFile": "Quitar archivo",
+      "transcribe": "Transcribir",
+      "transcribeCount": "Transcribir {{count}} archivos",
+      "submitting": "Encolando…",
+      "profile": "Perfil",
+      "language": "Idioma",
+      "languages": {
+        "auto": "Detección automática",
+        "en": "Inglés",
+        "es": "Español"
+      },
+      "diarization": "Diarización de hablantes",
+      "diarizationHint": "Identifica y etiqueta quién habla.",
+      "model": "Modelo",
+      "models": {
+        "large-v3-turbo": {
+          "name": "Large v3 Turbo",
+          "size": "~1.6 GB"
+        },
+        "large-v3": {
+          "name": "Large v3",
+          "size": "~3 GB"
+        }
+      },
+      "computeType": "Tipo de cómputo",
+      "computeTypes": {
+        "float16": "float16 (GPU)",
+        "int8": "int8 (poca memoria)"
+      },
+      "batchSize": "Tamaño de lote",
+      "advanced": "Avanzado",
+      "speakers": {
+        "label": "Cantidad de hablantes",
+        "auto": "Automático",
+        "exact": "Exacto",
+        "range": "Rango",
+        "exactLabel": "Hablantes",
+        "min": "Mín.",
+        "max": "Máx.",
+        "rangeError": "La cantidad de hablantes debe estar entre 1 y 32.",
+        "minMaxError": "El mínimo no puede ser mayor que el máximo."
+      },
+      "downloadModelsTitle": "¿Descargar los modelos de WhisperX?",
+      "downloadModelsDescription": "Los modelos necesarios aún no están descargados. Se descargarán ahora (~1.6–3 GB) antes de comenzar la transcripción.",
+      "downloadModelsConfirm": "Descargar y continuar"
+    },
+    "profiles": {
+      "memo": {
+        "name": "Nota de voz",
+        "description": "Transcripción rápida de un solo hablante para notas de voz."
+      },
+      "meeting": {
+        "name": "Reunión",
+        "description": "Transcripción de varios hablantes con diarización para reuniones."
+      },
+      "critical-interview": {
+        "name": "Entrevista crítica",
+        "description": "Máxima precisión con alineación y diarización para entrevistas que no puedes fallar."
+      }
+    },
+    "progress": {
+      "sessionJobs": "Esta sesión",
+      "cancel": "Cancelar",
+      "retry": "Reintentar",
+      "estimated": "estimado",
+      "countOfTotal": "{{completed}} de {{total}} {{unit}}",
+      "unit": {
+        "seconds": "segundos",
+        "segments": "segmentos",
+        "percent": "por ciento",
+        "files": "archivos"
+      }
+    },
+    "status": {
+      "created": "Creado",
+      "queued": "En cola",
+      "validating": "Validando",
+      "preparing": "Preparando",
+      "transcribing": "Transcribiendo",
+      "aligning": "Alineando",
+      "diarizing": "Identificando hablantes",
+      "canonicalizing": "Finalizando transcripción",
+      "persisting": "Guardando",
+      "transcript_complete": "Transcripción lista",
+      "note_extracting": "Extrayendo notas",
+      "note_validating": "Validando notas",
+      "note_rendering": "Generando notas",
+      "complete": "Completado",
+      "cancelled": "Cancelado",
+      "failed": "Falló",
+      "interrupted": "Interrumpido",
+      "transcript_complete_note_failed": "Transcripción lista, fallaron las notas"
+    },
+    "stages": {
+      "starting": "Iniciando",
+      "probing-audio": "Analizando audio",
+      "normalizing-audio": "Normalizando audio",
+      "loading-asr": "Cargando modelo de transcripción",
+      "transcribing": "Transcribiendo",
+      "unloading-asr": "Descargando modelo de transcripción",
+      "loading-alignment": "Cargando modelo de alineación",
+      "aligning": "Alineando palabras",
+      "unloading-alignment": "Descargando modelo de alineación",
+      "loading-diarization": "Cargando modelo de diarización",
+      "diarizing": "Identificando hablantes",
+      "unloading-diarization": "Descargando modelo de diarización",
+      "canonicalizing": "Finalizando transcripción",
+      "writing-artifacts": "Escribiendo archivos",
+      "complete": "Completado"
+    },
+    "warnings": {
+      "OOM_FALLBACK_USED": "Poca memoria de GPU — se usó una alternativa más lenta.",
+      "DIARIZATION_UNAVAILABLE": "La diarización de hablantes no estuvo disponible y se omitió.",
+      "ALIGNMENT_PARTIAL": "La alineación de palabras se completó solo parcialmente.",
+      "CPU_FALLBACK_USED": "Sin GPU disponible — se ejecutó en CPU (más lento)."
+    },
+    "errors": {
+      "RUNTIME_NOT_INSTALLED": "El entorno de WhisperX no está instalado.",
+      "CUDA_UNAVAILABLE": "No se encontró una GPU NVIDIA / CUDA compatible.",
+      "CUDA_OUT_OF_MEMORY": "La GPU se quedó sin memoria. Prueba un tamaño de lote menor o int8.",
+      "HF_TOKEN_REQUIRED": "Se requiere un token de Hugging Face para la diarización de hablantes.",
+      "AUDIO_UNREADABLE": "No se pudo leer el archivo de audio.",
+      "AUDIO_UNSUPPORTED_FORMAT": "Este formato de audio no es compatible.",
+      "AUDIO_TOO_LONG": "El archivo de audio es demasiado largo para procesarlo.",
+      "AUDIO_NO_SPEECH": "No se detectó voz en el audio.",
+      "AUDIO_CORRUPT": "El archivo de audio parece estar dañado.",
+      "DISK_SPACE_INSUFFICIENT": "No hay suficiente espacio en disco para completar el trabajo.",
+      "WORKER_CRASHED": "El proceso de transcripción se cerró inesperadamente.",
+      "WORKER_TIMEOUT": "El proceso de transcripción agotó el tiempo de espera.",
+      "WORKER_UNAVAILABLE": "El proceso de transcripción no está disponible.",
+      "JOB_CANCELLED": "El trabajo fue cancelado.",
+      "generic": "La transcripción falló ({{code}}).",
+      "unknown": "Ocurrió un error desconocido."
+    },
+    "review": {
+      "recordings": "Grabaciones",
+      "empty": "Todavía no hay grabaciones.",
+      "storageUsed": "{{size}} usados por archivos gestionados",
+      "open": "Abrir",
+      "retry": "Reintentar",
+      "delete": "Eliminar",
+      "cancel": "Cancelar",
+      "deleteTitle": "¿Eliminar esta grabación?",
+      "deleteDescription": "Esto elimina de forma permanente la transcripción, los nombres de los hablantes, las ediciones y cualquier nota o exportación generada para esta grabación. Tu archivo de grabación original se conserva: queda exactamente donde está en tu computadora.",
+      "deleteConfirm": "Eliminar",
+      "back": "Volver a las grabaciones",
+      "loadMore": "Cargar más",
+      "loadMoreError": "No se pudo cargar el resto de la transcripción.",
+      "loadingTranscript": "Cargando transcripción…",
+      "noTranscript": "No hay una transcripción disponible para esta grabación.",
+      "segmentCount": "Mostrando {{loaded}} de {{total}} segmentos",
+      "audioUnavailable": "Vista previa de audio no disponible",
+      "audioPlayerAria": "Reproductor de audio de la grabación",
+      "unknownSpeaker": "Hablante desconocido",
+      "provenance": {
+        "summary": "{{model}} · {{language}}",
+        "modelUnknown": "Modelo desconocido",
+        "languageUnknown": "Idioma desconocido"
+      },
+      "speakers": "Hablantes",
+      "speakerNamePlaceholder": "Nombre para mostrar",
+      "speakerNameAria": "Nombre para mostrar de {{speaker}}",
+      "speakerMappingNote": "Cambiar el nombre solo modifica las etiquetas que se muestran aquí; el texto de la transcripción nunca se edita.",
+      "speakerSaveError": "No se pudo guardar el nombre del hablante.",
+      "edit": "Editar",
+      "save": "Guardar",
+      "edited": "editado",
+      "originalLabel": "Original: {{text}}",
+      "editPlaceholder": "Editar el texto de la transcripción",
+      "saveRevisionError": "No se pudo guardar tu edición.",
+      "exports": "Exportar",
+      "export": {
+        "raw": "Texto (.txt)",
+        "speaker": "Hablantes (.md)",
+        "srt": "Subtítulos (.srt)",
+        "vtt": "Subtítulos (.vtt)"
+      },
+      "exportError": "No se pudo exportar el archivo.",
+      "flags": {
+        "unaligned": "Sin alinear",
+        "partial-alignment": "Alineación parcial",
+        "possible-overlap": "Posible superposición",
+        "possible-hallucination": "Posible alucinación",
+        "low-confidence": "Baja confianza",
+        "manual-review": "Requiere revisión"
+      }
+    },
+
+    "notes": {
+      "tab": {
+        "transcript": "Transcripción",
+        "notes": "Notas"
+      },
+      "generate": "Generar notas",
+      "regenerate": "Regenerar notas",
+      "generating": "Generando notas…",
+      "strict": "Modo estricto",
+      "strictHint": "Descarta cualquier elemento cuya evidencia no pueda verificarse contra la transcripción.",
+      "noLocalModel": "Selecciona un modelo local de notas en Configuración para generar notas.",
+      "noneYet": "Aún no hay notas. Genera notas a partir de la transcripción para comenzar.",
+      "failed": "Falló la generación de notas.",
+      "retry": "Reintentar",
+      "droppedSummary": "{{dropped}} elementos descartados, {{issues}} problemas de validación",
+      "reviewLegend": "Los elementos marcados como «Needs review» no pudieron verificarse por completo contra la transcripción.",
+      "notesModelInfo": "Notas: generadas con {{model}}",
+      "notesModelNone": "Notas: sin modelo local configurado — solo transcripciones"
     }
   },
   "meetingNotification": {

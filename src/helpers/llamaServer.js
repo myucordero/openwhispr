@@ -6,6 +6,7 @@ const debugLogger = require("./debugLogger");
 const { killProcess } = require("../utils/process");
 const { isPortAvailable } = require("../utils/serverUtils");
 const { getSafeTempDir } = require("./safeTempDir");
+const { getReasoningThreadCount, getRecommendedGpuLayers } = require("./runtimeTuning");
 const { app } = require("electron");
 const sidecarPidFile = require("./sidecarPidFile");
 
@@ -19,6 +20,80 @@ const HEALTH_CHECK_TIMEOUT_MS = 2000;
 const STARTUP_POLL_INTERVAL_MS = 500;
 const HEALTH_CHECK_FAILURE_THRESHOLD = 3;
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+
+function asTrimmedString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function extractTextFromContent(content) {
+  if (!content) return "";
+
+  if (typeof content === "string") {
+    return content.trim();
+  }
+
+  if (Array.isArray(content)) {
+    const parts = [];
+    for (const chunk of content) {
+      if (typeof chunk === "string") {
+        const text = chunk.trim();
+        if (text) parts.push(text);
+        continue;
+      }
+      if (!chunk || typeof chunk !== "object") continue;
+      const candidate =
+        asTrimmedString(chunk.text) ||
+        asTrimmedString(chunk.value) ||
+        asTrimmedString(chunk.content);
+      if (candidate) parts.push(candidate);
+    }
+    return parts.join("\n").trim();
+  }
+
+  if (typeof content === "object") {
+    return (
+      asTrimmedString(content.text) ||
+      asTrimmedString(content.value) ||
+      asTrimmedString(content.content)
+    );
+  }
+
+  return "";
+}
+
+function sanitizeAssistantOutput(text) {
+  const normalized = asTrimmedString(text);
+  if (!normalized) return "";
+
+  // Remove explicit reasoning blocks when a model includes them inline.
+  return normalized
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+    .trim();
+}
+
+function extractLlamaChatCompletionText(response) {
+  if (!response || typeof response !== "object") return "";
+
+  const choices = Array.isArray(response.choices) ? response.choices : [];
+  for (const choice of choices) {
+    const message = choice?.message || choice?.delta || {};
+    const candidate = sanitizeAssistantOutput(
+      extractTextFromContent(message?.content) ||
+      asTrimmedString(choice?.text) ||
+      asTrimmedString(response?.output_text) ||
+      asTrimmedString(response?.text)
+    );
+
+    if (candidate) return candidate;
+  }
+
+  return sanitizeAssistantOutput(
+    extractTextFromContent(response?.message?.content) ||
+    asTrimmedString(response?.text) ||
+    asTrimmedString(response?.output_text)
+  );
+}
 
 class LlamaServerManager {
   constructor() {
@@ -136,12 +211,16 @@ class LlamaServerManager {
       "--port",
       String(this.port),
       "--threads",
-      String(options.threads || 4),
+      String(options.threads || getReasoningThreadCount()),
       "--jinja",
     ];
 
     if (process.platform === "darwin") {
-      const args = [...baseArgs, "--n-gpu-layers", "99"];
+      const args = [
+        ...baseArgs,
+        "--n-gpu-layers",
+        String(options.gpuLayers || getRecommendedGpuLayers()),
+      ];
       await this._startWithBinary(
         binaryPaths.default,
         args,
@@ -163,7 +242,8 @@ class LlamaServerManager {
   }
 
   async _startWithGpuFallback(binaryPaths, baseArgs, options) {
-    const gpuArgs = [...baseArgs, "--n-gpu-layers", "99"];
+    const gpuLayers = String(options.gpuLayers || getRecommendedGpuLayers());
+    const gpuArgs = [...baseArgs, "--n-gpu-layers", gpuLayers];
     const cpuArgs = baseArgs;
 
     if (binaryPaths.vulkan) {
@@ -445,10 +525,9 @@ class LlamaServerManager {
       stream: false,
     };
 
-    // Without this, Qwen chat templates leave `message.content` empty and
-    // route output into `reasoning_content`. Non-Qwen templates ignore it.
-    if (options.disableThinking !== false) {
+    if (options.disableThinking) {
       requestBody.chat_template_kwargs = { enable_thinking: false };
+      requestBody.thinking_forced_open = false;
     }
 
     const body = JSON.stringify(requestBody);
@@ -486,9 +565,25 @@ class LlamaServerManager {
 
             try {
               const response = JSON.parse(data);
-              const message = response.choices?.[0]?.message;
-              const text = message?.content || message?.reasoning_content || "";
-              resolve(text.trim());
+              const text = extractLlamaChatCompletionText(response);
+              if (!text) {
+                debugLogger.warn("llama-server returned empty completion payload", {
+                  hasChoices: Array.isArray(response?.choices),
+                  choiceCount: Array.isArray(response?.choices) ? response.choices.length : 0,
+                  topLevelKeys: Object.keys(response || {}),
+                  firstChoiceKeys: response?.choices?.[0] ? Object.keys(response.choices[0]) : [],
+                  firstMessageKeys: response?.choices?.[0]?.message
+                    ? Object.keys(response.choices[0].message)
+                    : [],
+                });
+                reject(
+                  new Error(
+                    "llama-server returned an empty completion payload (no assistant text found)"
+                  )
+                );
+                return;
+              }
+              resolve(text);
             } catch (e) {
               reject(new Error(`Failed to parse llama-server response: ${e.message}`));
             }

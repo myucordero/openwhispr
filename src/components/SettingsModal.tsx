@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import SidebarModal, { type SidebarItem } from "./ui/SidebarModal";
 import SettingsPage, { SettingsSectionType } from "./SettingsPage";
-import { WORKSPACES_ENABLED } from "../lib/features";
+import { WORKSPACES_ENABLED, LOCAL_ONLY_MODE } from "../lib/features";
 
 export type { SettingsSectionType };
 
@@ -56,20 +56,25 @@ export default function SettingsModal({ open, onOpenChange, initialSection }: Se
   const { t } = useTranslation();
   const sidebarItems: SidebarItem<SettingsSectionType>[] = useMemo(
     () => [
-      {
-        id: "account",
-        label: t("settingsModal.sections.account.label"),
-        icon: UserCircle,
-        description: t("settingsModal.sections.account.description"),
-        group: t("settingsModal.groups.account"),
-      },
-      {
-        id: "plansBilling",
-        label: t("settingsModal.sections.plansBilling.label"),
-        icon: CreditCard,
-        description: t("settingsModal.sections.plansBilling.description"),
-        group: t("settingsModal.groups.account"),
-      },
+      // Cloud account + billing are hidden in local-only builds.
+      ...(LOCAL_ONLY_MODE
+        ? []
+        : [
+            {
+              id: "account" as const,
+              label: t("settingsModal.sections.account.label"),
+              icon: UserCircle,
+              description: t("settingsModal.sections.account.description"),
+              group: t("settingsModal.groups.account"),
+            },
+            {
+              id: "plansBilling" as const,
+              label: t("settingsModal.sections.plansBilling.label"),
+              icon: CreditCard,
+              description: t("settingsModal.sections.plansBilling.description"),
+              group: t("settingsModal.groups.account"),
+            },
+          ]),
       ...(WORKSPACES_ENABLED
         ? [
             {
@@ -128,9 +133,13 @@ export default function SettingsModal({ open, onOpenChange, initialSection }: Se
   );
 
   const resolveSection = (section: string | undefined): SettingsSectionType => {
-    if (!section) return "account";
+    // Local-only builds have no account section; land on "general" instead.
+    const defaultSection: SettingsSectionType = LOCAL_ONLY_MODE ? "general" : "account";
+    if (!section) return defaultSection;
     const resolved = (SECTION_ALIASES[section] ?? section) as SettingsSectionType;
-    if (resolved === "workspace" && !WORKSPACES_ENABLED) return "account";
+    if (resolved === "workspace" && !WORKSPACES_ENABLED) return defaultSection;
+    if (LOCAL_ONLY_MODE && (resolved === "account" || resolved === "plansBilling"))
+      return defaultSection;
     return resolved;
   };
 

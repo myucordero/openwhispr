@@ -97,6 +97,20 @@
     ".env",
     "src/assets/**/*",
     {
+      "from": "tools/whisperx-sidecar",
+      "to": "whisperx-sidecar",
+      "filter": [
+        "pyproject.toml",
+        "uv.lock",
+        "README.md",
+        "src/**/*",
+        "!**/__pycache__/**",
+        "!**/.venv*/**",
+        "!**/.pytest_cache/**",
+        "!tests/**"
+      ]
+    },
+    {
       "from": "resources/bin/",
       "to": "bin/",
       "filter": [

@@ -23,7 +23,7 @@ import WorkspaceSwitcher from "./WorkspaceSwitcher";
 import InviteTeammateDialog from "./InviteTeammateDialog";
 import CreateWorkspaceDialog from "./CreateWorkspaceDialog";
 import { useWorkspace } from "../hooks/useWorkspace";
-import { WORKSPACES_ENABLED } from "../lib/features";
+import { WORKSPACES_ENABLED, LOCAL_ONLY_MODE } from "../lib/features";
 
 const platform = getCachedPlatform();
 
@@ -75,6 +75,7 @@ export default function ControlPanelSidebar({
 
   const showLimitBanner = authLoaded && isSignedIn && !isProUser && isOverLimit;
   const showUpgradeBanner =
+    !LOCAL_ONLY_MODE &&
     !showLimitBanner &&
     authLoaded &&
     (!isSignedIn || usageLoaded !== false) &&
@@ -298,10 +299,12 @@ export default function ControlPanelSidebar({
           }
         />
 
-        <div className="mx-1 h-px bg-border/10 dark:bg-white/6 my-1.5!" />
+        {!LOCAL_ONLY_MODE && (
+          <>
+            <div className="mx-1 h-px bg-border/10 dark:bg-white/6 my-1.5!" />
 
-        <div className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md">
-          {userImage ? (
+            <div className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md">
+              {userImage ? (
             <img src={userImage} alt="" className="w-6 h-6 rounded-full shrink-0 object-cover" />
           ) : (
             <UserCircle size={18} className="shrink-0 text-foreground/50 dark:text-foreground/45" />
@@ -325,6 +328,8 @@ export default function ControlPanelSidebar({
             ) : null}
           </div>
         </div>
+          </>
+        )}
       </div>
 
       {WORKSPACES_ENABLED && activeWorkspace && (

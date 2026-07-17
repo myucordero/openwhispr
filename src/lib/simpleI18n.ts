@@ -1,0 +1,146 @@
+type LanguageResources = Record<string, Record<string, unknown>>;
+
+export interface TFunction {
+  (key: string, options: Record<string, unknown> & { returnObjects: true }): unknown;
+  (key: string, options?: Record<string, unknown>): string;
+}
+
+type EventName = "languageChanged";
+type Listener = (value: string) => void;
+
+function getNestedValue(obj: unknown, key: string): unknown {
+  if (!obj || !key) return undefined;
+  return key.split(".").reduce<unknown>((acc, part) => {
+    if (!acc || typeof acc !== "object") return undefined;
+    const record = acc as Record<string, unknown>;
+    return record[part];
+  }, obj);
+}
+
+function interpolate(template: unknown, options?: Record<string, unknown>): string {
+  const text = typeof template === "string" ? template : String(template ?? "");
+  if (!options) return text;
+  return text.replace(/\{\{(.*?)\}\}/g, (_, rawKey: string) => {
+    const key = rawKey.trim();
+    const value = options[key];
+    return value === undefined || value === null ? "" : String(value);
+  });
+}
+
+export class SimpleI18n {
+  private resources: LanguageResources = {};
+  public language = "en";
+  private fallbackLng = "en";
+  private defaultNS = "translation";
+  private listeners = new Map<EventName, Set<Listener>>();
+
+  use(_plugin: unknown): this {
+    return this;
+  }
+
+  init(config: {
+    resources?: LanguageResources;
+    lng?: string;
+    fallbackLng?: string;
+    defaultNS?: string;
+    ns?: string[];
+    interpolation?: Record<string, unknown>;
+    returnEmptyString?: boolean;
+    returnNull?: boolean;
+    initImmediate?: boolean;
+  }): Promise<this> {
+    this.resources = config.resources || {};
+    this.language = config.lng || "en";
+    this.fallbackLng = config.fallbackLng || "en";
+    this.defaultNS = config.defaultNS || "translation";
+    return Promise.resolve(this);
+  }
+
+  t(key: string, options: Record<string, unknown> & { returnObjects: true }): unknown;
+  t(key: string, options?: Record<string, unknown>): string;
+  t(key: string, options: Record<string, unknown> = {}): unknown {
+    const language = (options.lng as string) || this.language;
+    const ns = (options.ns as string) || this.defaultNS;
+    const current = getNestedValue(this.resources[language]?.[ns], key);
+    const fallback = getNestedValue(this.resources[this.fallbackLng]?.[ns], key);
+    const resolved =
+      current !== undefined
+        ? current
+        : fallback !== undefined
+          ? fallback
+          : options.defaultValue !== undefined
+            ? options.defaultValue
+            : key;
+    // returnObjects: hand back the raw array/object so callers can map/iterate.
+    if (options.returnObjects) return resolved;
+    return interpolate(resolved, options);
+  }
+
+  getFixedT(language: string, ns?: string): TFunction {
+    return ((key: string, options: Record<string, unknown> = {}) =>
+      this.t(key, { ...options, ns: ns || options.ns, lng: language })) as TFunction;
+  }
+
+  hasResourceBundle(language: string, ns: string): boolean {
+    return this.resources[language]?.[ns] !== undefined;
+  }
+
+  addResourceBundle(
+    language: string,
+    ns: string,
+    resources: unknown,
+    deep = true,
+    overwrite = true
+  ): void {
+    const currentLanguage = this.resources[language] || {};
+    const currentBundle = currentLanguage[ns];
+
+    if (
+      deep &&
+      overwrite &&
+      currentBundle &&
+      typeof currentBundle === "object" &&
+      resources &&
+      typeof resources === "object"
+    ) {
+      currentLanguage[ns] = {
+        ...(currentBundle as Record<string, unknown>),
+        ...(resources as Record<string, unknown>),
+      };
+    } else if (overwrite || currentBundle === undefined) {
+      currentLanguage[ns] = resources as Record<string, unknown>;
+    }
+
+    this.resources[language] = currentLanguage;
+  }
+
+  changeLanguage(nextLanguage: string): Promise<string> {
+    this.language = nextLanguage || this.fallbackLng;
+    this.emit("languageChanged", this.language);
+    return Promise.resolve(this.language);
+  }
+
+  on(event: EventName, listener: Listener): void {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set());
+    }
+    this.listeners.get(event)?.add(listener);
+  }
+
+  off(event: EventName, listener: Listener): void {
+    this.listeners.get(event)?.delete(listener);
+  }
+
+  private emit(event: EventName, value: string): void {
+    for (const listener of this.listeners.get(event) || []) {
+      listener(value);
+    }
+  }
+}
+
+export function createInstance(): SimpleI18n {
+  return new SimpleI18n();
+}
+
+const defaultInstance = new SimpleI18n();
+export default defaultInstance;

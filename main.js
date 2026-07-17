@@ -318,12 +318,17 @@ let linuxPortalAudioManager = null;
 let windowsLoopbackAudioManager = null;
 let meetingAecManager = null;
 let qdrantManager = null;
+let whisperxMain = null;
 let ipcHandlers = null;
 let cliBridge = null;
 let globeKeyAlertShown = false;
 let authBridgeServer = null;
 const WHISPER_WAKE_REWARM_DELAY_MS = 3000;
 let wakeRewarmTimer = null;
+
+function isTruthyEnv(value) {
+  return ["1", "true", "yes", "on"].includes((value || "").trim().toLowerCase());
+}
 
 function parseAuthBridgePort() {
   const raw = (process.env.OPENWHISPR_AUTH_BRIDGE_PORT || "").trim();
@@ -424,6 +429,15 @@ function initializeCoreManagers() {
   windowManager.windowsKeyManager = windowsKeyManager;
   windowManager.linuxKeyManager = linuxKeyManager;
 
+  const WhisperXMain = require("./src/helpers/whisperx/whisperxMain");
+  whisperxMain = new WhisperXMain({
+    app,
+    databaseManager,
+    environmentManager,
+    logger: debugLogger,
+    getWindows: () => BrowserWindow.getAllWindows(),
+  });
+
   // IPC handlers must be registered before window content loads
   ipcHandlers = new IPCHandlers({
     environmentManager,
@@ -445,6 +459,7 @@ function initializeCoreManagers() {
     linuxPortalAudioManager,
     windowsLoopbackAudioManager,
     meetingAecManager,
+    whisperxMain,
     getTrayManager: () => trayManager,
     oauthProtocolRegistered: protocolRegistered,
     oauthProtocol: OAUTH_PROTOCOL,
@@ -775,6 +790,75 @@ function startAuthBridgeServer() {
   });
 }
 
+async function autoEnableGpuAccelerationIfConfigured() {
+  if (!isTruthyEnv(process.env.LOCAL_AUTO_ENABLE_GPU)) {
+    return;
+  }
+
+  debugLogger?.info("LOCAL_AUTO_ENABLE_GPU is enabled; attempting GPU bootstrap");
+  let changedEnv = false;
+
+  if (whisperCudaManager) {
+    try {
+      const { detectNvidiaGpu } = require("./src/utils/gpuDetection");
+      const gpuInfo = await detectNvidiaGpu();
+      if (gpuInfo?.hasNvidiaGpu) {
+        if (gpuInfo.vramMb && Number.isFinite(gpuInfo.vramMb)) {
+          process.env.LOCAL_GPU_VRAM_MB = String(gpuInfo.vramMb);
+          changedEnv = true;
+        }
+        if (!whisperCudaManager.isDownloaded()) {
+          debugLogger?.info("Auto-downloading CUDA Whisper binary", {
+            gpuName: gpuInfo.gpuName,
+          });
+          await whisperCudaManager.download();
+        }
+        if (process.env.WHISPER_CUDA_ENABLED !== "true") {
+          process.env.WHISPER_CUDA_ENABLED = "true";
+          changedEnv = true;
+        }
+      }
+    } catch (error) {
+      debugLogger?.warn("Automatic CUDA bootstrap failed", { error: error.message });
+    }
+  }
+
+  if (process.platform !== "darwin") {
+    try {
+      const { detectVulkanGpu } = require("./src/utils/vulkanDetection");
+      const gpuInfo = await detectVulkanGpu();
+      if (gpuInfo?.available) {
+        const LlamaVulkanManager = require("./src/helpers/llamaVulkanManager");
+        const vulkanManager = new LlamaVulkanManager();
+        if (vulkanManager.isSupported()) {
+          if (!vulkanManager.isDownloaded()) {
+            debugLogger?.info("Auto-downloading Vulkan llama-server binary", {
+              deviceName: gpuInfo.deviceName,
+            });
+            await vulkanManager.download();
+          }
+          if (process.env.LLAMA_VULKAN_ENABLED !== "true") {
+            process.env.LLAMA_VULKAN_ENABLED = "true";
+            changedEnv = true;
+          }
+          if (process.env.LLAMA_GPU_BACKEND) {
+            delete process.env.LLAMA_GPU_BACKEND;
+            changedEnv = true;
+          }
+        }
+      }
+    } catch (error) {
+      debugLogger?.warn("Automatic Vulkan bootstrap failed", { error: error.message });
+    }
+  }
+
+  if (changedEnv) {
+    environmentManager.saveAllKeysToEnvFile().catch((error) => {
+      debugLogger?.warn("Failed to persist auto-enabled GPU flags", { error: error.message });
+    });
+  }
+}
+
 // Main application startup
 async function startApp() {
   reapStaleSidecars();
@@ -783,6 +867,19 @@ async function startApp() {
   initializeCoreManagers();
   await environmentManager.init();
   registerSidecars();
+
+  // WhisperX subsystem: recover interrupted jobs and register shutdown.
+  // Guarded so a failure here can never block app boot.
+  if (whisperxMain) {
+    sidecarRegistry.register("whisperx", () => whisperxMain.shutdown());
+    try {
+      const summary = whisperxMain.startup();
+      debugLogger.info("WhisperX startup recovery complete", summary);
+    } catch (err) {
+      debugLogger.warn("WhisperX startup failed (non-fatal)", { error: err?.message });
+    }
+  }
+
   startAuthBridgeServer();
 
   cliBridge = new CliBridge(ipcHandlers);
@@ -822,6 +919,41 @@ async function startApp() {
   ipcMain.on("activation-mode-changed", (_event, mode) => {
     windowManager.setActivationModeCache(mode);
     environmentManager.saveActivationMode(mode);
+
+    if (process.platform !== "win32" || !hotkeyManager) {
+      return;
+    }
+
+    const currentHotkey = hotkeyManager.getCurrentHotkey?.();
+    if (!currentHotkey || currentHotkey === "GLOBE") {
+      return;
+    }
+
+    const { isModifierOnlyHotkey, isRightSideModifier } = require("./src/helpers/hotkeyManager");
+    const isNativeOnly = isModifierOnlyHotkey(currentHotkey) || isRightSideModifier(currentHotkey);
+
+    if (mode === "push") {
+      // In push mode on Windows, rely on native key listener instead of globalShortcut.
+      if (!isNativeOnly) {
+        const accelerator = currentHotkey.startsWith("Fn+")
+          ? currentHotkey.slice(3)
+          : currentHotkey;
+        try {
+          globalShortcut.unregister(accelerator);
+        } catch (error) {
+          debugLogger?.warn("Failed to unregister hotkey during push-mode switch", {
+            hotkey: currentHotkey,
+            error: error?.message,
+          });
+        }
+      }
+      return;
+    }
+
+    // Switched back to tap mode: ensure non-native hotkeys are registered with globalShortcut.
+    if (!isNativeOnly) {
+      hotkeyManager.setupShortcuts(currentHotkey, windowManager.createHotkeyCallback());
+    }
   });
 
   ipcMain.on("floating-icon-auto-hide-changed", (_event, enabled) => {
@@ -983,6 +1115,11 @@ async function startApp() {
         debugLogger.debug("whisper wake re-warm error (non-fatal)", { error: err.message });
       });
     }, WHISPER_WAKE_REWARM_DELAY_MS);
+  });
+
+  // Optional personal mode: one-time GPU bootstrap (non-blocking).
+  autoEnableGpuAccelerationIfConfigured().catch((err) => {
+    debugLogger?.warn("GPU bootstrap task failed", { error: err.message });
   });
 
   // Non-blocking server pre-warming. CUDA wins when both GPU backends are enabled.

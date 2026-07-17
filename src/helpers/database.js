@@ -5,6 +5,7 @@ const { randomUUID } = require("crypto");
 const debugLogger = require("./debugLogger");
 const { buildNoteSearchQuery } = require("./noteSearch");
 const { app } = require("electron");
+const { applyRecordingJobsSchema, createRecordingJobsRepo } = require("./whisperx/recordingJobsRepo");
 
 // Server-enforced trigger cap (openwhispr-api); enforced here so one oversized
 // trigger can't 400 the whole sync batch.
@@ -649,6 +650,9 @@ class DatabaseManager {
       this.db.exec(
         "CREATE INDEX IF NOT EXISTS idx_snippets_pending_sync ON snippets(sync_status) WHERE sync_status = 'pending'"
       );
+
+      applyRecordingJobsSchema(this.db);
+      this.recordingJobs = createRecordingJobsRepo(this.db);
 
       return true;
     } catch (error) {

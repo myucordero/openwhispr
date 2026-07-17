@@ -2937,6 +2937,243 @@
       "others": "他の人"
     }
   },
+  "whisperx": {
+    "diarization": {
+      "title": "話者ダイアライゼーション（Hugging Face トークン）",
+      "configured": "トークン設定済み",
+      "hint": "話者ラベルには pyannote community-1 を使用します。モデル利用規約に同意のうえ、無料の読み取り専用 Hugging Face トークンが必要です。トークンなしでも文字起こしは動作します。",
+      "placeholder": "hf_... 読み取り専用トークン",
+      "save": "トークンを保存",
+      "remove": "トークンを削除"
+    },
+    "provider": {
+      "name": "WhisperX",
+      "tab": "WhisperX",
+      "description": "単語単位のタイムスタンプと話者ラベル付けに対応した高精度なローカル文字起こし。"
+    },
+    "readiness": {
+      "title": "WhisperX の状態",
+      "recheck": "再確認",
+      "runtime": "ランタイム",
+      "cuda": "CUDA",
+      "cpuOnly": "CPUのみ",
+      "models": "モデル",
+      "token": "HFトークン",
+      "setupHint": "WhisperXのランタイムはまだインストールされていません。ローカルで文字起こしするには設定してください。",
+      "setUp": "WhisperXをセットアップ",
+      "settingUp": "セットアップ中…",
+      "unavailable": "このビルドではWhisperXは利用できません。"
+    },
+    "upload": {
+      "title": "WhisperXで文字起こし",
+      "dropOrBrowse": "音声ファイルをドロップするか、クリックして参照",
+      "removeFile": "ファイルを削除",
+      "transcribe": "文字起こし",
+      "transcribeCount": "{{count}} 件のファイルを文字起こし",
+      "submitting": "キューに追加中…",
+      "profile": "プロファイル",
+      "language": "言語",
+      "languages": {
+        "auto": "自動検出",
+        "en": "英語",
+        "es": "スペイン語"
+      },
+      "diarization": "話者分離",
+      "diarizationHint": "誰が話しているかを識別してラベル付けします。",
+      "model": "モデル",
+      "models": {
+        "large-v3-turbo": {
+          "name": "Large v3 Turbo",
+          "size": "約1.6GB"
+        },
+        "large-v3": {
+          "name": "Large v3",
+          "size": "約3GB"
+        }
+      },
+      "computeType": "計算タイプ",
+      "computeTypes": {
+        "float16": "float16（GPU）",
+        "int8": "int8（省メモリ）"
+      },
+      "batchSize": "バッチサイズ",
+      "advanced": "詳細設定",
+      "speakers": {
+        "label": "話者数",
+        "auto": "自動",
+        "exact": "正確な数",
+        "range": "範囲",
+        "exactLabel": "話者",
+        "min": "最小",
+        "max": "最大",
+        "rangeError": "話者数は1〜32の範囲で指定してください。",
+        "minMaxError": "最小値は最大値より大きくできません。"
+      },
+      "downloadModelsTitle": "WhisperXのモデルをダウンロードしますか？",
+      "downloadModelsDescription": "必要なモデルはまだダウンロードされていません。文字起こしを開始する前に今すぐダウンロードされます（約1.6〜3GB）。",
+      "downloadModelsConfirm": "ダウンロードして続行"
+    },
+    "profiles": {
+      "memo": {
+        "name": "メモ",
+        "description": "簡単な音声メモ向けの高速な単一話者の文字起こし。"
+      },
+      "meeting": {
+        "name": "会議",
+        "description": "会議向けの話者分離付き複数話者の文字起こし。"
+      },
+      "critical-interview": {
+        "name": "重要インタビュー",
+        "description": "失敗の許されないインタビュー向けに、アライメントと話者分離で最高精度を実現。"
+      }
+    },
+    "progress": {
+      "sessionJobs": "このセッション",
+      "cancel": "キャンセル",
+      "retry": "再試行",
+      "estimated": "推定",
+      "countOfTotal": "{{total}} {{unit}} 中 {{completed}}",
+      "unit": {
+        "seconds": "秒",
+        "segments": "セグメント",
+        "percent": "パーセント",
+        "files": "ファイル"
+      }
+    },
+    "status": {
+      "created": "作成済み",
+      "queued": "キュー待ち",
+      "validating": "検証中",
+      "preparing": "準備中",
+      "transcribing": "文字起こし中",
+      "aligning": "アライメント中",
+      "diarizing": "話者を識別中",
+      "canonicalizing": "文字起こしを確定中",
+      "persisting": "保存中",
+      "transcript_complete": "文字起こし完了",
+      "note_extracting": "ノートを抽出中",
+      "note_validating": "ノートを検証中",
+      "note_rendering": "ノートを生成中",
+      "complete": "完了",
+      "cancelled": "キャンセル済み",
+      "failed": "失敗",
+      "interrupted": "中断",
+      "transcript_complete_note_failed": "文字起こしは完了しましたが、ノートの生成に失敗しました"
+    },
+    "stages": {
+      "starting": "開始中",
+      "probing-audio": "音声を解析中",
+      "normalizing-audio": "音声を正規化中",
+      "loading-asr": "文字起こしモデルを読み込み中",
+      "transcribing": "文字起こし中",
+      "unloading-asr": "文字起こしモデルを解放中",
+      "loading-alignment": "アライメントモデルを読み込み中",
+      "aligning": "単語をアライメント中",
+      "unloading-alignment": "アライメントモデルを解放中",
+      "loading-diarization": "話者分離モデルを読み込み中",
+      "diarizing": "話者を識別中",
+      "unloading-diarization": "話者分離モデルを解放中",
+      "canonicalizing": "文字起こしを確定中",
+      "writing-artifacts": "ファイルを書き込み中",
+      "complete": "完了"
+    },
+    "warnings": {
+      "OOM_FALLBACK_USED": "GPUメモリが不足したため、より低速な代替手段を使用しました。",
+      "DIARIZATION_UNAVAILABLE": "話者分離を利用できなかったためスキップしました。",
+      "ALIGNMENT_PARTIAL": "単語のアライメントは部分的にしか完了しませんでした。",
+      "CPU_FALLBACK_USED": "利用可能なGPUがないため、CPUで実行しました（低速）。"
+    },
+    "errors": {
+      "RUNTIME_NOT_INSTALLED": "WhisperXのランタイムがインストールされていません。",
+      "CUDA_UNAVAILABLE": "互換性のあるNVIDIA GPU / CUDAが見つかりませんでした。",
+      "CUDA_OUT_OF_MEMORY": "GPUのメモリが不足しました。バッチサイズを小さくするか、int8を試してください。",
+      "HF_TOKEN_REQUIRED": "話者分離にはHugging Faceのトークンが必要です。",
+      "AUDIO_UNREADABLE": "音声ファイルを読み込めませんでした。",
+      "AUDIO_UNSUPPORTED_FORMAT": "この音声フォーマットはサポートされていません。",
+      "AUDIO_TOO_LONG": "音声ファイルが長すぎて処理できません。",
+      "AUDIO_NO_SPEECH": "音声内に発話が検出されませんでした。",
+      "AUDIO_CORRUPT": "音声ファイルが破損している可能性があります。",
+      "DISK_SPACE_INSUFFICIENT": "ジョブを完了するためのディスク容量が不足しています。",
+      "WORKER_CRASHED": "文字起こしワーカーがクラッシュしました。",
+      "WORKER_TIMEOUT": "文字起こしワーカーがタイムアウトしました。",
+      "WORKER_UNAVAILABLE": "文字起こしワーカーを利用できません。",
+      "JOB_CANCELLED": "ジョブはキャンセルされました。",
+      "generic": "文字起こしに失敗しました（{{code}}）。",
+      "unknown": "不明なエラーが発生しました。"
+    },
+    "review": {
+      "recordings": "録音",
+      "empty": "まだ録音がありません。",
+      "storageUsed": "管理対象ファイルが {{size}} を使用中",
+      "open": "開く",
+      "retry": "再試行",
+      "delete": "削除",
+      "cancel": "キャンセル",
+      "deleteTitle": "この録音を削除しますか？",
+      "deleteDescription": "この操作を行うと、この録音の文字起こし、話者名、編集内容、および生成されたノートやエクスポートがすべて完全に削除されます。元の録音ファイルは保持され、コンピューター上の元の場所にそのまま残ります。",
+      "deleteConfirm": "削除",
+      "back": "録音一覧に戻る",
+      "loadMore": "もっと読み込む",
+      "loadMoreError": "文字起こしの続きを読み込めませんでした。",
+      "loadingTranscript": "文字起こしを読み込み中…",
+      "noTranscript": "この録音には利用可能な文字起こしがありません。",
+      "segmentCount": "{{total}} セグメント中 {{loaded}} 件を表示中",
+      "audioUnavailable": "音声プレビューは利用できません",
+      "audioPlayerAria": "録音の音声プレーヤー",
+      "unknownSpeaker": "不明な話者",
+      "provenance": {
+        "summary": "{{model}} · {{language}}",
+        "modelUnknown": "不明なモデル",
+        "languageUnknown": "不明な言語"
+      },
+      "speakers": "話者",
+      "speakerNamePlaceholder": "表示名",
+      "speakerNameAria": "{{speaker}} の表示名",
+      "speakerMappingNote": "名前の変更はここに表示されるラベルのみを変更します。文字起こし自体のテキストが編集されることはありません。",
+      "speakerSaveError": "話者名を保存できませんでした。",
+      "edit": "編集",
+      "save": "保存",
+      "edited": "編集済み",
+      "originalLabel": "元のテキスト: {{text}}",
+      "editPlaceholder": "文字起こしのテキストを編集",
+      "saveRevisionError": "編集内容を保存できませんでした。",
+      "exports": "エクスポート",
+      "export": {
+        "raw": "テキスト (.txt)",
+        "speaker": "話者 (.md)",
+        "srt": "字幕 (.srt)",
+        "vtt": "キャプション (.vtt)"
+      },
+      "exportError": "ファイルをエクスポートできませんでした。",
+      "flags": {
+        "unaligned": "未アライメント",
+        "partial-alignment": "部分的なアライメント",
+        "possible-overlap": "重複の可能性",
+        "possible-hallucination": "ハルシネーションの可能性",
+        "low-confidence": "信頼度が低い",
+        "manual-review": "要確認"
+      }
+    },
+    "notes": {
+      "tab": {
+        "transcript": "文字起こし",
+        "notes": "ノート"
+      },
+      "generate": "ノートを生成",
+      "regenerate": "ノートを再生成",
+      "generating": "ノートを生成中…",
+      "strict": "厳密モード",
+      "strictHint": "文字起こしに対して根拠を検証できない項目はすべて破棄します。",
+      "noLocalModel": "ノートを生成するには、設定でローカルのノートモデルを選択してください。",
+      "noneYet": "まだノートがありません。文字起こしからノートを生成して始めましょう。",
+      "failed": "ノートの生成に失敗しました。",
+      "retry": "再試行",
+      "droppedSummary": "{{dropped}} 件の項目を破棄、{{issues}} 件の検証エラー",
+      "reviewLegend": "「要確認」とマークされた項目は、文字起こしに対して完全には検証できませんでした。",
+      "notesModelInfo": "ノート: {{model}} で生成",
+      "notesModelNone": "ノート: ローカルモデルが未設定 — 文字起こしのみ"
+    }
+  },
   "workspaces": {
     "switcher": {
       "personal": "Personal",

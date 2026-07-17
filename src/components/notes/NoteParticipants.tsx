@@ -160,8 +160,12 @@ export default function NoteParticipants({ noteId, participants }: NoteParticipa
 
   const chipLabel =
     localParticipants.length > 0
-      ? `${localParticipants.length} ${localParticipants.length === 1 ? t("notes.participants.attendee", "attendee") : t("notes.participants.attendees", "attendees")}`
-      : t("notes.participants.addAttendees", "Add attendees");
+      ? `${localParticipants.length} ${
+          localParticipants.length === 1
+            ? t("notes.participants.attendee", { defaultValue: "attendee" })
+            : t("notes.participants.attendees", { defaultValue: "attendees" })
+        }`
+      : t("notes.participants.addAttendees", { defaultValue: "Add attendees" });
 
   return (
     <Popover
@@ -183,7 +187,9 @@ export default function NoteParticipants({ noteId, participants }: NoteParticipa
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={t("notes.participants.addPlaceholder", "Add attendees...")}
+            placeholder={t("notes.participants.addPlaceholder", {
+              defaultValue: "Add attendees...",
+            })}
             className="w-full px-2 py-1.5 rounded-md bg-transparent text-xs text-foreground placeholder:text-foreground/20 outline-none border-none appearance-none"
             autoFocus
           />
@@ -212,7 +218,7 @@ export default function NoteParticipants({ noteId, participants }: NoteParticipa
 
           {search && !search.includes("@") && suggestions.length === 0 && (
             <div className="px-3 py-2 text-[11px] text-foreground/30">
-              {t("notes.participants.typeEmail", "Type an email to add...")}
+              {t("notes.participants.typeEmail", { defaultValue: "Type an email to add..." })}
             </div>
           )}
 
@@ -238,7 +244,7 @@ export default function NoteParticipants({ noteId, participants }: NoteParticipa
                     {p.displayName || p.email.split("@")[0]}
                     {p.self && (
                       <span className="ml-1 text-foreground/30">
-                        {t("notes.participants.me", "(me)")}
+                        {t("notes.participants.me", { defaultValue: "(me)" })}
                       </span>
                     )}
                   </span>
@@ -256,7 +262,7 @@ export default function NoteParticipants({ noteId, participants }: NoteParticipa
 
           {localParticipants.length === 0 && !search && (
             <div className="px-3 py-4 text-center text-[11px] text-foreground/30">
-              {t("notes.participants.typeEmail", "Type an email to add...")}
+              {t("notes.participants.typeEmail", { defaultValue: "Type an email to add..." })}
             </div>
           )}
         </div>

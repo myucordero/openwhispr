@@ -230,6 +230,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // BYOK API keys (get/save for every provider in the secretKeys manifest)
   ...secretKeyApi,
 
+  // Hugging Face token (WhisperX diarization) — status only, value never
+  // read back to the renderer.
+  getHuggingFaceTokenStatus: () => ipcRenderer.invoke("get-huggingface-token-status"),
+  saveHuggingFaceToken: (key) => ipcRenderer.invoke("save-huggingface-token", key),
+  deleteHuggingFaceToken: () => ipcRenderer.invoke("delete-huggingface-token"),
+
   // Clipboard functions
   checkAccessibilityPermission: (silent) =>
     ipcRenderer.invoke("check-accessibility-permission", silent),
@@ -323,6 +329,40 @@ contextBridge.exposeInMainWorld("electronAPI", {
   ),
   onMeetingDiarizationComplete: registerListener(
     "meeting-diarization-complete",
+    (callback) => (_event, data) => callback(data)
+  ),
+
+  // WhisperX recording jobs (reliable notes pipeline)
+  whisperxGetReadiness: () => ipcRenderer.invoke("whisperx-get-readiness"),
+  whisperxProvisionRuntime: () => ipcRenderer.invoke("whisperx-provision-runtime"),
+  whisperxStartJob: (payload) => ipcRenderer.invoke("whisperx-start-job", payload),
+  whisperxCancelJob: (jobId) => ipcRenderer.invoke("whisperx-cancel-job", jobId),
+  whisperxRetryJob: (jobId) => ipcRenderer.invoke("whisperx-retry-job", jobId),
+  whisperxDeleteJob: (jobId) => ipcRenderer.invoke("whisperx-delete-job", jobId),
+  whisperxGetJob: (jobId) => ipcRenderer.invoke("whisperx-get-job", jobId),
+  whisperxListJobs: (query) => ipcRenderer.invoke("whisperx-list-jobs", query),
+  whisperxReadTranscriptPage: (payload) =>
+    ipcRenderer.invoke("whisperx-read-transcript-page", payload),
+  whisperxReadArtifact: (payload) => ipcRenderer.invoke("whisperx-read-artifact", payload),
+  whisperxReadSourceAudio: (jobId) => ipcRenderer.invoke("whisperx-read-source-audio", jobId),
+  whisperxGenerateNotes: (jobId, options) =>
+    ipcRenderer.invoke("whisperx-generate-notes", jobId, options),
+  whisperxListNoteRuns: (jobId) => ipcRenderer.invoke("whisperx-list-note-runs", jobId),
+  whisperxSaveSpeakerMapping: (payload) =>
+    ipcRenderer.invoke("whisperx-save-speaker-mapping", payload),
+  whisperxGetSpeakerMappings: (jobId) =>
+    ipcRenderer.invoke("whisperx-get-speaker-mappings", jobId),
+  whisperxSaveTranscriptRevision: (payload) =>
+    ipcRenderer.invoke("whisperx-save-transcript-revision", payload),
+  whisperxListTranscriptRevisions: (jobId) =>
+    ipcRenderer.invoke("whisperx-list-transcript-revisions", jobId),
+  whisperxGetStorageUsage: () => ipcRenderer.invoke("whisperx-storage-usage"),
+  onWhisperxJobEvent: registerListener(
+    "whisperx-job-event",
+    (callback) => (_event, data) => callback(data)
+  ),
+  onWhisperxProvisionProgress: registerListener(
+    "whisperx-provision-progress",
     (callback) => (_event, data) => callback(data)
   ),
 
@@ -468,6 +508,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   processLocalReasoning: (text, modelId, agentName, config) =>
     ipcRenderer.invoke("process-local-reasoning", text, modelId, agentName, config),
   checkLocalReasoningAvailable: () => ipcRenderer.invoke("check-local-reasoning-available"),
+  cliInference: (params) => ipcRenderer.invoke("cli-inference", params),
+  cliInferenceAvailable: (cli) => ipcRenderer.invoke("cli-inference-available", cli),
 
   // Anthropic reasoning
   processAnthropicReasoning: (text, modelId, agentName, config) =>

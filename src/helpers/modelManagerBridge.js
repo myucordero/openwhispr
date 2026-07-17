@@ -12,6 +12,7 @@ const {
 const modelRegistryData = require("../models/modelRegistryData.json");
 const LlamaServerManager = require("./llamaServer");
 const debugLogger = require("./debugLogger");
+const { getReasoningThreadCount, getRecommendedGpuLayers } = require("./runtimeTuning");
 
 const MIN_FILE_SIZE = 1_000_000; // 1MB minimum for valid model files
 
@@ -368,8 +369,8 @@ class ModelManager {
 
       await this.serverManager.start(modelPath, {
         contextSize: options.contextSize || modelInfo.model.contextLength || 4096,
-        threads: options.threads || 4,
-        gpuLayers: 99,
+        threads: options.threads || getReasoningThreadCount(),
+        gpuLayers: options.gpuLayers || getRecommendedGpuLayers(),
       });
       this.currentServerModelId = modelId;
 
@@ -379,23 +380,28 @@ class ModelManager {
       });
     }
 
+    const isQwen3Model = modelInfo.provider.id === "qwen" && /^qwen3-/i.test(modelId);
+    const disableThinking = options.disableThinking ?? isQwen3Model;
+    const userPrompt = disableThinking ? `/no_think\n${prompt}` : prompt;
+
     // Build messages for chat completion
     const messages = [
       { role: "system", content: options.systemPrompt || "" },
-      { role: "user", content: prompt },
+      { role: "user", content: userPrompt },
     ];
 
     debugLogger.logReasoning("INFERENCE_SENDING_REQUEST", {
       messageCount: messages.length,
       systemPromptLength: (options.systemPrompt || "").length,
-      userPromptLength: prompt.length,
+      userPromptLength: userPrompt.length,
+      disableThinking,
     });
 
     try {
       const result = await this.serverManager.inference(messages, {
         temperature: options.temperature ?? 0.7,
-        max_tokens: options.maxTokens ?? 512,
-        disableThinking: options.disableThinking,
+        ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
+        disableThinking,
       });
 
       const totalTime = Date.now() - startTime;
@@ -442,8 +448,8 @@ class ModelManager {
     try {
       await this.serverManager.start(modelPath, {
         contextSize: modelInfo.model.contextLength || 4096,
-        threads: 4,
-        gpuLayers: 99,
+        threads: getReasoningThreadCount(),
+        gpuLayers: getRecommendedGpuLayers(),
       });
       this.currentServerModelId = modelId;
       debugLogger.info("llama-server pre-warmed", { modelId });

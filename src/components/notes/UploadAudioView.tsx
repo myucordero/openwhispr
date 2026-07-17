@@ -22,7 +22,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  ConfirmDialog,
+} from "../ui/dialog";
 import { Input } from "../ui/input";
 import type { FolderItem } from "../../types/electron";
 import {
@@ -31,6 +38,16 @@ import {
   DOWNLOAD_ERROR_KEYS,
   MEETINGS_FOLDER_NAME,
 } from "./shared";
+import { useDialogs } from "../../hooks/useDialogs";
+import { useCliNoteReady } from "../../hooks/useCliNoteReady";
+import { useRecordingJobsStore } from "../../stores/recordingJobsStore";
+import WhisperXUploadOptions, {
+  defaultWhisperXOptions,
+  validateWhisperXOptions,
+  type WhisperXOptions,
+} from "./WhisperXUploadOptions";
+import RecordingJobProgress from "./RecordingJobProgress";
+import RecordingJobsPanel from "./RecordingJobsPanel";
 import { useAuth } from "../../hooks/useAuth";
 import { useUsage } from "../../hooks/useUsage";
 import { useSettings } from "../../hooks/useSettings";
@@ -39,6 +56,8 @@ import { getAllReasoningModels, getBatchTranscriptionModel } from "../../models/
 import {
   useSettingsStore,
   selectIsCloudCleanupMode,
+  selectResolvedNoteFormatting,
+  selectResolvedLLMConfig,
   selectResolvedUploadTranscription,
   getSettings,
 } from "../../stores/settingsStore";
@@ -58,6 +77,14 @@ import { getBaseLanguageCode } from "../../utils/languageSupport";
 type UploadState = "idle" | "selected" | "downloading" | "transcribing" | "complete" | "error";
 
 const SUPPORTED_EXTENSIONS = ["mp3", "wav", "m4a", "webm", "ogg", "oga", "flac", "aac"];
+// MP4 video is accepted too: every transcription path routes the file through
+// ffmpeg (convertToWav / the WhisperX worker's decode), which extracts the audio
+// track automatically, so an MP4 uploads and processes like audio. Scoped to the
+// MP4 family — it's the one container cloud providers accept and that Chromium's
+// <audio> review player can decode (as audio/mp4); other video containers would
+// transcribe but break BYOK transcription and playback, so they're excluded.
+const SUPPORTED_VIDEO_EXTENSIONS = ["mp4", "m4v"];
+const ACCEPTED_UPLOAD_EXTENSIONS = [...SUPPORTED_EXTENSIONS, ...SUPPORTED_VIDEO_EXTENSIONS];
 
 const BYOK_MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB — hard limit for bring-your-own-key
 const CLOUD_FREE_MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB — free plan cloud limit
@@ -223,6 +250,39 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
 
   const [providerReady, setProviderReady] = useState<boolean | null>(null);
 
+  // WhisperX job flow (multi-file). Only active when the local WhisperX provider
+  // is selected; other providers keep the single-file state machine above.
+  const whisperxModel = useSettingsStore((s) => s.whisperxModel);
+  // Resolved note-formatting scope, used to gate auto note generation. Reactive
+  // so the info line below reflects settings changes without a remount.
+  const noteFormattingProvider = useSettingsStore((s) => selectResolvedNoteFormatting(s).provider);
+  const noteFormattingModel = useSettingsStore((s) => selectResolvedNoteFormatting(s).model);
+  const isCliNoteProvider =
+    noteFormattingProvider === "claude-cli" || noteFormattingProvider === "codex-cli";
+  const cliNoteReady = useCliNoteReady(noteFormattingProvider);
+  const hasLocalNoteModel =
+    ((noteFormattingProvider === "local" && noteFormattingModel.length > 0) || isCliNoteProvider) &&
+    cliNoteReady;
+  // CLI backends have no model id to show; label them by the tool name (brand).
+  const noteModelLabel = isCliNoteProvider
+    ? noteFormattingProvider === "claude-cli"
+      ? "Claude"
+      : "Codex"
+    : noteFormattingModel;
+  const startWhisperxJob = useRecordingJobsStore((s) => s.startJob);
+  const attachWhisperxEvents = useRecordingJobsStore((s) => s.attachEvents);
+  const [whisperxFiles, setWhisperxFiles] = useState<
+    Array<{ name: string; path: string; sizeBytes: number }>
+  >([]);
+  const [whisperxOptions, setWhisperxOptions] = useState<WhisperXOptions>(() =>
+    defaultWhisperXOptions("meeting", whisperxModel)
+  );
+  const [submittedJobIds, setSubmittedJobIds] = useState<string[]>([]);
+  const [whisperxSubmitting, setWhisperxSubmitting] = useState(false);
+  const [whisperxError, setWhisperxError] = useState<string | null>(null);
+  const { confirmDialog, showConfirmDialog, hideConfirmDialog } = useDialogs();
+  const confirmResolverRef = useRef<((v: boolean) => void) | null>(null);
+
   const { isSignedIn } = useAuth();
   const usage = useUsage();
   const isProUser = usage?.isSubscribed || usage?.isTrial;
@@ -274,6 +334,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
   // Mode detection
   const isSelfHosted = transcriptionMode === "self-hosted" && !useLocalWhisper;
   const isByok = !useLocalWhisper && !isOpenWhisprCloud;
+  const isWhisperxMode = useLocalWhisper && localTranscriptionProvider === "whisperx";
 
   // Mode-aware file size validation
   // Local: no limits at all
@@ -402,11 +463,182 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
     cortiClientSecret,
   ]);
 
+  // Subscribe once to WhisperX job events so progress updates flow into the store.
+  useEffect(() => {
+    if (!isWhisperxMode) return;
+    attachWhisperxEvents();
+  }, [isWhisperxMode, attachWhisperxEvents]);
+
+  const addWhisperxFiles = (
+    incoming: Array<{ name: string; path: string; sizeBytes: number }>
+  ) => {
+    if (incoming.length === 0) return;
+    setWhisperxFiles((prev) => {
+      const seen = new Set(prev.map((f) => f.path));
+      const merged = [...prev];
+      for (const f of incoming) {
+        if (!seen.has(f.path)) {
+          merged.push(f);
+          seen.add(f.path);
+        }
+      }
+      return merged;
+    });
+    setWhisperxError(null);
+  };
+
+  const handleWhisperxBrowse = async () => {
+    const res = await window.electronAPI.selectAudioFile();
+    if (!res.canceled && res.filePath) {
+      const name = res.filePath.split(/[/\\]/).pop() || "audio";
+      const sizeBytes = (await window.electronAPI.getFileSize?.(res.filePath)) ?? 0;
+      addWhisperxFiles([{ name, path: res.filePath, sizeBytes }]);
+    }
+  };
+
+  const handleWhisperxDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const collected: Array<{ name: string; path: string; sizeBytes: number }> = [];
+    for (const f of Array.from(e.dataTransfer.files)) {
+      const ext = f.name.split(".").pop()?.toLowerCase() || "";
+      if (!ACCEPTED_UPLOAD_EXTENSIONS.includes(ext)) continue;
+      const filePath = window.electronAPI.getPathForFile(f);
+      if (!filePath) continue;
+      collected.push({ name: f.name, path: filePath, sizeBytes: f.size });
+    }
+    addWhisperxFiles(collected);
+  };
+
+  const removeWhisperxFile = (path: string) => {
+    setWhisperxFiles((prev) => prev.filter((f) => f.path !== path));
+  };
+
+  const confirmModelDownload = (): Promise<boolean> =>
+    new Promise<boolean>((resolve) => {
+      confirmResolverRef.current = resolve;
+      showConfirmDialog({
+        title: t("whisperx.upload.downloadModelsTitle"),
+        description: t("whisperx.upload.downloadModelsDescription"),
+        confirmText: t("whisperx.upload.downloadModelsConfirm"),
+        cancelText: t("notes.upload.cancel"),
+        onConfirm: () => {
+          confirmResolverRef.current = null;
+          resolve(true);
+        },
+      });
+    });
+
+  const handleConfirmDialogClose = () => {
+    hideConfirmDialog();
+    if (confirmResolverRef.current) {
+      confirmResolverRef.current(false);
+      confirmResolverRef.current = null;
+    }
+  };
+
+  const handleWhisperxSubmit = async () => {
+    if (whisperxFiles.length === 0 || whisperxSubmitting) return;
+
+    const validationError = validateWhisperXOptions(whisperxOptions);
+    if (validationError) {
+      setWhisperxError(t(validationError));
+      return;
+    }
+    setWhisperxError(null);
+
+    // Prompt for model download when the ASR model isn't present yet.
+    let allowModelDownload = false;
+    const readiness = await window.electronAPI?.whisperxGetReadiness?.();
+    const asrReady = readiness?.asrModelReady ?? true;
+    if (!asrReady) {
+      const confirmed = await confirmModelDownload();
+      if (!confirmed) return;
+      allowModelDownload = true;
+    }
+
+    const opts = whisperxOptions;
+    const overrides: NonNullable<Parameters<typeof startWhisperxJob>[0]["overrides"]> = {
+      language: opts.language,
+      model: opts.model,
+      computeType: opts.computeType,
+      batchSize: opts.batchSize,
+      diarization: opts.diarization,
+    };
+    if (opts.diarization) {
+      if (opts.speakerMode === "exact") {
+        overrides.exactSpeakers = opts.exactSpeakers;
+      } else if (opts.speakerMode === "range") {
+        overrides.minSpeakers = opts.minSpeakers;
+        overrides.maxSpeakers = opts.maxSpeakers;
+      }
+    }
+
+    const settingsState = useSettingsStore.getState();
+    const customDictionary = settingsState.customDictionary;
+
+    // Resolve the noteFormatting scope at submit time. A local GGUF model or the
+    // local CLI backend (claude/codex) takes effect; other providers are rejected
+    // by main, so the job rests at transcript_complete for later manual notes.
+    const noteCfg = selectResolvedNoteFormatting(settingsState);
+    const isCliNote = noteCfg.provider === "claude-cli" || noteCfg.provider === "codex-cli";
+    const noteGeneration =
+      (noteCfg.provider === "local" && noteCfg.model) || isCliNote
+        ? {
+            provider: noteCfg.provider as "local" | "claude-cli" | "codex-cli",
+            // CLI backends use the subscription default; never forward the
+            // fallback GGUF model id (noteFormatting falls back to cleanup).
+            model: isCliNote ? "" : noteCfg.model,
+            disableThinking:
+              selectResolvedLLMConfig(settingsState, "noteFormatting").disableThinking !== false,
+          }
+        : undefined;
+
+    setWhisperxSubmitting(true);
+    try {
+      const newIds: string[] = [];
+      const submittedPaths = new Set<string>();
+      // Submit sequentially; the main process queues jobs FIFO.
+      for (const f of whisperxFiles) {
+        const res = await startWhisperxJob({
+          sourcePath: f.path,
+          displayName: f.name,
+          profile: opts.profile,
+          overrides,
+          customDictionary,
+          allowModelDownload,
+          ...(noteGeneration ? { noteGeneration } : {}),
+        });
+        if (res.success && res.job) {
+          newIds.push(res.job.id);
+          submittedPaths.add(f.path);
+        } else {
+          setWhisperxError(
+            res.code
+              ? t(`whisperx.errors.${res.code}`, {
+                  defaultValue: res.error || t("whisperx.errors.unknown"),
+                })
+              : res.error || t("whisperx.errors.unknown")
+          );
+        }
+      }
+      if (newIds.length > 0) {
+        setSubmittedJobIds((prev) => [...newIds, ...prev]);
+        // Keep files that failed to enqueue selected so the user can retry
+        // them; only successfully submitted files leave the picker.
+        setWhisperxFiles((prev) => prev.filter((f) => !submittedPaths.has(f.path)));
+      }
+    } finally {
+      setWhisperxSubmitting(false);
+    }
+  };
+
   const getActiveModelLabel = (): string => {
     if (isOpenWhisprCloud) return t("notes.upload.openwhisprCloud");
     if (useLocalWhisper) {
       if (localTranscriptionProvider === "nvidia")
         return `Parakeet · ${parakeetModel || "default"}`;
+      if (localTranscriptionProvider === "whisperx") return `WhisperX · ${whisperxModel}`;
       return `Whisper · ${whisperModel || "base"}`;
     }
     if (isSelfHosted) {
@@ -512,7 +744,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
       const ext = f.name.split(".").pop()?.toLowerCase() || "";
-      if (SUPPORTED_EXTENSIONS.includes(ext)) {
+      if (ACCEPTED_UPLOAD_EXTENSIONS.includes(ext)) {
         const filePath = window.electronAPI.getPathForFile(f);
         if (filePath) {
           validFiles.push({ name: f.name, path: filePath, sizeBytes: f.size });
@@ -860,13 +1092,34 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
         className="w-full max-w-md shrink-0 my-auto"
         style={{ animation: "float-up 0.4s ease-out" }}
       >
-        <div className="max-w-[320px] mx-auto">
-          {state === "idle" && providerReady === false && (
-            <NoProviderView t={t} onOpenSettings={() => onOpenSettings?.("uploadTranscription")} />
-          )}
+        {isWhisperxMode ? (
+          <WhisperXJobFlow
+            t={t}
+            files={whisperxFiles}
+            options={whisperxOptions}
+            onOptionsChange={setWhisperxOptions}
+            onDrop={handleWhisperxDrop}
+            onBrowse={handleWhisperxBrowse}
+            onRemoveFile={removeWhisperxFile}
+            onSubmit={handleWhisperxSubmit}
+            submitting={whisperxSubmitting}
+            error={whisperxError}
+            submittedJobIds={submittedJobIds}
+            isDragOver={isDragOver}
+            setIsDragOver={setIsDragOver}
+            getActiveModelLabel={getActiveModelLabel}
+            hasLocalNoteModel={hasLocalNoteModel}
+            noteModel={noteModelLabel}
+          />
+        ) : (
+          <>
+          <div className="max-w-[320px] mx-auto">
+            {state === "idle" && providerReady === false && (
+              <NoProviderView t={t} onOpenSettings={() => onOpenSettings?.("uploadTranscription")} />
+            )}
 
-          {state === "idle" && providerReady !== false && (
-            <>
+            {state === "idle" && providerReady !== false && (
+              <>
               <IdleView
                 t={t}
                 getActiveModelLabel={getActiveModelLabel}
@@ -927,7 +1180,9 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
                       <rect width="28" height="20" rx="4" fill="#FF0000" />
                       <polygon points="11,4 11,16 21,10" fill="white" />
                     </svg>
-                  ) : /\.(mp3|wav|m4a|ogg|flac|aac|webm|opus)(\?|$)/i.test(urlInput) ? (
+                  ) : /\.(mp3|wav|m4a|ogg|oga|flac|aac|webm|opus|mp4|m4v)(\?|$)/i.test(
+                      urlInput
+                    ) ? (
                     <FileAudio
                       size={13}
                       className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground/20 z-10 pointer-events-none"
@@ -1256,7 +1511,20 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
             )}
           </div>
         )}
+          </>
+        )}
       </div>
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => !open && handleConfirmDialogClose()}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmText={confirmDialog.confirmText}
+        cancelText={confirmDialog.cancelText}
+        onConfirm={confirmDialog.onConfirm}
+        variant={confirmDialog.variant}
+      />
 
       <Dialog open={showNewFolderDialog} onOpenChange={setShowNewFolderDialog}>
         <DialogContent className="sm:max-w-95">
@@ -1293,6 +1561,179 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+interface WhisperXJobFlowProps {
+  t: (key: string, options?: Record<string, unknown>) => string;
+  files: Array<{ name: string; path: string; sizeBytes: number }>;
+  options: WhisperXOptions;
+  onOptionsChange: (next: WhisperXOptions) => void;
+  onDrop: (e: React.DragEvent) => void;
+  onBrowse: () => void;
+  onRemoveFile: (path: string) => void;
+  onSubmit: () => void;
+  submitting: boolean;
+  error: string | null;
+  submittedJobIds: string[];
+  isDragOver: boolean;
+  setIsDragOver: (v: boolean) => void;
+  getActiveModelLabel: () => string;
+  hasLocalNoteModel: boolean;
+  noteModel: string;
+}
+
+function WhisperXJobFlow({
+  t,
+  files,
+  options,
+  onOptionsChange,
+  onDrop,
+  onBrowse,
+  onRemoveFile,
+  onSubmit,
+  submitting,
+  error,
+  submittedJobIds,
+  isDragOver,
+  setIsDragOver,
+  getActiveModelLabel,
+  hasLocalNoteModel,
+  noteModel,
+}: WhisperXJobFlowProps) {
+  const canSubmit = files.length > 0 && !submitting && !validateWhisperXOptions(options);
+
+  return (
+    <div className="w-full max-w-md mx-auto space-y-4" style={{ animation: "float-up 0.3s ease-out" }}>
+      <div className="flex flex-col items-center">
+        <div className="w-10 h-10 rounded-[10px] bg-linear-to-b from-primary/10 to-primary/[0.03] dark:from-primary/15 dark:to-primary/5 border border-primary/15 dark:border-primary/20 flex items-center justify-center mb-3">
+          <Upload size={17} strokeWidth={1.5} className="text-primary/50" />
+        </div>
+        <h2 className="text-xs font-semibold text-foreground mb-1">
+          {t("whisperx.upload.title")}
+        </h2>
+        <p className="text-xs text-foreground/25">
+          {t("notes.upload.using", { model: getActiveModelLabel() })}
+        </p>
+      </div>
+
+      {/* Multi-file drop zone */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={t("whisperx.upload.dropOrBrowse")}
+        onDrop={onDrop}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          setIsDragOver(false);
+        }}
+        onClick={onBrowse}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onBrowse();
+          }
+        }}
+        className={cn(
+          "rounded-lg p-6 text-center cursor-pointer transition-[background-color,border-color] duration-300",
+          "bg-surface-1/40 dark:bg-white/[0.03] border border-foreground/6 dark:border-white/6",
+          "hover:bg-surface-1/60 dark:hover:bg-white/[0.05] hover:border-foreground/12 dark:hover:border-white/10",
+          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30",
+          isDragOver && "border-primary/30 bg-primary/[0.04] dark:bg-primary/[0.06]"
+        )}
+      >
+        <div className="flex flex-col items-center gap-1.5">
+          <Upload size={16} className="text-foreground/25 dark:text-foreground/35" />
+          <p className="text-xs text-foreground/40">{t("whisperx.upload.dropOrBrowse")}</p>
+          <p className="text-xs text-foreground/15 tracking-wide">
+            {t("notes.upload.supportedFormats")}
+          </p>
+        </div>
+      </div>
+
+      {/* Selected files */}
+      {files.length > 0 && (
+        <div className="space-y-1.5">
+          {files.map((f) => (
+            <div
+              key={f.path}
+              className="flex items-center gap-2.5 rounded-lg border border-foreground/8 dark:border-white/6 bg-surface-1/40 dark:bg-white/[0.03] p-2.5"
+            >
+              <FileAudio size={14} className="text-primary/60 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-foreground/70 truncate font-medium">{f.name}</p>
+                {f.sizeBytes > 0 && (
+                  <p className="text-xs text-foreground/25">{formatFileSize(f.sizeBytes)}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => onRemoveFile(f.path)}
+                aria-label={t("whisperx.upload.removeFile")}
+                className="text-foreground/15 hover:text-foreground/40 transition-colors p-1 rounded"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Options */}
+      <div className="rounded-lg border border-foreground/8 dark:border-white/6 bg-surface-1/40 dark:bg-white/[0.03] p-3 space-y-2.5">
+        <WhisperXUploadOptions value={options} onChange={onOptionsChange} />
+        <p className="text-xs text-foreground/30 border-t border-foreground/6 dark:border-white/6 pt-2.5">
+          {hasLocalNoteModel
+            ? t("whisperx.notes.notesModelInfo", { model: noteModel })
+            : t("whisperx.notes.notesModelNone")}
+        </p>
+      </div>
+
+      {error && (
+        <div className="rounded-lg border border-destructive/15 bg-destructive/[0.03] px-3 py-2.5">
+          <div className="flex items-start gap-2">
+            <AlertCircle size={13} className="text-destructive/50 shrink-0 mt-0.5" />
+            <p className="text-xs text-destructive/70 leading-relaxed">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Action */}
+      <div className="flex justify-center">
+        <Button
+          variant="default"
+          size="sm"
+          onClick={onSubmit}
+          disabled={!canSubmit}
+          className="h-8 text-xs px-5"
+        >
+          {submitting
+            ? t("whisperx.upload.submitting")
+            : files.length > 1
+              ? t("whisperx.upload.transcribeCount", { count: files.length })
+              : t("whisperx.upload.transcribe")}
+        </Button>
+      </div>
+
+      {/* This session's jobs */}
+      {submittedJobIds.length > 0 && (
+        <div className="pt-1">
+          <p className="text-xs font-medium text-foreground/40 mb-2">
+            {t("whisperx.progress.sessionJobs")}
+          </p>
+          <RecordingJobProgress jobIds={submittedJobIds} />
+        </div>
+      )}
+
+      {/* All recordings (any status) — review, retry, delete, transcript review */}
+      <div className="pt-1 border-t border-foreground/6 dark:border-white/6">
+        <RecordingJobsPanel />
+      </div>
     </div>
   );
 }
@@ -1385,7 +1826,7 @@ function IdleView({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".mp3,.wav,.m4a,.webm,.ogg,.oga,.flac,.aac"
+        accept={ACCEPTED_UPLOAD_EXTENSIONS.map((ext) => `.${ext}`).join(",")}
         onChange={handleFileInputChange}
         className="sr-only"
         tabIndex={-1}

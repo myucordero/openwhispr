@@ -131,6 +131,24 @@ test("agent is reachable in self-hosted mode without an explicit model", async (
   );
 });
 
+test("agent is reachable with the CLI backend without an explicit model", async () => {
+  const { resolveDictationAgentReachability } = await load();
+
+  // Seeded local-only config: dictationAgent provider "claude-cli", empty model.
+  // The CLI uses the account default, so an empty model must still be reachable —
+  // otherwise the agent silently degrades to cleanup / the voice hotkey skips.
+  assert.equal(
+    resolveDictationAgentReachability({
+      useDictationAgent: true,
+      dictationAgentModel: "",
+      isCloudAgent: false,
+      isSelfHostedAgent: false,
+      isCliAgent: true,
+    }),
+    true
+  );
+});
+
 test("agent is unreachable with an empty model on a model-required provider", async () => {
   const { resolveDictationAgentReachability } = await load();
 
