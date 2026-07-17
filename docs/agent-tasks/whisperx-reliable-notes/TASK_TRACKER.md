@@ -163,29 +163,31 @@ Two real bugs found by the orchestration test agent and FIXED: (1) whisperxProce
 
 ## 4. OpenWhispr Integration
 
-- [ ] `whisperx` local upload provider registered
-- [ ] Existing live dictation remains unchanged
-- [ ] Settings and profile presets implemented
-- [ ] Upload UI options implemented
-- [ ] Batch queue integration implemented
-- [ ] Real stage progress UI implemented
-- [ ] Cancel/retry implemented
-- [ ] Language and speaker-count controls implemented
-- [ ] Custom dictionary hotwords integrated
-- [ ] Narrow preload/IPC contracts implemented
+- [x] `whisperx` local upload provider registered (LocalTranscriptionProvider union + both settingsStore coercion sites + TranscriptionModelPicker third tab with readiness panel + provision flow)
+- [x] Existing live dictation remains unchanged (no dictation path touched; transcribe-local-whisper untouched; full suite green)
+- [x] Settings and profile presets implemented (whisperxModel setting; WhisperXUploadOptions: profile/language/diarization/speaker segmented control/advanced model-compute-batch)
+- [x] Upload UI options implemented (UploadAudioView whisperx mode; multi-file drop/browse whisperx-only; model-download consent dialog wired to allowModelDownload)
+- [x] Batch queue integration implemented (multi-file submit → sequential FIFO in main-process RecordingJobManager per D-102)
+- [x] Real stage progress UI implemented (RecordingJobProgress: real stage/progress events, honest indeterminate when no total, warning badges)
+- [x] Cancel/retry implemented (UI buttons → whisperx-cancel-job/whisperx-retry-job → process-tree kill / requeue)
+- [x] Language and speaker-count controls implemented (auto/en/es; Auto|Exact|Range 1–32 validated)
+- [x] Custom dictionary hotwords integrated (customDictionary from settings store → startJob payload → sanitized hotwords + initialPrompt)
+- [x] Narrow preload/IPC contracts implemented (16 whisperx-* channels incl. whisperx-read-source-audio; jobId-keyed reads only — renderer never supplies paths post-creation; payload validation main-side; redacted error envelopes)
 
 ## 5. Persistence and Artifacts
 
-- [ ] Job database migration implemented
-- [ ] Artifact manifest and hashes implemented
-- [ ] Atomic finalize/incomplete cleanup implemented
-- [ ] Canonical transcript JSON persisted
-- [ ] Raw TXT persisted
-- [ ] Speaker Markdown persisted
-- [ ] SRT/VTT persisted
-- [ ] Retention and delete semantics implemented
-- [ ] External source file protected from deletion
-- [ ] Reopen/resume/retry behavior implemented
+- [x] Job database migration implemented (recordingJobsRepo.js — Phase 1; wired into initDatabase)
+- [x] Artifact manifest and hashes implemented (manifest.json with descriptors; streaming sha256 verify on finalize)
+- [x] Atomic finalize/incomplete cleanup implemented (.incomplete-<jobId> staging → verify → atomic dir rename; stale staging cleanup at startup; failure cleanup keeps finalized outputs)
+- [x] Canonical transcript JSON persisted (validated on finalize + SOURCE_HASH_MISMATCH cross-check)
+- [x] Raw TXT persisted; [x] Speaker Markdown persisted (when diarization); [x] SRT/VTT persisted
+- [x] Retention and delete semantics implemented (delete removes managed artifacts + DB cascade; storage usage IPC + UI footer; confirm dialog states external file is kept)
+- [x] External source file protected from deletion (store can only delete inside jobsRoot; tested with outside-root source file)
+- [x] Reopen/resume/retry behavior implemented (RecordingJobsPanel lists all statuses across restarts; transcript view reopens finalized jobs; retry from failed/cancelled/interrupted; startup recovery → interrupted)
+- [x] Transcript review UI (RecordingTranscriptView: paged segments, speaker rename via mapping layer only, inline corrections as revisions with original preserved, flag badges, TXT/MD/SRT/VTT exports; RecordingAudioPlayer: bounded jobId-keyed source-audio playback + timestamp seek)
+
+Phase 3 exit evidence (2026-07-17): npm test 322/322; lint 0 errors; typecheck clean; build:renderer clean.
+i18n: whisperx.* namespaces complete in en + es (~150 keys each); remaining locales (fr, de, pt, it, ru, zh-CN, zh-TW, ja) queued for the Phase 5 sweep.
 
 ## 6. Reliable Notes
 

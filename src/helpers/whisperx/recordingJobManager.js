@@ -106,7 +106,14 @@ class RecordingJobManager {
   }
 
   // ------------------------------------------------------------------ create
-  async createJob({ sourcePath, displayName, profile, overrides = {}, customDictionary = [] }) {
+  async createJob({
+    sourcePath,
+    displayName,
+    profile,
+    overrides = {},
+    customDictionary = [],
+    allowModelDownload = false,
+  }) {
     let stat;
     try {
       stat = fs.statSync(sourcePath);
@@ -120,6 +127,9 @@ class RecordingJobManager {
     }
 
     const settings = resolveJobSettings(profile, overrides, customDictionary);
+    // Per-job offline override: when the caller allows a model download, the
+    // worker's offline env is relaxed for this job only (see _buildRequest).
+    settings.allowModelDownload = Boolean(allowModelDownload);
     const jobId = this.uuid();
     const createdAt = this.now();
 
@@ -320,7 +330,7 @@ class RecordingJobManager {
         ...(settings.maxSpeakers !== undefined ? { maxSpeakers: settings.maxSpeakers } : {}),
       },
       runtime: {
-        offline: this.offline,
+        offline: this.offline && !settings.allowModelDownload,
         modelCacheDirectory: this.modelCacheDirectory,
         temporaryDirectory: this.temporaryDirectory,
       },

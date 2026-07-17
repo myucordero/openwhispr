@@ -269,6 +269,37 @@ contextBridge.exposeInMainWorld("electronAPI", {
     (callback) => (_event, data) => callback(data)
   ),
 
+  // WhisperX recording jobs (reliable notes pipeline)
+  whisperxGetReadiness: () => ipcRenderer.invoke("whisperx-get-readiness"),
+  whisperxProvisionRuntime: () => ipcRenderer.invoke("whisperx-provision-runtime"),
+  whisperxStartJob: (payload) => ipcRenderer.invoke("whisperx-start-job", payload),
+  whisperxCancelJob: (jobId) => ipcRenderer.invoke("whisperx-cancel-job", jobId),
+  whisperxRetryJob: (jobId) => ipcRenderer.invoke("whisperx-retry-job", jobId),
+  whisperxDeleteJob: (jobId) => ipcRenderer.invoke("whisperx-delete-job", jobId),
+  whisperxGetJob: (jobId) => ipcRenderer.invoke("whisperx-get-job", jobId),
+  whisperxListJobs: (query) => ipcRenderer.invoke("whisperx-list-jobs", query),
+  whisperxReadTranscriptPage: (payload) =>
+    ipcRenderer.invoke("whisperx-read-transcript-page", payload),
+  whisperxReadArtifact: (payload) => ipcRenderer.invoke("whisperx-read-artifact", payload),
+  whisperxReadSourceAudio: (jobId) => ipcRenderer.invoke("whisperx-read-source-audio", jobId),
+  whisperxSaveSpeakerMapping: (payload) =>
+    ipcRenderer.invoke("whisperx-save-speaker-mapping", payload),
+  whisperxGetSpeakerMappings: (jobId) =>
+    ipcRenderer.invoke("whisperx-get-speaker-mappings", jobId),
+  whisperxSaveTranscriptRevision: (payload) =>
+    ipcRenderer.invoke("whisperx-save-transcript-revision", payload),
+  whisperxListTranscriptRevisions: (jobId) =>
+    ipcRenderer.invoke("whisperx-list-transcript-revisions", jobId),
+  whisperxGetStorageUsage: () => ipcRenderer.invoke("whisperx-storage-usage"),
+  onWhisperxJobEvent: registerListener(
+    "whisperx-job-event",
+    (callback) => (_event, data) => callback(data)
+  ),
+  onWhisperxProvisionProgress: registerListener(
+    "whisperx-provision-progress",
+    (callback) => (_event, data) => callback(data)
+  ),
+
   // Speaker name mapping
   getSpeakerMappings: (noteId) => ipcRenderer.invoke("get-speaker-mappings", noteId),
   setSpeakerMapping: (noteId, speakerId, displayName, email, profileId) =>

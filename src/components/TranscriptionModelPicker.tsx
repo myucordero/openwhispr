@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { Download, Trash2, Cloud, Lock, X, Zap, Check } from "lucide-react";
+import { Download, Trash2, Cloud, Lock, X, Zap, Check, AlertCircle, Loader2 } from "lucide-react";
 import { ProviderIcon } from "./ui/ProviderIcon";
 import { ProviderTabs } from "./ui/ProviderTabs";
 import ModelCardList from "./ui/ModelCardList";
@@ -29,6 +29,8 @@ import { API_ENDPOINTS, normalizeBaseUrl } from "../config/constants";
 import { createExternalLinkHandler } from "../utils/externalLinks";
 import { getCachedPlatform } from "../utils/platform";
 import type { CudaWhisperStatus } from "../types/electron";
+import type { WhisperXReadiness, WhisperXModel } from "../types/whisperx";
+import { Badge } from "./ui/badge";
 import logger from "../utils/logger";
 
 interface LocalModel {
@@ -210,7 +212,222 @@ const VALID_CLOUD_PROVIDER_IDS = CLOUD_PROVIDER_TABS.map((p) => p.id);
 const LOCAL_PROVIDER_TABS: Array<{ id: string; name: string; disabled?: boolean }> = [
   { id: "whisper", name: "OpenAI" },
   { id: "nvidia", name: "NVIDIA" },
+  { id: "whisperx", name: "WhisperX" },
 ];
+
+const WHISPERX_MODELS: WhisperXModel[] = ["large-v3-turbo", "large-v3"];
+
+interface WhisperXPanelProps {
+  styles: ModelPickerStyles;
+}
+
+/**
+ * WhisperX local-provider panel: readiness summary + one-click runtime
+ * provisioning + model selection. All whisperx* preload methods are optional,
+ * so every call is guarded and the panel degrades to an "unavailable" state.
+ */
+function WhisperXPanel({ styles }: WhisperXPanelProps) {
+  const { t } = useTranslation();
+  const whisperxModel = useSettingsStore((s) => s.whisperxModel);
+  const setWhisperxModel = useSettingsStore((s) => s.setWhisperxModel);
+
+  const [readiness, setReadiness] = useState<
+    (Partial<WhisperXReadiness> & { success?: boolean; error?: string }) | null
+  >(null);
+  const [checking, setChecking] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+  const [provisioning, setProvisioning] = useState(false);
+  const [provisionLog, setProvisionLog] = useState<string[]>([]);
+
+  const checkReadiness = useCallback(async () => {
+    if (!window.electronAPI?.whisperxGetReadiness) {
+      setUnavailable(true);
+      return;
+    }
+    setChecking(true);
+    try {
+      const res = await window.electronAPI.whisperxGetReadiness();
+      setReadiness(res ?? null);
+    } catch (error) {
+      logger.error("Failed to check WhisperX readiness", { error }, "whisperx");
+      setReadiness(null);
+    } finally {
+      setChecking(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkReadiness();
+  }, [checkReadiness]);
+
+  const handleProvision = useCallback(async () => {
+    if (!window.electronAPI?.whisperxProvisionRuntime) return;
+    setProvisioning(true);
+    setProvisionLog([]);
+    const cleanup = window.electronAPI.onWhisperxProvisionProgress?.((p) => {
+      setProvisionLog((prev) => [...prev, p.message]);
+    });
+    try {
+      await window.electronAPI.whisperxProvisionRuntime();
+    } catch (error) {
+      logger.error("WhisperX provisioning failed", { error }, "whisperx");
+    } finally {
+      cleanup?.();
+      setProvisioning(false);
+      await checkReadiness();
+    }
+  }, [checkReadiness]);
+
+  if (unavailable) {
+    return (
+      <div className="rounded-md border border-border bg-surface-1 p-3">
+        <div className="flex items-start gap-2">
+          <AlertCircle size={13} className="text-warning shrink-0 mt-0.5" />
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {t("whisperx.readiness.unavailable")}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const runtimeInstalled = readiness?.runtimeInstalled ?? false;
+  const cudaAvailable = readiness?.cudaAvailable ?? false;
+  const asrReady = readiness?.asrModelReady ?? false;
+  const tokenConfigured = readiness?.diarizationTokenConfigured ?? false;
+
+  const readyBadge = (label: string, ok: boolean, detail?: string | null) => (
+    <Badge variant={ok ? "success" : "outline"} className="gap-1">
+      {ok ? <Check size={10} /> : <X size={10} />}
+      {label}
+      {detail ? <span className="opacity-60">· {detail}</span> : null}
+    </Badge>
+  );
+
+  return (
+    <div className="space-y-2">
+      <div className="rounded-md border border-border bg-surface-1 p-2.5 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-foreground">
+            {t("whisperx.readiness.title")}
+          </span>
+          <Button
+            onClick={checkReadiness}
+            disabled={checking}
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+          >
+            {checking ? (
+              <Loader2 size={11} className="animate-spin" />
+            ) : (
+              t("whisperx.readiness.recheck")
+            )}
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {readyBadge(
+            t("whisperx.readiness.runtime"),
+            runtimeInstalled,
+            readiness?.runtimeVersion ?? null
+          )}
+          {readyBadge(
+            t("whisperx.readiness.cuda"),
+            cudaAvailable,
+            cudaAvailable ? (readiness?.gpuName ?? null) : t("whisperx.readiness.cpuOnly")
+          )}
+          {readyBadge(t("whisperx.readiness.models"), asrReady)}
+          {readyBadge(t("whisperx.readiness.token"), tokenConfigured)}
+        </div>
+
+        {!runtimeInstalled && (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {t("whisperx.readiness.setupHint")}
+            </p>
+            <Button
+              onClick={handleProvision}
+              disabled={provisioning}
+              size="sm"
+              variant="default"
+              className="h-7 px-3 text-xs"
+            >
+              {provisioning ? (
+                <>
+                  <Loader2 size={11} className="mr-1.5 animate-spin" />
+                  {t("whisperx.readiness.settingUp")}
+                </>
+              ) : (
+                t("whisperx.readiness.setUp")
+              )}
+            </Button>
+          </div>
+        )}
+
+        {provisionLog.length > 0 && (
+          <div
+            role="log"
+            aria-live="polite"
+            className="max-h-28 overflow-y-auto rounded-sm bg-background/60 border border-border/60 p-2 font-mono text-[10px] leading-relaxed text-muted-foreground"
+          >
+            {provisionLog.map((line, i) => (
+              <div key={i} className="truncate">
+                {line}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-foreground">{t("whisperx.upload.model")}</label>
+        <div className="space-y-0.5">
+          {WHISPERX_MODELS.map((modelId) => {
+            const isSelected = modelId === whisperxModel;
+            return (
+              <button
+                key={modelId}
+                type="button"
+                onClick={() => setWhisperxModel(modelId)}
+                aria-pressed={isSelected}
+                className={`relative w-full text-left overflow-hidden rounded-md border transition-colors duration-200 ${
+                  isSelected ? styles.modelCard.selected : styles.modelCard.default
+                } cursor-pointer`}
+              >
+                <div className="flex items-center gap-1.5 p-2">
+                  <div className="shrink-0">
+                    <div
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        isSelected ? "bg-primary" : "bg-muted-foreground/20"
+                      }`}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                    <span className="font-semibold text-sm text-foreground truncate tracking-tight">
+                      {t(`whisperx.upload.models.${modelId}.name`)}
+                    </span>
+                    <span className="text-xs text-muted-foreground/50 tabular-nums shrink-0">
+                      {t(`whisperx.upload.models.${modelId}.size`)}
+                    </span>
+                    {modelId === "large-v3-turbo" && (
+                      <span className={styles.badges.recommended}>{t("common.recommended")}</span>
+                    )}
+                  </div>
+                  {isSelected && (
+                    <span className="text-xs font-medium text-primary px-2 py-0.5 bg-primary/10 rounded-sm shrink-0">
+                      {t("common.active")}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface ModeToggleProps {
   useLocalWhisper: boolean;
@@ -985,6 +1202,7 @@ export default function TranscriptionModelPicker({
           <div>
             {internalLocalProvider === "whisper" && renderLocalModels()}
             {internalLocalProvider === "nvidia" && renderParakeetModels()}
+            {internalLocalProvider === "whisperx" && <WhisperXPanel styles={styles} />}
           </div>
         </>
       )}

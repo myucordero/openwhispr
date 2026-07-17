@@ -22,10 +22,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  ConfirmDialog,
+} from "../ui/dialog";
 import { Input } from "../ui/input";
 import type { FolderItem } from "../../types/electron";
 import { findDefaultFolder, MEETINGS_FOLDER_NAME } from "./shared";
+import { useDialogs } from "../../hooks/useDialogs";
+import { useRecordingJobsStore } from "../../stores/recordingJobsStore";
+import WhisperXUploadOptions, {
+  defaultWhisperXOptions,
+  validateWhisperXOptions,
+  type WhisperXOptions,
+} from "./WhisperXUploadOptions";
+import RecordingJobProgress from "./RecordingJobProgress";
+import RecordingJobsPanel from "./RecordingJobsPanel";
 import { useAuth } from "../../hooks/useAuth";
 import { useUsage } from "../../hooks/useUsage";
 import { useSettings } from "../../hooks/useSettings";
@@ -93,6 +109,23 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [providerReady, setProviderReady] = useState<boolean | null>(null);
 
+  // WhisperX job flow (multi-file). Only active when the local WhisperX provider
+  // is selected; other providers keep the single-file state machine above.
+  const whisperxModel = useSettingsStore((s) => s.whisperxModel);
+  const startWhisperxJob = useRecordingJobsStore((s) => s.startJob);
+  const attachWhisperxEvents = useRecordingJobsStore((s) => s.attachEvents);
+  const [whisperxFiles, setWhisperxFiles] = useState<
+    Array<{ name: string; path: string; sizeBytes: number }>
+  >([]);
+  const [whisperxOptions, setWhisperxOptions] = useState<WhisperXOptions>(() =>
+    defaultWhisperXOptions("meeting", whisperxModel)
+  );
+  const [submittedJobIds, setSubmittedJobIds] = useState<string[]>([]);
+  const [whisperxSubmitting, setWhisperxSubmitting] = useState(false);
+  const [whisperxError, setWhisperxError] = useState<string | null>(null);
+  const { confirmDialog, showConfirmDialog, hideConfirmDialog } = useDialogs();
+  const confirmResolverRef = useRef<((v: boolean) => void) | null>(null);
+
   const { isSignedIn } = useAuth();
   const usage = useUsage();
   const isProUser = usage?.isSubscribed || usage?.isTrial;
@@ -136,6 +169,7 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
 
   // Mode detection
   const isByok = !useLocalWhisper && !isOpenWhisprCloud;
+  const isWhisperxMode = useLocalWhisper && localTranscriptionProvider === "whisperx";
 
   // Mode-aware file size validation
   // Local: no limits at all
@@ -234,11 +268,159 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
     customTranscriptionApiKey,
   ]);
 
+  // Subscribe once to WhisperX job events so progress updates flow into the store.
+  useEffect(() => {
+    if (!isWhisperxMode) return;
+    attachWhisperxEvents();
+  }, [isWhisperxMode, attachWhisperxEvents]);
+
+  const addWhisperxFiles = (
+    incoming: Array<{ name: string; path: string; sizeBytes: number }>
+  ) => {
+    if (incoming.length === 0) return;
+    setWhisperxFiles((prev) => {
+      const seen = new Set(prev.map((f) => f.path));
+      const merged = [...prev];
+      for (const f of incoming) {
+        if (!seen.has(f.path)) {
+          merged.push(f);
+          seen.add(f.path);
+        }
+      }
+      return merged;
+    });
+    setWhisperxError(null);
+  };
+
+  const handleWhisperxBrowse = async () => {
+    const res = await window.electronAPI.selectAudioFile();
+    if (!res.canceled && res.filePath) {
+      const name = res.filePath.split(/[/\\]/).pop() || "audio";
+      const sizeBytes = (await window.electronAPI.getFileSize?.(res.filePath)) ?? 0;
+      addWhisperxFiles([{ name, path: res.filePath, sizeBytes }]);
+    }
+  };
+
+  const handleWhisperxDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const collected: Array<{ name: string; path: string; sizeBytes: number }> = [];
+    for (const f of Array.from(e.dataTransfer.files)) {
+      const ext = f.name.split(".").pop()?.toLowerCase() || "";
+      if (!SUPPORTED_EXTENSIONS.includes(ext)) continue;
+      const filePath = window.electronAPI.getPathForFile(f);
+      if (!filePath) continue;
+      collected.push({ name: f.name, path: filePath, sizeBytes: f.size });
+    }
+    addWhisperxFiles(collected);
+  };
+
+  const removeWhisperxFile = (path: string) => {
+    setWhisperxFiles((prev) => prev.filter((f) => f.path !== path));
+  };
+
+  const confirmModelDownload = (): Promise<boolean> =>
+    new Promise<boolean>((resolve) => {
+      confirmResolverRef.current = resolve;
+      showConfirmDialog({
+        title: t("whisperx.upload.downloadModelsTitle"),
+        description: t("whisperx.upload.downloadModelsDescription"),
+        confirmText: t("whisperx.upload.downloadModelsConfirm"),
+        cancelText: t("notes.upload.cancel"),
+        onConfirm: () => {
+          confirmResolverRef.current = null;
+          resolve(true);
+        },
+      });
+    });
+
+  const handleConfirmDialogClose = () => {
+    hideConfirmDialog();
+    if (confirmResolverRef.current) {
+      confirmResolverRef.current(false);
+      confirmResolverRef.current = null;
+    }
+  };
+
+  const handleWhisperxSubmit = async () => {
+    if (whisperxFiles.length === 0 || whisperxSubmitting) return;
+
+    const validationError = validateWhisperXOptions(whisperxOptions);
+    if (validationError) {
+      setWhisperxError(t(validationError));
+      return;
+    }
+    setWhisperxError(null);
+
+    // Prompt for model download when the ASR model isn't present yet.
+    let allowModelDownload = false;
+    const readiness = await window.electronAPI?.whisperxGetReadiness?.();
+    const asrReady = readiness?.asrModelReady ?? true;
+    if (!asrReady) {
+      const confirmed = await confirmModelDownload();
+      if (!confirmed) return;
+      allowModelDownload = true;
+    }
+
+    const opts = whisperxOptions;
+    const overrides: NonNullable<Parameters<typeof startWhisperxJob>[0]["overrides"]> = {
+      language: opts.language,
+      model: opts.model,
+      computeType: opts.computeType,
+      batchSize: opts.batchSize,
+      diarization: opts.diarization,
+    };
+    if (opts.diarization) {
+      if (opts.speakerMode === "exact") {
+        overrides.exactSpeakers = opts.exactSpeakers;
+      } else if (opts.speakerMode === "range") {
+        overrides.minSpeakers = opts.minSpeakers;
+        overrides.maxSpeakers = opts.maxSpeakers;
+      }
+    }
+
+    const customDictionary = useSettingsStore.getState().customDictionary;
+
+    setWhisperxSubmitting(true);
+    try {
+      const newIds: string[] = [];
+      // Submit sequentially; the main process queues jobs FIFO.
+      for (const f of whisperxFiles) {
+        const res = await startWhisperxJob({
+          sourcePath: f.path,
+          displayName: f.name,
+          profile: opts.profile,
+          overrides,
+          customDictionary,
+          allowModelDownload,
+        });
+        if (res.success && res.job) {
+          newIds.push(res.job.id);
+        } else {
+          setWhisperxError(
+            res.code
+              ? t(`whisperx.errors.${res.code}`, {
+                  defaultValue: res.error || t("whisperx.errors.unknown"),
+                })
+              : res.error || t("whisperx.errors.unknown")
+          );
+        }
+      }
+      if (newIds.length > 0) {
+        setSubmittedJobIds((prev) => [...newIds, ...prev]);
+        setWhisperxFiles([]);
+      }
+    } finally {
+      setWhisperxSubmitting(false);
+    }
+  };
+
   const getActiveModelLabel = (): string => {
     if (isOpenWhisprCloud) return t("notes.upload.openwhisprCloud");
     if (useLocalWhisper) {
       if (localTranscriptionProvider === "nvidia")
         return `Parakeet · ${parakeetModel || "default"}`;
+      if (localTranscriptionProvider === "whisperx") return `WhisperX · ${whisperxModel}`;
       return `Whisper · ${whisperModel || "base"}`;
     }
     const name =
@@ -574,69 +756,88 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
           </div>
         )}
 
-        <div className="max-w-[320px] mx-auto">
-          {state === "idle" && providerReady === false && (
-            <NoProviderView t={t} onOpenSettings={() => onOpenSettings?.("transcription")} />
-          )}
+        {isWhisperxMode ? (
+          <WhisperXJobFlow
+            t={t}
+            files={whisperxFiles}
+            options={whisperxOptions}
+            onOptionsChange={setWhisperxOptions}
+            onDrop={handleWhisperxDrop}
+            onBrowse={handleWhisperxBrowse}
+            onRemoveFile={removeWhisperxFile}
+            onSubmit={handleWhisperxSubmit}
+            submitting={whisperxSubmitting}
+            error={whisperxError}
+            submittedJobIds={submittedJobIds}
+            isDragOver={isDragOver}
+            setIsDragOver={setIsDragOver}
+            getActiveModelLabel={getActiveModelLabel}
+          />
+        ) : (
+          <div className="max-w-[320px] mx-auto">
+            {state === "idle" && providerReady === false && (
+              <NoProviderView t={t} onOpenSettings={() => onOpenSettings?.("transcription")} />
+            )}
 
-          {state === "idle" && providerReady !== false && (
-            <IdleView
-              t={t}
-              getActiveModelLabel={getActiveModelLabel}
-              handleDrop={handleDrop}
-              handleBrowse={handleBrowse}
-              isDragOver={isDragOver}
-              setIsDragOver={setIsDragOver}
-            />
-          )}
+            {state === "idle" && providerReady !== false && (
+              <IdleView
+                t={t}
+                getActiveModelLabel={getActiveModelLabel}
+                handleDrop={handleDrop}
+                handleBrowse={handleBrowse}
+                isDragOver={isDragOver}
+                setIsDragOver={setIsDragOver}
+              />
+            )}
 
-          {state === "selected" && file && (
-            <SelectedView
-              t={t}
-              file={file}
-              getActiveModelLabel={getActiveModelLabel}
-              reset={reset}
-              handleTranscribe={handleTranscribe}
-              requiresUpgrade={!!requiresUpgrade}
-              fileTooLarge={fileTooLarge}
-              isLargeFile={isLargeFile}
-              isOpenWhisprCloud={isOpenWhisprCloud}
-              byokTooLarge={byokTooLarge}
-              requiresAccount={requiresAccount}
-              isProUser={!!isProUser}
-              onUpgrade={() => usage?.openCheckout()}
-              onCreateAccount={handleCreateAccount}
-              onSwitchToCloud={switchToCloud}
-            />
-          )}
+            {state === "selected" && file && (
+              <SelectedView
+                t={t}
+                file={file}
+                getActiveModelLabel={getActiveModelLabel}
+                reset={reset}
+                handleTranscribe={handleTranscribe}
+                requiresUpgrade={!!requiresUpgrade}
+                fileTooLarge={fileTooLarge}
+                isLargeFile={isLargeFile}
+                isOpenWhisprCloud={isOpenWhisprCloud}
+                byokTooLarge={byokTooLarge}
+                requiresAccount={requiresAccount}
+                isProUser={!!isProUser}
+                onUpgrade={() => usage?.openCheckout()}
+                onCreateAccount={handleCreateAccount}
+                onSwitchToCloud={switchToCloud}
+              />
+            )}
 
-          {state === "transcribing" && (
-            <TranscribingView
-              t={t}
-              progress={progress}
-              getTranscribingLabel={getTranscribingLabel}
-              file={file}
-              chunkProgress={chunkProgress}
-            />
-          )}
+            {state === "transcribing" && (
+              <TranscribingView
+                t={t}
+                progress={progress}
+                getTranscribingLabel={getTranscribingLabel}
+                file={file}
+                chunkProgress={chunkProgress}
+              />
+            )}
 
-          {state === "complete" && result && (
-            <CompleteView
-              t={t}
-              result={result}
-              folders={folders}
-              selectedFolderId={selectedFolderId}
-              handleFolderChange={handleFolderChange}
-              noteId={noteId}
-              onNoteCreated={onNoteCreated}
-              reset={reset}
-            />
-          )}
+            {state === "complete" && result && (
+              <CompleteView
+                t={t}
+                result={result}
+                folders={folders}
+                selectedFolderId={selectedFolderId}
+                handleFolderChange={handleFolderChange}
+                noteId={noteId}
+                onNoteCreated={onNoteCreated}
+                reset={reset}
+              />
+            )}
 
-          {state === "error" && error && (
-            <ErrorView t={t} error={error} reset={reset} handleTranscribe={handleTranscribe} />
-          )}
-        </div>
+            {state === "error" && error && (
+              <ErrorView t={t} error={error} reset={reset} handleTranscribe={handleTranscribe} />
+            )}
+          </div>
+        )}
 
         {!showSetup && (state === "idle" || state === "selected") && (
           <div className="mx-auto mt-5" style={{ maxWidth: advancedOpen ? "448px" : "320px" }}>
@@ -660,6 +861,17 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => !open && handleConfirmDialogClose()}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmText={confirmDialog.confirmText}
+        cancelText={confirmDialog.cancelText}
+        onConfirm={confirmDialog.onConfirm}
+        variant={confirmDialog.variant}
+      />
 
       <Dialog open={showNewFolderDialog} onOpenChange={setShowNewFolderDialog}>
         <DialogContent className="sm:max-w-95">
@@ -696,6 +908,170 @@ export default function UploadAudioView({ onNoteCreated, onOpenSettings }: Uploa
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+interface WhisperXJobFlowProps {
+  t: (key: string, options?: Record<string, unknown>) => string;
+  files: Array<{ name: string; path: string; sizeBytes: number }>;
+  options: WhisperXOptions;
+  onOptionsChange: (next: WhisperXOptions) => void;
+  onDrop: (e: React.DragEvent) => void;
+  onBrowse: () => void;
+  onRemoveFile: (path: string) => void;
+  onSubmit: () => void;
+  submitting: boolean;
+  error: string | null;
+  submittedJobIds: string[];
+  isDragOver: boolean;
+  setIsDragOver: (v: boolean) => void;
+  getActiveModelLabel: () => string;
+}
+
+function WhisperXJobFlow({
+  t,
+  files,
+  options,
+  onOptionsChange,
+  onDrop,
+  onBrowse,
+  onRemoveFile,
+  onSubmit,
+  submitting,
+  error,
+  submittedJobIds,
+  isDragOver,
+  setIsDragOver,
+  getActiveModelLabel,
+}: WhisperXJobFlowProps) {
+  const canSubmit = files.length > 0 && !submitting && !validateWhisperXOptions(options);
+
+  return (
+    <div className="w-full max-w-md mx-auto space-y-4" style={{ animation: "float-up 0.3s ease-out" }}>
+      <div className="flex flex-col items-center">
+        <div className="w-10 h-10 rounded-[10px] bg-linear-to-b from-primary/10 to-primary/[0.03] dark:from-primary/15 dark:to-primary/5 border border-primary/15 dark:border-primary/20 flex items-center justify-center mb-3">
+          <Upload size={17} strokeWidth={1.5} className="text-primary/50" />
+        </div>
+        <h2 className="text-xs font-semibold text-foreground mb-1">
+          {t("whisperx.upload.title")}
+        </h2>
+        <p className="text-xs text-foreground/25">
+          {t("notes.upload.using", { model: getActiveModelLabel() })}
+        </p>
+      </div>
+
+      {/* Multi-file drop zone */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={t("whisperx.upload.dropOrBrowse")}
+        onDrop={onDrop}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          setIsDragOver(false);
+        }}
+        onClick={onBrowse}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onBrowse();
+          }
+        }}
+        className={cn(
+          "rounded-lg p-6 text-center cursor-pointer transition-[background-color,border-color] duration-300",
+          "bg-surface-1/40 dark:bg-white/[0.03] border border-foreground/6 dark:border-white/6",
+          "hover:bg-surface-1/60 dark:hover:bg-white/[0.05] hover:border-foreground/12 dark:hover:border-white/10",
+          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30",
+          isDragOver && "border-primary/30 bg-primary/[0.04] dark:bg-primary/[0.06]"
+        )}
+      >
+        <div className="flex flex-col items-center gap-1.5">
+          <Upload size={16} className="text-foreground/25 dark:text-foreground/35" />
+          <p className="text-xs text-foreground/40">{t("whisperx.upload.dropOrBrowse")}</p>
+          <p className="text-xs text-foreground/15 tracking-wide">
+            {t("notes.upload.supportedFormats")}
+          </p>
+        </div>
+      </div>
+
+      {/* Selected files */}
+      {files.length > 0 && (
+        <div className="space-y-1.5">
+          {files.map((f) => (
+            <div
+              key={f.path}
+              className="flex items-center gap-2.5 rounded-lg border border-foreground/8 dark:border-white/6 bg-surface-1/40 dark:bg-white/[0.03] p-2.5"
+            >
+              <FileAudio size={14} className="text-primary/60 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-foreground/70 truncate font-medium">{f.name}</p>
+                {f.sizeBytes > 0 && (
+                  <p className="text-xs text-foreground/25">{formatFileSize(f.sizeBytes)}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => onRemoveFile(f.path)}
+                aria-label={t("whisperx.upload.removeFile")}
+                className="text-foreground/15 hover:text-foreground/40 transition-colors p-1 rounded"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Options */}
+      <div className="rounded-lg border border-foreground/8 dark:border-white/6 bg-surface-1/40 dark:bg-white/[0.03] p-3">
+        <WhisperXUploadOptions value={options} onChange={onOptionsChange} />
+      </div>
+
+      {error && (
+        <div className="rounded-lg border border-destructive/15 bg-destructive/[0.03] px-3 py-2.5">
+          <div className="flex items-start gap-2">
+            <AlertCircle size={13} className="text-destructive/50 shrink-0 mt-0.5" />
+            <p className="text-xs text-destructive/70 leading-relaxed">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Action */}
+      <div className="flex justify-center">
+        <Button
+          variant="default"
+          size="sm"
+          onClick={onSubmit}
+          disabled={!canSubmit}
+          className="h-8 text-xs px-5"
+        >
+          {submitting
+            ? t("whisperx.upload.submitting")
+            : files.length > 1
+              ? t("whisperx.upload.transcribeCount", { count: files.length })
+              : t("whisperx.upload.transcribe")}
+        </Button>
+      </div>
+
+      {/* This session's jobs */}
+      {submittedJobIds.length > 0 && (
+        <div className="pt-1">
+          <p className="text-xs font-medium text-foreground/40 mb-2">
+            {t("whisperx.progress.sessionJobs")}
+          </p>
+          <RecordingJobProgress jobIds={submittedJobIds} />
+        </div>
+      )}
+
+      {/* All recordings (any status) — review, retry, delete, transcript review */}
+      <div className="pt-1 border-t border-foreground/6 dark:border-white/6">
+        <RecordingJobsPanel />
+      </div>
     </div>
   );
 }

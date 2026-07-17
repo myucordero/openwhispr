@@ -28,6 +28,7 @@ const {
 } = require("./speakerAssignmentPolicy");
 const { downsample24kTo16k, pcm16ToWav } = require("../utils/audioUtils");
 const postMigrationDetector = require("./postMigrationDetector");
+const { redactText } = require("./whisperx/redaction");
 const {
   DEFAULT_EXPECTED_SPEAKER_COUNT,
   MAX_SPEAKER_COUNT,
@@ -316,6 +317,7 @@ class IPCHandlers {
     this.audioTapManager = managers.audioTapManager;
     this.linuxPortalAudioManager = managers.linuxPortalAudioManager;
     this.meetingAecManager = managers.meetingAecManager;
+    this.whisperxMain = managers.whisperxMain;
     this.oauthProtocolRegistered = managers.oauthProtocolRegistered === true;
     this.oauthProtocol = managers.oauthProtocol || "openwhispr";
     this.sessionId = crypto.randomUUID();
@@ -1688,6 +1690,95 @@ class IPCHandlers {
     ipcMain.handle("whisper-server-status", async () => {
       return this.whisperManager.getServerStatus();
     });
+
+    // WhisperX recording job handlers
+    const whisperxCall = async (event, fn) => {
+      try {
+        const result = await fn();
+        return { success: true, ...(result || {}) };
+      } catch (error) {
+        return {
+          success: false,
+          error: redactText(error?.message || "Unknown error"),
+          code: error?.code || "UNKNOWN_INTERNAL_ERROR",
+        };
+      }
+    };
+
+    ipcMain.handle("whisperx-get-readiness", async (event) =>
+      whisperxCall(event, async () => ({ readiness: await this.whisperxMain.getReadiness() }))
+    );
+
+    ipcMain.handle("whisperx-provision-runtime", async (event) =>
+      whisperxCall(event, () =>
+        this.whisperxMain.provisionRuntime({
+          onProgress: (progress) => {
+            if (!event.sender.isDestroyed()) {
+              event.sender.send("whisperx-provision-progress", {
+                step: progress?.step,
+                message: progress?.message,
+              });
+            }
+          },
+        })
+      )
+    );
+
+    ipcMain.handle("whisperx-start-job", async (event, payload) =>
+      whisperxCall(event, () => this.whisperxMain.startJob(payload))
+    );
+
+    ipcMain.handle("whisperx-cancel-job", async (event, jobId) =>
+      whisperxCall(event, () => this.whisperxMain.cancelJob(jobId))
+    );
+
+    ipcMain.handle("whisperx-retry-job", async (event, jobId) =>
+      whisperxCall(event, () => this.whisperxMain.retryJob(jobId))
+    );
+
+    ipcMain.handle("whisperx-delete-job", async (event, jobId) =>
+      whisperxCall(event, () => this.whisperxMain.deleteJob(jobId))
+    );
+
+    ipcMain.handle("whisperx-get-job", async (event, jobId) =>
+      whisperxCall(event, () => this.whisperxMain.getJob(jobId))
+    );
+
+    ipcMain.handle("whisperx-list-jobs", async (event, query) =>
+      whisperxCall(event, () => this.whisperxMain.listJobs(query))
+    );
+
+    ipcMain.handle("whisperx-read-transcript-page", async (event, payload) =>
+      whisperxCall(event, () => this.whisperxMain.readTranscriptPage(payload))
+    );
+
+    ipcMain.handle("whisperx-read-artifact", async (event, payload) =>
+      whisperxCall(event, () => this.whisperxMain.readArtifactText(payload))
+    );
+
+    ipcMain.handle("whisperx-read-source-audio", async (event, jobId) =>
+      whisperxCall(event, () => this.whisperxMain.readSourceAudio(jobId))
+    );
+
+    ipcMain.handle("whisperx-save-speaker-mapping", async (event, payload) =>
+      whisperxCall(event, () => this.whisperxMain.saveSpeakerMapping(payload))
+    );
+
+    ipcMain.handle("whisperx-get-speaker-mappings", async (event, jobId) =>
+      whisperxCall(event, () => this.whisperxMain.getSpeakerMappings(jobId))
+    );
+
+    ipcMain.handle("whisperx-save-transcript-revision", async (event, payload) =>
+      whisperxCall(event, () => this.whisperxMain.saveTranscriptRevision(payload))
+    );
+
+    ipcMain.handle("whisperx-list-transcript-revisions", async (event, jobId) =>
+      whisperxCall(event, () => this.whisperxMain.listTranscriptRevisions(jobId))
+    );
+
+    ipcMain.handle("whisperx-storage-usage", async (event) =>
+      whisperxCall(event, () => this.whisperxMain.getStorageUsage())
+    );
 
     ipcMain.handle("detect-gpu", async () => {
       const { detectNvidiaGpu } = require("../utils/gpuDetection");

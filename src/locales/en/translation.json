@@ -2694,5 +2694,215 @@
       "you": "You",
       "others": "Others"
     }
+  },
+  "whisperx": {
+    "provider": {
+      "name": "WhisperX",
+      "tab": "WhisperX",
+      "description": "High-accuracy local transcription with word-level timestamps and speaker labels."
+    },
+    "readiness": {
+      "title": "WhisperX status",
+      "recheck": "Recheck",
+      "runtime": "Runtime",
+      "cuda": "CUDA",
+      "cpuOnly": "CPU only",
+      "models": "Models",
+      "token": "HF token",
+      "setupHint": "The WhisperX runtime isn't installed yet. Set it up to transcribe locally.",
+      "setUp": "Set up WhisperX",
+      "settingUp": "Setting up…",
+      "unavailable": "WhisperX isn't available in this build."
+    },
+    "upload": {
+      "title": "Transcribe with WhisperX",
+      "dropOrBrowse": "Drop audio files or click to browse",
+      "removeFile": "Remove file",
+      "transcribe": "Transcribe",
+      "transcribeCount": "Transcribe {{count}} files",
+      "submitting": "Queuing…",
+      "profile": "Profile",
+      "language": "Language",
+      "languages": {
+        "auto": "Auto-detect",
+        "en": "English",
+        "es": "Spanish"
+      },
+      "diarization": "Speaker diarization",
+      "diarizationHint": "Identify and label who is speaking.",
+      "model": "Model",
+      "models": {
+        "large-v3-turbo": {
+          "name": "Large v3 Turbo",
+          "size": "~1.6 GB"
+        },
+        "large-v3": {
+          "name": "Large v3",
+          "size": "~3 GB"
+        }
+      },
+      "computeType": "Compute type",
+      "computeTypes": {
+        "float16": "float16 (GPU)",
+        "int8": "int8 (low memory)"
+      },
+      "batchSize": "Batch size",
+      "advanced": "Advanced",
+      "speakers": {
+        "label": "Speaker count",
+        "auto": "Auto",
+        "exact": "Exact",
+        "range": "Range",
+        "exactLabel": "Speakers",
+        "min": "Min",
+        "max": "Max",
+        "rangeError": "Speaker count must be between 1 and 32.",
+        "minMaxError": "Minimum can't be greater than maximum."
+      },
+      "downloadModelsTitle": "Download WhisperX models?",
+      "downloadModelsDescription": "The required models aren't downloaded yet. They'll be downloaded now (~1.6–3 GB) before transcription starts.",
+      "downloadModelsConfirm": "Download & continue"
+    },
+    "profiles": {
+      "memo": {
+        "name": "Memo",
+        "description": "Fast single-speaker transcription for quick voice notes."
+      },
+      "meeting": {
+        "name": "Meeting",
+        "description": "Multi-speaker transcription with diarization for meetings."
+      },
+      "critical-interview": {
+        "name": "Critical interview",
+        "description": "Highest accuracy with alignment and diarization for interviews you can't get wrong."
+      }
+    },
+    "progress": {
+      "sessionJobs": "This session",
+      "cancel": "Cancel",
+      "retry": "Retry",
+      "estimated": "estimated",
+      "countOfTotal": "{{completed}} of {{total}} {{unit}}",
+      "unit": {
+        "seconds": "seconds",
+        "segments": "segments",
+        "percent": "percent",
+        "files": "files"
+      }
+    },
+    "status": {
+      "created": "Created",
+      "queued": "Queued",
+      "validating": "Validating",
+      "preparing": "Preparing",
+      "transcribing": "Transcribing",
+      "aligning": "Aligning",
+      "diarizing": "Identifying speakers",
+      "canonicalizing": "Finalizing transcript",
+      "persisting": "Saving",
+      "transcript_complete": "Transcript ready",
+      "note_extracting": "Extracting notes",
+      "note_validating": "Validating notes",
+      "note_rendering": "Rendering notes",
+      "complete": "Complete",
+      "cancelled": "Cancelled",
+      "failed": "Failed",
+      "interrupted": "Interrupted",
+      "transcript_complete_note_failed": "Transcript ready, notes failed"
+    },
+    "stages": {
+      "starting": "Starting",
+      "probing-audio": "Probing audio",
+      "normalizing-audio": "Normalizing audio",
+      "loading-asr": "Loading transcription model",
+      "transcribing": "Transcribing",
+      "unloading-asr": "Unloading transcription model",
+      "loading-alignment": "Loading alignment model",
+      "aligning": "Aligning words",
+      "unloading-alignment": "Unloading alignment model",
+      "loading-diarization": "Loading diarization model",
+      "diarizing": "Identifying speakers",
+      "unloading-diarization": "Unloading diarization model",
+      "canonicalizing": "Finalizing transcript",
+      "writing-artifacts": "Writing files",
+      "complete": "Complete"
+    },
+    "warnings": {
+      "OOM_FALLBACK_USED": "Ran low on GPU memory — used a slower fallback.",
+      "DIARIZATION_UNAVAILABLE": "Speaker diarization was unavailable and skipped.",
+      "ALIGNMENT_PARTIAL": "Word alignment was only partially completed.",
+      "CPU_FALLBACK_USED": "No GPU available — ran on CPU (slower)."
+    },
+    "errors": {
+      "RUNTIME_NOT_INSTALLED": "The WhisperX runtime isn't installed.",
+      "CUDA_UNAVAILABLE": "No compatible NVIDIA GPU / CUDA was found.",
+      "CUDA_OUT_OF_MEMORY": "The GPU ran out of memory. Try a smaller batch size or int8.",
+      "HF_TOKEN_REQUIRED": "A Hugging Face token is required for speaker diarization.",
+      "AUDIO_UNREADABLE": "The audio file couldn't be read.",
+      "AUDIO_UNSUPPORTED_FORMAT": "This audio format isn't supported.",
+      "AUDIO_TOO_LONG": "The audio file is too long to process.",
+      "AUDIO_NO_SPEECH": "No speech was detected in the audio.",
+      "AUDIO_CORRUPT": "The audio file appears to be corrupt.",
+      "DISK_SPACE_INSUFFICIENT": "Not enough disk space to complete the job.",
+      "WORKER_CRASHED": "The transcription worker crashed.",
+      "WORKER_TIMEOUT": "The transcription worker timed out.",
+      "WORKER_UNAVAILABLE": "The transcription worker is unavailable.",
+      "JOB_CANCELLED": "The job was cancelled.",
+      "generic": "Transcription failed ({{code}}).",
+      "unknown": "An unknown error occurred."
+    },
+    "review": {
+      "recordings": "Recordings",
+      "empty": "No recordings yet.",
+      "storageUsed": "{{size}} used by managed files",
+      "open": "Open",
+      "retry": "Retry",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "deleteTitle": "Delete this recording?",
+      "deleteDescription": "This permanently removes the transcript, speaker names, edits, and any generated notes and exports for this recording. Your original recording file is kept — it stays exactly where it is on your computer.",
+      "deleteConfirm": "Delete",
+      "back": "Back to recordings",
+      "loadMore": "Load more",
+      "loadMoreError": "Couldn't load more of the transcript.",
+      "loadingTranscript": "Loading transcript…",
+      "noTranscript": "No transcript is available for this recording.",
+      "segmentCount": "Showing {{loaded}} of {{total}} segments",
+      "audioUnavailable": "Audio preview unavailable",
+      "audioPlayerAria": "Recording audio player",
+      "unknownSpeaker": "Unknown speaker",
+      "provenance": {
+        "summary": "{{model}} · {{language}}",
+        "modelUnknown": "Unknown model",
+        "languageUnknown": "Language unknown"
+      },
+      "speakers": "Speakers",
+      "speakerNamePlaceholder": "Display name",
+      "speakerNameAria": "Display name for {{speaker}}",
+      "speakerMappingNote": "Renaming only changes the labels shown here — the transcript text itself is never edited.",
+      "speakerSaveError": "Couldn't save the speaker name.",
+      "edit": "Edit",
+      "save": "Save",
+      "edited": "edited",
+      "originalLabel": "Original: {{text}}",
+      "editPlaceholder": "Edit transcript text",
+      "saveRevisionError": "Couldn't save your edit.",
+      "exports": "Export",
+      "export": {
+        "raw": "Text (.txt)",
+        "speaker": "Speakers (.md)",
+        "srt": "Subtitles (.srt)",
+        "vtt": "Captions (.vtt)"
+      },
+      "exportError": "Couldn't export the file.",
+      "flags": {
+        "unaligned": "Unaligned",
+        "partial-alignment": "Partial alignment",
+        "possible-overlap": "Possible overlap",
+        "possible-hallucination": "Possible hallucination",
+        "low-confidence": "Low confidence",
+        "manual-review": "Needs review"
+      }
+    }
   }
 }

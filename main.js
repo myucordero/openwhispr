@@ -290,6 +290,7 @@ let audioTapManager = null;
 let linuxPortalAudioManager = null;
 let meetingAecManager = null;
 let qdrantManager = null;
+let whisperxMain = null;
 let ipcHandlers = null;
 let cliBridge = null;
 let globeKeyAlertShown = false;
@@ -378,6 +379,15 @@ function initializeCoreManagers() {
   meetingAecManager = new MeetingAecManager();
   windowManager.textEditMonitor = textEditMonitor;
 
+  const WhisperXMain = require("./src/helpers/whisperx/whisperxMain");
+  whisperxMain = new WhisperXMain({
+    app,
+    databaseManager,
+    environmentManager,
+    logger: debugLogger,
+    getWindows: () => BrowserWindow.getAllWindows(),
+  });
+
   // IPC handlers must be registered before window content loads
   ipcHandlers = new IPCHandlers({
     environmentManager,
@@ -397,6 +407,7 @@ function initializeCoreManagers() {
     audioTapManager,
     linuxPortalAudioManager,
     meetingAecManager,
+    whisperxMain,
     getTrayManager: () => trayManager,
     oauthProtocolRegistered: protocolRegistered,
     oauthProtocol: OAUTH_PROTOCOL,
@@ -800,6 +811,19 @@ async function startApp() {
   initializeCoreManagers();
   await environmentManager.init();
   registerSidecars();
+
+  // WhisperX subsystem: recover interrupted jobs and register shutdown.
+  // Guarded so a failure here can never block app boot.
+  if (whisperxMain) {
+    sidecarRegistry.register("whisperx", () => whisperxMain.shutdown());
+    try {
+      const summary = whisperxMain.startup();
+      debugLogger.info("WhisperX startup recovery complete", summary);
+    } catch (err) {
+      debugLogger.warn("WhisperX startup failed (non-fatal)", { error: err?.message });
+    }
+  }
+
   startAuthBridgeServer();
 
   cliBridge = new CliBridge(ipcHandlers);
