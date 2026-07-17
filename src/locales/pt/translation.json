@@ -2648,6 +2648,14 @@
     }
   },
   "whisperx": {
+    "diarization": {
+      "title": "Diarização de falantes (token do Hugging Face)",
+      "configured": "Token configurado",
+      "hint": "Os rótulos de falantes usam o pyannote community-1, que exige um token gratuito somente leitura do Hugging Face após aceitar os termos do modelo. A transcrição funciona sem ele.",
+      "placeholder": "Token somente leitura hf_...",
+      "save": "Salvar token",
+      "remove": "Remover token"
+    },
     "provider": {
       "name": "WhisperX",
       "tab": "WhisperX",

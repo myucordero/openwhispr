@@ -238,6 +238,8 @@ function WhisperXPanel({ styles }: WhisperXPanelProps) {
   const [unavailable, setUnavailable] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
   const [provisionLog, setProvisionLog] = useState<string[]>([]);
+  const [tokenInput, setTokenInput] = useState("");
+  const [tokenBusy, setTokenBusy] = useState(false);
 
   const checkReadiness = useCallback(async () => {
     if (!window.electronAPI?.whisperxGetReadiness) {
@@ -258,6 +260,34 @@ function WhisperXPanel({ styles }: WhisperXPanelProps) {
 
   useEffect(() => {
     checkReadiness();
+  }, [checkReadiness]);
+
+  const handleSaveToken = useCallback(async () => {
+    const value = tokenInput.trim();
+    if (!value || !window.electronAPI?.saveHuggingFaceToken) return;
+    setTokenBusy(true);
+    try {
+      await window.electronAPI.saveHuggingFaceToken(value);
+      setTokenInput("");
+      await checkReadiness();
+    } catch (error) {
+      logger.error("Failed to save HF token", { error }, "whisperx");
+    } finally {
+      setTokenBusy(false);
+    }
+  }, [tokenInput, checkReadiness]);
+
+  const handleRemoveToken = useCallback(async () => {
+    if (!window.electronAPI?.deleteHuggingFaceToken) return;
+    setTokenBusy(true);
+    try {
+      await window.electronAPI.deleteHuggingFaceToken();
+      await checkReadiness();
+    } catch (error) {
+      logger.error("Failed to remove HF token", { error }, "whisperx");
+    } finally {
+      setTokenBusy(false);
+    }
   }, [checkReadiness]);
 
   const handleProvision = useCallback(async () => {
@@ -424,6 +454,63 @@ function WhisperXPanel({ styles }: WhisperXPanelProps) {
             );
           })}
         </div>
+      </div>
+
+      <div className="rounded-md border border-border bg-surface-1 p-2.5 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-foreground">
+            {t("whisperx.diarization.title")}
+          </span>
+          {tokenConfigured && (
+            <Badge variant="success" className="gap-1">
+              <Check size={10} />
+              {t("whisperx.diarization.configured")}
+            </Badge>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          {t("whisperx.diarization.hint")}
+        </p>
+        {tokenConfigured ? (
+          <Button
+            onClick={handleRemoveToken}
+            disabled={tokenBusy}
+            size="sm"
+            variant="outline"
+            className="h-7 px-3 text-xs"
+          >
+            {tokenBusy ? (
+              <Loader2 size={11} className="animate-spin" />
+            ) : (
+              t("whisperx.diarization.remove")
+            )}
+          </Button>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="password"
+              value={tokenInput}
+              onChange={(e) => setTokenInput(e.target.value)}
+              placeholder={t("whisperx.diarization.placeholder")}
+              aria-label={t("whisperx.diarization.title")}
+              className="h-7 text-xs flex-1"
+              autoComplete="off"
+            />
+            <Button
+              onClick={handleSaveToken}
+              disabled={tokenBusy || tokenInput.trim().length === 0}
+              size="sm"
+              variant="default"
+              className="h-7 px-3 text-xs shrink-0"
+            >
+              {tokenBusy ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                t("whisperx.diarization.save")
+              )}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

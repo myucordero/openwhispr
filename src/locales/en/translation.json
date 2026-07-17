@@ -2696,6 +2696,14 @@
     }
   },
   "whisperx": {
+    "diarization": {
+      "title": "Speaker diarization (Hugging Face token)",
+      "configured": "Token configured",
+      "hint": "Speaker labels use pyannote community-1, which needs a free read-only Hugging Face token after accepting the model terms. Transcription works without it.",
+      "placeholder": "hf_... read-only token",
+      "save": "Save token",
+      "remove": "Remove token"
+    },
     "provider": {
       "name": "WhisperX",
       "tab": "WhisperX",

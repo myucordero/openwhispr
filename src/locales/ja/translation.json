@@ -2648,6 +2648,14 @@
     }
   },
   "whisperx": {
+    "diarization": {
+      "title": "話者ダイアライゼーション（Hugging Face トークン）",
+      "configured": "トークン設定済み",
+      "hint": "話者ラベルには pyannote community-1 を使用します。モデル利用規約に同意のうえ、無料の読み取り専用 Hugging Face トークンが必要です。トークンなしでも文字起こしは動作します。",
+      "placeholder": "hf_... 読み取り専用トークン",
+      "save": "トークンを保存",
+      "remove": "トークンを削除"
+    },
     "provider": {
       "name": "WhisperX",
       "tab": "WhisperX",

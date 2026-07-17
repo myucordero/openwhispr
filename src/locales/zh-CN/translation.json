@@ -2643,6 +2643,14 @@
     }
   },
   "whisperx": {
+    "diarization": {
+      "title": "说话人分离（Hugging Face 令牌）",
+      "configured": "令牌已配置",
+      "hint": "说话人标签使用 pyannote community-1，需要在接受模型条款后创建免费的 Hugging Face 只读令牌。没有它也可以正常转录。",
+      "placeholder": "hf_... 只读令牌",
+      "save": "保存令牌",
+      "remove": "移除令牌"
+    },
     "provider": {
       "name": "WhisperX",
       "tab": "WhisperX",

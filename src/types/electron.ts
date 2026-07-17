@@ -1911,6 +1911,11 @@ declare global {
         jobId: string;
         relativePath: string;
       }) => Promise<{ success: boolean; text?: string; bytes?: number; error?: string }>;
+      // Hugging Face token for pyannote diarization: status-only readback —
+      // the renderer can never retrieve the stored value.
+      getHuggingFaceTokenStatus?: () => Promise<{ configured: boolean }>;
+      saveHuggingFaceToken?: (key: string) => Promise<{ success: boolean }>;
+      deleteHuggingFaceToken?: () => Promise<{ success: boolean }>;
       // Bounded (300 MB) source-audio read keyed by job id; Buffer arrives as
       // Uint8Array/ArrayBuffer over IPC.
       whisperxReadSourceAudio?: (jobId: string) => Promise<{

@@ -2648,6 +2648,14 @@
     }
   },
   "whisperx": {
+    "diarization": {
+      "title": "Diarisation des locuteurs (jeton Hugging Face)",
+      "configured": "Jeton configuré",
+      "hint": "Les étiquettes de locuteurs utilisent pyannote community-1, qui nécessite un jeton Hugging Face gratuit en lecture seule après acceptation des conditions du modèle. La transcription fonctionne sans.",
+      "placeholder": "Jeton en lecture seule hf_...",
+      "save": "Enregistrer le jeton",
+      "remove": "Supprimer le jeton"
+    },
     "provider": {
       "name": "WhisperX",
       "tab": "WhisperX",

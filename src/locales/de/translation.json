@@ -2648,6 +2648,14 @@
     }
   },
   "whisperx": {
+    "diarization": {
+      "title": "Sprecher-Diarisierung (Hugging-Face-Token)",
+      "configured": "Token konfiguriert",
+      "hint": "Sprecherlabels nutzen pyannote community-1; dafür ist nach Annahme der Modellbedingungen ein kostenloses Hugging-Face-Token (nur Lesen) nötig. Die Transkription funktioniert auch ohne.",
+      "placeholder": "hf_... Nur-Lese-Token",
+      "save": "Token speichern",
+      "remove": "Token entfernen"
+    },
     "provider": {
       "name": "WhisperX",
       "tab": "WhisperX",

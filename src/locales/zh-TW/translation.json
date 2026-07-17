@@ -2643,6 +2643,14 @@
     }
   },
   "whisperx": {
+    "diarization": {
+      "title": "說話者分離（Hugging Face 權杖）",
+      "configured": "權杖已設定",
+      "hint": "說話者標籤使用 pyannote community-1，需在接受模型條款後建立免費的 Hugging Face 唯讀權杖。沒有它也能正常轉錄。",
+      "placeholder": "hf_... 唯讀權杖",
+      "save": "儲存權杖",
+      "remove": "移除權杖"
+    },
     "provider": {
       "name": "WhisperX",
       "tab": "WhisperX",

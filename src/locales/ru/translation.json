@@ -2650,6 +2650,14 @@
     }
   },
   "whisperx": {
+    "diarization": {
+      "title": "Диаризация говорящих (токен Hugging Face)",
+      "configured": "Токен настроен",
+      "hint": "Метки говорящих используют pyannote community-1: нужен бесплатный токен Hugging Face только для чтения после принятия условий модели. Транскрипция работает и без него.",
+      "placeholder": "Токен только для чтения hf_...",
+      "save": "Сохранить токен",
+      "remove": "Удалить токен"
+    },
     "provider": {
       "name": "WhisperX",
       "tab": "WhisperX",

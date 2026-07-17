@@ -2696,6 +2696,14 @@
     }
   },
   "whisperx": {
+    "diarization": {
+      "title": "Diarización de hablantes (token de Hugging Face)",
+      "configured": "Token configurado",
+      "hint": "Las etiquetas de hablantes usan pyannote community-1, que requiere un token gratuito de solo lectura de Hugging Face tras aceptar los términos del modelo. La transcripción funciona sin él.",
+      "placeholder": "Token de solo lectura hf_...",
+      "save": "Guardar token",
+      "remove": "Eliminar token"
+    },
     "provider": {
       "name": "WhisperX",
       "tab": "WhisperX",
