@@ -126,8 +126,21 @@ class RealBackends:
         self._align_metadata = None
 
     # --- diarization ---
+    _DIARIZATION_MODELS = {
+        "pyannote-community-1": "pyannote/speaker-diarization-community-1",
+    }
+
     def load_diarize(self) -> Any:
-        if self.request.diarization.provider == "pyannote-community-1" and not self.hf_token:
+        provider = self.request.diarization.provider
+        model_name = self._DIARIZATION_MODELS.get(provider)
+        if model_name is None:
+            # openwhispr-local is the JS-side sherpa-onnx fallback; the Python
+            # worker only implements pyannote. Degrade with a precise reason.
+            raise WorkerError(
+                "DIARIZATION_MODEL_NOT_READY",
+                f"Diarization provider '{provider}' is not handled by the WhisperX worker",
+            )
+        if not self.hf_token:
             raise WorkerError(
                 "HF_TOKEN_REQUIRED", "Diarization requires a Hugging Face token"
             )
@@ -137,8 +150,12 @@ class RealBackends:
             raise WorkerError(
                 "DIARIZATION_MODEL_NOT_READY", "Diarization backend unavailable"
             ) from exc
+        # whisperx 3.8.x signature: (model_name=None, token=None, device=..., cache_dir=None)
         self._diarize_pipeline = DiarizationPipeline(
-            use_auth_token=self.hf_token, device=self.device
+            model_name=model_name,
+            token=self.hf_token,
+            device=self.device,
+            cache_dir=self.request.runtime.model_cache_directory,
         )
         return self._diarize_pipeline
 

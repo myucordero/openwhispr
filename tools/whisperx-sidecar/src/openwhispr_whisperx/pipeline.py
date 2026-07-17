@@ -22,6 +22,7 @@ from . import audio as audio_module
 from . import TRANSCRIPT_SCHEMA_VERSION
 from .errors import JobCancelled, WorkerError, classify_oom
 from .protocol import now_iso
+from .redaction import redact_text
 from .schemas import CanonicalTranscript, WhisperXJobRequest
 from .transcript import build_canonical_transcript
 from .artifacts import FORMAT_TO_ARTIFACT, render_format, write_artifact
@@ -180,10 +181,16 @@ def run_pipeline(
                 {"reason": exc.code},
             )
             _safe(lambda: backends.gc_cuda())
-        except Exception:  # noqa: BLE001 - degrade gracefully, no speakers
+        except Exception as exc:  # noqa: BLE001 - degrade gracefully, no speakers
+            # Never swallow the reason invisibly: a TypeError here once hid a
+            # broken loader signature entirely.
             _warn(
                 "DIARIZATION_UNAVAILABLE",
                 "Diarization failed; continuing without speaker labels",
+                {
+                    "reason": type(exc).__name__,
+                    "message": redact_text(str(exc))[:300],
+                },
             )
             _safe(lambda: backends.gc_cuda())
 
