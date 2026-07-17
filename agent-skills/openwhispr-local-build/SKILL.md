@@ -81,10 +81,35 @@ Result: a routine rebuild makes **zero GitHub API calls**, so it never hits the
 
 ## Update flows
 
-- **Upstream OpenWhispr**: in WSL run the weekly fork-sync
-  (`git checkout main && git fetch upstream && git rebase upstream/main &&
-  git push origin main`), rebase your feature branch if needed, then
-  `npm run ship:local` + the Windows update script.
+- **Upstream OpenWhispr** (a "vX.Y.Z available" notice in the app means the fork
+  is behind — the updater checks upstream releases, not your fork):
+  1. In WSL, fast-forward main: `git checkout main && git fetch upstream &&
+     git merge --ff-only upstream/main && git push origin main` (the fork's main
+     is normally a strict ancestor of upstream/main, so this is a clean ff).
+  2. Bring it onto the feature branch. For a large gap (dozens of upstream
+     commits) **prefer a merge over a rebase** — it resolves the whole conflict
+     surface once instead of at every commit: `git checkout <branch> &&
+     git merge upstream/main`. **Never `git stash` mid-merge** — it silently
+     drops `MERGE_HEAD`; if you must, recover with `git stash pop` then
+     `git rev-parse upstream/main > .git/MERGE_HEAD` before committing so it
+     stays a real two-parent merge.
+  3. Resolve conflicts — the fork diverges from upstream in the same ~17 files
+     each sync (i18n shims in `src/lib/simpleI18n.ts`/`reactI18nextShim.tsx`,
+     `@homebridge/dbus-native` vs the fork's dbus dep, `auth.ts`
+     `getDesktopOAuthCallbackURL` helper, platform-aware `compile:native`, keep
+     BOTH `optionalDependencies` + upstream `overrides`, keep BOTH the `whisperx`
+     and upstream translation keys). Regenerate the lockfile with
+     `nvm exec 24 npm install` — never hand-merge `package-lock.json`. The
+     `upstream-sync-conflict-hotspots` memory has the exact per-file decisions.
+  4. **Validate before shipping** (catches merge-introduced type/runtime breaks
+     like the i18n shim missing `returnObjects`): `nvm exec 24 sh -c 'npm run
+     typecheck && npm run lint && npm run i18n:check && npm test && npm run
+     build:renderer'` — all green.
+  5. `npm run ship:local`, then the Windows update script.
+  An upstream release that adds a sidecar binary (e.g. yt-dlp) changes a
+  `scripts/download-*.js`, so the Windows script re-provisions on that run
+  (network + GitHub API) — set `$env:GITHUB_TOKEN` first if you might exceed the
+  60-req/hr limit.
 - **WhisperX / Python bump**: in WSL, on a branch:
   `cd tools/whisperx-sidecar && uv lock --upgrade`, then
   `uv run pytest` and `npm test`, then ship. The Windows script sees the
