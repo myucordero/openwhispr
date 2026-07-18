@@ -305,6 +305,12 @@ test("readArtifact enforces confinement and the maxBytes cap", () => {
       () => store.readArtifact("read", "file.txt", { maxBytes: 1 }),
       (e) => e instanceof ArtifactStoreError && e.code === "ARTIFACT_WRITE_FAILED"
     );
+    // Missing files raise a coded error, never a raw ENOENT (which would
+    // surface as an unclassified 500 with a filesystem path over the bridge).
+    assert.throws(
+      () => store.readArtifact("read", "missing.txt"),
+      (e) => e instanceof ArtifactStoreError && e.code === "AUDIO_FILE_NOT_FOUND"
+    );
   } finally {
     rm(root);
   }

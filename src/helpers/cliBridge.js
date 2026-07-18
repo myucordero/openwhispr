@@ -5,6 +5,7 @@ const path = require("path");
 const crypto = require("crypto");
 const debugLogger = require("./debugLogger");
 const { isPortAvailable } = require("../utils/serverUtils");
+const { redactText } = require("./whisperx/redaction");
 
 const PORT_RANGE_START = 8200;
 const PORT_RANGE_END = 8219;
@@ -14,6 +15,35 @@ const MAX_REQUEST_BODY_BYTES = 1 * 1024 * 1024;
 const LOOPBACK_ADDRESSES = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 
 const NO_CONTENT = Symbol("CliBridge.NoContent");
+
+// Recording sources accepted over the bridge. The renderer path gates
+// extensions in the upload UI/dialog (CLAUDE.md §21); the bridge has no dialog
+// in front of it, so it applies the same audio + MP4-family list itself. The
+// worker's probe/decode stages remain the authoritative audio check.
+const RECORDING_SOURCE_EXTENSIONS = new Set([
+  ".mp3",
+  ".wav",
+  ".m4a",
+  ".webm",
+  ".ogg",
+  ".oga",
+  ".flac",
+  ".aac",
+  ".mp4",
+  ".m4v",
+]);
+
+// WhisperX main-process error codes → HTTP status + v1 error code. Codes not
+// listed fall through to 500/internal_error.
+const WHISPERX_HTTP_ERRORS = {
+  AUDIO_FILE_NOT_FOUND: { status: 404, code: "not_found" },
+  WORKER_PROTOCOL_ERROR: { status: 400, code: "validation_error" },
+  OUTPUT_PATH_REJECTED: { status: 400, code: "validation_error" },
+  NOTE_MODEL_UNAVAILABLE: { status: 409, code: "conflict" },
+  RUNTIME_NOT_INSTALLED: { status: 503, code: "service_unavailable" },
+  // Surfaced by readArtifact when a file exceeds the read cap.
+  ARTIFACT_WRITE_FAILED: { status: 413, code: "payload_too_large" },
+};
 
 function getBridgeFilePath() {
   return path.join(os.homedir(), ".openwhispr", "cli-bridge.json");
@@ -28,21 +58,32 @@ async function findAvailablePort() {
 
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
-    let raw = "";
+    // Accumulate Buffers and decode once: per-chunk string concatenation
+    // corrupts multibyte UTF-8 split across chunk boundaries, and counting
+    // UTF-16 code units would under-enforce the byte cap.
+    const chunks = [];
+    let bytes = 0;
     req.on("data", (chunk) => {
-      raw += chunk;
-      if (raw.length > MAX_REQUEST_BODY_BYTES) {
+      bytes += chunk.length;
+      if (bytes > MAX_REQUEST_BODY_BYTES) {
         reject(new Error("Request body too large"));
         req.destroy();
+        return;
       }
+      chunks.push(chunk);
     });
     req.on("end", () => {
-      if (!raw) return resolve({});
+      if (bytes === 0) return resolve({});
+      let parsed;
       try {
-        resolve(JSON.parse(raw));
+        parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
       } catch {
-        reject(new Error("Invalid JSON payload"));
+        return reject(new Error("Invalid JSON payload"));
       }
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return reject(new Error("Request body must be a JSON object"));
+      }
+      resolve(parsed);
     });
     req.on("error", reject);
   });
@@ -211,8 +252,23 @@ class CliBridge {
       sendV1Error(res, 404, "not_found", err.message);
       return;
     }
-    debugLogger.error("CLI bridge route error", { error: err.message }, "cli-bridge");
-    sendV1Error(res, 500, "internal_error", err.message || "Internal server error");
+    if (err.code === "VALIDATION") {
+      sendV1Error(res, 400, "validation_error", err.message);
+      return;
+    }
+    const whisperx = WHISPERX_HTTP_ERRORS[err.code];
+    if (whisperx) {
+      sendV1Error(res, whisperx.status, whisperx.code, redactText(err.message || ""));
+      return;
+    }
+    // whisperxMain reports a missing job as UNKNOWN_INTERNAL_ERROR("Job not
+    // found") rather than a dedicated code — surface it as a 404 here.
+    if (err.code === "UNKNOWN_INTERNAL_ERROR" && /job not found/i.test(err.message || "")) {
+      sendV1Error(res, 404, "not_found", err.message);
+      return;
+    }
+    debugLogger.error("CLI bridge route error", { error: redactText(err.message || "") }, "cli-bridge");
+    sendV1Error(res, 500, "internal_error", redactText(err.message || "Internal server error"));
   }
 
   _matchRoute(method, pathname) {
@@ -386,6 +442,136 @@ class CliBridge {
           model: null,
         });
         return NO_CONTENT;
+      }),
+      ...this._buildRecordingRoutes({ exact, param }),
+    ];
+  }
+
+  // WhisperX recording jobs (fork feature, CLAUDE.md §18) exposed to the CLI.
+  // Everything funnels through whisperxMain, which owns validation, path
+  // confinement, GPU coordination, and redaction — the bridge only maps HTTP
+  // to that surface and gates the one input the renderer flow gates via a
+  // dialog: the source file extension.
+  _buildRecordingRoutes({ exact, param }) {
+    const whisperx = () => {
+      const manager = this.ipcHandlers.whisperxMain;
+      if (!manager) {
+        const err = new Error("WhisperX is not available in this build");
+        err.code = "RUNTIME_NOT_INSTALLED";
+        throw err;
+      }
+      return manager;
+    };
+
+    const validation = (message) => {
+      const err = new Error(message);
+      err.code = "VALIDATION";
+      return err;
+    };
+
+    const parsePositiveInt = (value, fallback = undefined) => {
+      if (value === null || value === undefined || value === "") return fallback;
+      const n = Number(value);
+      return Number.isInteger(n) && n >= 0 ? n : fallback;
+    };
+
+    return [
+      exact("GET", "/v1/recordings/readiness", async () => ({
+        data: await whisperx().getReadiness(),
+      })),
+      exact("GET", "/v1/recordings/list", ({ query }) => {
+        const opts = {};
+        const status = query.get("status");
+        if (status) opts.status = status;
+        const limit = parsePositiveInt(query.get("limit"));
+        if (limit !== undefined) opts.limit = limit;
+        const offset = parsePositiveInt(query.get("offset"));
+        if (offset !== undefined) opts.offset = offset;
+        const { jobs } = whisperx().listJobs(opts);
+        return { data: jobs, has_more: false, next_cursor: null };
+      }),
+      exact(
+        "POST",
+        "/v1/recordings/create",
+        async ({ body }) => {
+          const sourcePath = body.source_path;
+          if (typeof sourcePath !== "string" || !sourcePath.trim()) {
+            throw validation("source_path is required");
+          }
+          if (!path.isAbsolute(sourcePath)) {
+            throw validation("source_path must be an absolute path");
+          }
+          const ext = path.extname(sourcePath).toLowerCase();
+          if (!RECORDING_SOURCE_EXTENSIONS.has(ext)) {
+            throw validation(
+              `Unsupported source extension "${ext}". Supported: ${[...RECORDING_SOURCE_EXTENSIONS].join(", ")}`
+            );
+          }
+          const payload = { sourcePath };
+          if (body.display_name !== undefined) payload.displayName = body.display_name;
+          if (body.profile !== undefined) payload.profile = body.profile;
+          // Engine override keys (language, model, computeType, batchSize,
+          // alignment, diarization, diarizationProvider, exactSpeakers,
+          // minSpeakers, maxSpeakers) pass through verbatim — whisperxMain
+          // validates against its allowlist.
+          if (body.overrides !== undefined) payload.overrides = body.overrides;
+          if (body.custom_dictionary !== undefined) payload.customDictionary = body.custom_dictionary;
+          if (body.allow_model_download !== undefined)
+            payload.allowModelDownload = body.allow_model_download;
+          if (body.note_generation !== undefined) payload.noteGeneration = body.note_generation;
+          const { job } = await whisperx().startJob(payload);
+          return { data: job };
+        },
+        201
+      ),
+      param("GET", "/v1/recordings/", "", "id", ({ params }) => ({
+        data: whisperx().getJob(params.id),
+      })),
+      param("POST", "/v1/recordings/", "/cancel", "id", async ({ params }) => ({
+        data: await whisperx().cancelJob(params.id),
+      })),
+      param("POST", "/v1/recordings/", "/retry", "id", ({ params }) => ({
+        data: whisperx().retryJob(params.id).job,
+      })),
+      param("DELETE", "/v1/recordings/", "", "id", ({ params }) => {
+        whisperx().deleteJob(params.id);
+        return NO_CONTENT;
+      }),
+      param("GET", "/v1/recordings/", "/transcript", "id", ({ params, query }) => ({
+        data: whisperx().readTranscriptPage({
+          jobId: params.id,
+          offset: parsePositiveInt(query.get("offset"), 0),
+          limit: parsePositiveInt(query.get("limit")),
+        }),
+      })),
+      param("GET", "/v1/recordings/", "/artifact", "id", ({ params, query }) => {
+        const relativePath = query.get("path");
+        if (!relativePath) throw validation("path query parameter is required");
+        return {
+          data: whisperx().readArtifactText({
+            jobId: params.id,
+            relativePath,
+            maxBytes: parsePositiveInt(query.get("max_bytes")),
+          }),
+        };
+      }),
+      param("GET", "/v1/recordings/", "/notes", "id", ({ params }) => ({
+        data: whisperx().listNoteRuns(params.id).noteRuns,
+        has_more: false,
+        next_cursor: null,
+      })),
+      param("POST", "/v1/recordings/", "/notes", "id", async ({ params, body }) => {
+        let llm;
+        if (body.provider || body.model) {
+          llm = {};
+          if (body.provider !== undefined) llm.provider = body.provider;
+          if (body.model !== undefined) llm.model = body.model;
+          // Real booleans only — Boolean("false") === true would invert intent.
+          if (typeof body.disable_thinking === "boolean")
+            llm.disableThinking = body.disable_thinking;
+        }
+        const strict = typeof body.strict === "boolean" ? body.strict : undefined;
+        return { data: await whisperx().generateNotes(params.id, { llm, strict }) };
       }),
     ];
   }

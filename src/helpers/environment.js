@@ -403,7 +403,9 @@ class EnvironmentManager {
   // diarization model provisioning (WhisperX reliable-notes pipeline).
   // Renderer must never read the value back; only configured/not status.
   getHuggingFaceToken() {
-    return this._getKey("HUGGINGFACE_TOKEN");
+    // HF_TOKEN is the conventional Hugging Face env name (used in .env files
+    // and by the sidecar itself) — accept it as a fallback source.
+    return this._getKey("HUGGINGFACE_TOKEN") || this._getKey("HF_TOKEN");
   }
 
   saveHuggingFaceToken(key) {

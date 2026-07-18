@@ -253,7 +253,17 @@ class RecordingArtifactStore {
     if (!resolved) {
       throw new ArtifactStoreError("OUTPUT_PATH_REJECTED", `Unsafe path "${relativePath}"`);
     }
-    const stat = fs.statSync(resolved);
+    let stat;
+    try {
+      stat = fs.statSync(resolved);
+    } catch (error) {
+      // Coded error instead of a raw ENOENT (which would surface as an
+      // unclassified 500 with a filesystem path over the CLI bridge).
+      if (error && error.code === "ENOENT") {
+        throw new ArtifactStoreError("AUDIO_FILE_NOT_FOUND", `Artifact not found: ${relativePath}`);
+      }
+      throw error;
+    }
     if (stat.size > maxBytes) {
       throw new ArtifactStoreError("ARTIFACT_WRITE_FAILED", "Artifact exceeds read cap", {
         size: stat.size,

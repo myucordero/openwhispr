@@ -53,13 +53,13 @@ interface ProfileDefaults {
 // process remains the source of truth; these values seed the form so the user
 // sees sensible defaults before overriding.
 const PROFILE_DEFAULTS: Record<RecordingProfile, ProfileDefaults> = {
-  memo: { diarization: false, model: "large-v3-turbo", computeType: "float16", batchSize: 8 },
-  meeting: { diarization: true, model: "large-v3-turbo", computeType: "float16", batchSize: 8 },
+  memo: { diarization: false, model: "large-v3-turbo", computeType: "float16", batchSize: 4 },
+  meeting: { diarization: true, model: "large-v3-turbo", computeType: "float16", batchSize: 4 },
   "critical-interview": {
     diarization: true,
     model: "large-v3",
     computeType: "float16",
-    batchSize: 4,
+    batchSize: 2,
   },
 };
 
