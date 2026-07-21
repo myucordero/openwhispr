@@ -744,8 +744,11 @@ CLI bridge:
   override), `OPENWHISPR_MODEL_CACHE` (model cache override, default
   `~/.cache/openwhispr/whisperx-models`), and an `LD_LIBRARY_PATH` guard that
   prepends the venv's `nvidia/*/lib` dirs to work around CTranslate2's cuDNN
-  dlopen-by-soname discovery on Linux/WSL2. Tests:
-  `tests/whisperx/cliHeadless.test.cjs`.
+  dlopen-by-soname discovery on Linux/WSL2. On a successful local-mode run,
+  `exportTranscriptMarkdown` also writes a Markdown transcript next to the
+  source file (`<base>.md`, falling back to `<base>.transcript.md` on a
+  foreign-content collision, skipped if both are taken) — disable with
+  `--no-export`. Tests: `tests/whisperx/cliHeadless.test.cjs`.
 
 ## Development Guidelines
 

@@ -323,6 +323,7 @@ test("buildLocalRequest — hotword/speaker limits mirror schemas.py", () => {
 // same OPENWHISPR_WORKER_CMD full-env-passthrough test-only mechanism.
 const STUB_WORKER_SOURCE = `
 const fs = require("fs");
+const path = require("path");
 function readStdin() {
   return new Promise((resolve) => {
     let data = "";
@@ -337,7 +338,7 @@ if (process.env.STUB_PID_FILE) {
   fs.writeFileSync(process.env.STUB_PID_FILE, String(process.pid));
 }
 (async () => {
-  await readStdin();
+  const stdinData = await readStdin();
   const mode = process.env.STUB_MODE || "no-complete";
   emit({ type: "ready", protocolVersion: 1, workerVersion: "stub", whisperxVersion: "stub", pythonVersion: "stub" });
   if (mode === "no-complete") {
@@ -368,6 +369,19 @@ if (process.env.STUB_PID_FILE) {
     const padB = "b".repeat(15 * 1024);
     process.stderr.write(padA + marker + padB);
     process.exit(1);
+  } else if (mode === "export-plain" || mode === "export-diarized") {
+    const request = JSON.parse(stdinData);
+    const jobDirectory = request.output.jobDirectory;
+    fs.mkdirSync(jobDirectory, { recursive: true });
+    fs.writeFileSync(path.join(jobDirectory, "transcript.raw.txt"), "hello from the stub transcript\\n");
+    if (mode === "export-diarized") {
+      fs.writeFileSync(
+        path.join(jobDirectory, "transcript.speakers.md"),
+        "**Speaker 1:** hello from the stub transcript\\n"
+      );
+    }
+    emit({ type: "complete", result: { jobId: request.jobId, artifacts: [] } });
+    process.exit(0);
   } else {
     process.exit(1);
   }
@@ -575,6 +589,449 @@ test("integration: leaked hf_ token in worker stderr is redacted from CLI failur
     assert.equal(result.code, 1);
     assert.ok(!result.stderr.includes("hf_STUBSECRETTOKEN123456"), "raw HF token leaked into CLI stderr");
     assert.match(result.stderr, /\[redacted\]/);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+// ------------------------------------------------- markdown transcript export
+
+test("export: diarized run writes <base>.md sourced from transcript.speakers.md", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-export-diarized-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  writeTinyWav(wavPath);
+  const stubPath = writeStubWorker(tmpDir);
+  const homeDir = mkTempHome();
+
+  try {
+    const result = await runCli(["transcribe", wavPath, "--local"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "export-diarized",
+    });
+    assert.equal(result.code, 0, result.stderr);
+    const parsed = JSON.parse(result.stdout);
+
+    const mdPath = path.join(tmpDir, "source.md");
+    assert.equal(parsed.exportedPath, mdPath);
+    assert.ok(fs.existsSync(mdPath));
+    const content = fs.readFileSync(mdPath, "utf8");
+    assert.match(content, /^<!-- openwhispr-whisperx export \| source: source\.wav \| job: /);
+    assert.ok(content.includes("**Speaker 1:** hello from the stub transcript"));
+
+    const jobsRoot = path.join(homeDir, ".cache", "openwhispr", "headless-jobs");
+    const jobDir = path.join(jobsRoot, fs.readdirSync(jobsRoot)[0]);
+    const manifest = JSON.parse(fs.readFileSync(path.join(jobDir, "manifest.json"), "utf8"));
+    assert.equal(manifest.export.status, "written");
+    assert.equal(manifest.export.source, "speakers");
+    assert.equal(manifest.export.path, mdPath);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("export: non-diarized run synthesizes <base>.md from transcript.raw.txt", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-export-plain-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  writeTinyWav(wavPath);
+  const stubPath = writeStubWorker(tmpDir);
+  const homeDir = mkTempHome();
+
+  try {
+    const result = await runCli(["transcribe", wavPath, "--local"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "export-plain",
+    });
+    assert.equal(result.code, 0, result.stderr);
+
+    const mdPath = path.join(tmpDir, "source.md");
+    const content = fs.readFileSync(mdPath, "utf8");
+    assert.match(content, /^<!-- openwhispr-whisperx export \| source: source\.wav \| job: /);
+    assert.ok(content.includes("# source.wav"));
+    assert.ok(content.includes("hello from the stub transcript"));
+
+    const jobsRoot = path.join(homeDir, ".cache", "openwhispr", "headless-jobs");
+    const jobDir = path.join(jobsRoot, fs.readdirSync(jobsRoot)[0]);
+    const manifest = JSON.parse(fs.readFileSync(path.join(jobDir, "manifest.json"), "utf8"));
+    assert.equal(manifest.export.status, "written");
+    assert.equal(manifest.export.source, "raw");
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("exportTranscriptMarkdown — naming: final extension only, extensionless, hidden files", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-export-naming-"));
+  const jobDir = path.join(tmpDir, "job");
+  try {
+    fs.mkdirSync(jobDir, { recursive: true });
+    fs.writeFileSync(path.join(jobDir, "transcript.raw.txt"), "hi\n");
+
+    const dotted = path.join(tmpDir, "a.b.wav");
+    const r1 = cli.exportTranscriptMarkdown({ jobDir, sourcePath: dotted, displayName: "a.b.wav", jobId: "job-1" });
+    assert.equal(r1.status, "written");
+    assert.equal(r1.path, path.join(tmpDir, "a.b.md"));
+
+    const noExt = path.join(tmpDir, "recording");
+    const r2 = cli.exportTranscriptMarkdown({ jobDir, sourcePath: noExt, displayName: "recording", jobId: "job-2" });
+    assert.equal(r2.status, "written");
+    assert.equal(r2.path, path.join(tmpDir, "recording.md"));
+
+    const hidden = path.join(tmpDir, ".secret-audio");
+    const r3 = cli.exportTranscriptMarkdown({
+      jobDir,
+      sourcePath: hidden,
+      displayName: ".secret-audio",
+      jobId: "job-3",
+    });
+    assert.equal(r3.status, "written");
+    assert.equal(r3.path, path.join(tmpDir, ".secret-audio.md"));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("export: collision with a foreign <base>.md falls back to <base>.transcript.md, original untouched", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-export-collision-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  writeTinyWav(wavPath);
+  const mdPath = path.join(tmpDir, "source.md");
+  const userContent = "# My own notes\n\nDo not touch.\n";
+  fs.writeFileSync(mdPath, userContent);
+  const stubPath = writeStubWorker(tmpDir);
+  const homeDir = mkTempHome();
+
+  try {
+    const result = await runCli(["transcribe", wavPath, "--local"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "export-plain",
+    });
+    assert.equal(result.code, 0, result.stderr);
+
+    assert.equal(fs.readFileSync(mdPath, "utf8"), userContent, "pre-existing <base>.md was modified");
+    const altPath = path.join(tmpDir, "source.transcript.md");
+    assert.ok(fs.existsSync(altPath));
+    assert.match(fs.readFileSync(altPath, "utf8"), /^<!-- openwhispr-whisperx export/);
+
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.exportedPath, altPath);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("export: both candidates blocked by foreign content -> skipped, exit 0, files untouched", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-export-bothblocked-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  writeTinyWav(wavPath);
+  const mdPath = path.join(tmpDir, "source.md");
+  const altPath = path.join(tmpDir, "source.transcript.md");
+  fs.writeFileSync(mdPath, "user notes A\n");
+  fs.writeFileSync(altPath, "user notes B\n");
+  const stubPath = writeStubWorker(tmpDir);
+  const homeDir = mkTempHome();
+
+  try {
+    const result = await runCli(["transcribe", wavPath, "--local"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "export-plain",
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.match(result.stderr, /transcript export skipped/);
+
+    assert.equal(fs.readFileSync(mdPath, "utf8"), "user notes A\n");
+    assert.equal(fs.readFileSync(altPath, "utf8"), "user notes B\n");
+
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.exportedPath, null);
+
+    const jobsRoot = path.join(homeDir, ".cache", "openwhispr", "headless-jobs");
+    const jobDir = path.join(jobsRoot, fs.readdirSync(jobsRoot)[0]);
+    const manifest = JSON.parse(fs.readFileSync(path.join(jobDir, "manifest.json"), "utf8"));
+    assert.equal(manifest.export.status, "skipped");
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("export: idempotent re-run overwrites the same <base>.md, no proliferation", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-export-idempotent-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  writeTinyWav(wavPath);
+  const stubPath = writeStubWorker(tmpDir);
+  const homeDir = mkTempHome();
+
+  try {
+    const first = await runCli(["transcribe", wavPath, "--local"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "export-plain",
+    });
+    assert.equal(first.code, 0, first.stderr);
+    const mdPath = path.join(tmpDir, "source.md");
+    assert.ok(fs.existsSync(mdPath));
+    const firstContent = fs.readFileSync(mdPath, "utf8");
+
+    const second = await runCli(["transcribe", wavPath, "--local"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "export-plain",
+    });
+    assert.equal(second.code, 0, second.stderr);
+    const secondContent = fs.readFileSync(mdPath, "utf8");
+    assert.notEqual(secondContent, firstContent, "re-run should overwrite with a fresh job id in the marker");
+
+    assert.ok(
+      !fs.existsSync(path.join(tmpDir, "source.transcript.md")),
+      "idempotent re-run should not create a second export file"
+    );
+    const mdFiles = fs.readdirSync(tmpDir).filter((f) => f.endsWith(".md"));
+    assert.equal(mdFiles.length, 1);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("export: --no-export disables the transcript export", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-export-disabled-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  writeTinyWav(wavPath);
+  const stubPath = writeStubWorker(tmpDir);
+  const homeDir = mkTempHome();
+
+  try {
+    const result = await runCli(["transcribe", wavPath, "--local", "--no-export"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "export-plain",
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.ok(!fs.existsSync(path.join(tmpDir, "source.md")));
+
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.exportedPath, null);
+
+    const jobsRoot = path.join(homeDir, ".cache", "openwhispr", "headless-jobs");
+    const jobDir = path.join(jobsRoot, fs.readdirSync(jobsRoot)[0]);
+    const manifest = JSON.parse(fs.readFileSync(path.join(jobDir, "manifest.json"), "utf8"));
+    assert.equal(manifest.export.status, "disabled");
+    assert.equal(manifest.export.path, null);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("export: unwritable source directory -> failed status, exit 0, stderr warning", async (t) => {
+  if (process.geteuid?.() === 0) {
+    t.skip("root ignores directory mode bits");
+    return;
+  }
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-export-unwritable-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  writeTinyWav(wavPath);
+  const stubPath = writeStubWorker(tmpDir);
+  const homeDir = mkTempHome();
+
+  fs.chmodSync(tmpDir, 0o555);
+  try {
+    const result = await runCli(["transcribe", wavPath, "--local"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "export-plain",
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.match(result.stderr, /warning: transcript export failed:/);
+
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.exportedPath, null);
+
+    const jobsRoot = path.join(homeDir, ".cache", "openwhispr", "headless-jobs");
+    const jobDir = path.join(jobsRoot, fs.readdirSync(jobsRoot)[0]);
+    const manifest = JSON.parse(fs.readFileSync(path.join(jobDir, "manifest.json"), "utf8"));
+    assert.equal(manifest.export.status, "failed");
+  } finally {
+    fs.chmodSync(tmpDir, 0o755);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+// ----------------------------------------------- export fix-review coverage
+
+test("export: basename scoping — a marker for a.m4a never matches a.wav's export", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-export-scoping-"));
+  const wavPath = path.join(tmpDir, "a.wav");
+  writeTinyWav(wavPath);
+  const mdPath = path.join(tmpDir, "a.md");
+  const priorContent =
+    "<!-- openwhispr-whisperx export | source: a.m4a | job: prior-job -->\nprior transcript for a.m4a\n";
+  fs.writeFileSync(mdPath, priorContent);
+  const stubPath = writeStubWorker(tmpDir);
+  const homeDir = mkTempHome();
+
+  try {
+    const result = await runCli(["transcribe", wavPath, "--local"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "export-plain",
+    });
+    assert.equal(result.code, 0, result.stderr);
+
+    assert.equal(fs.readFileSync(mdPath, "utf8"), priorContent, "a.md (owned by a.m4a) must not be touched by a.wav's export");
+    const altPath = path.join(tmpDir, "a.transcript.md");
+    assert.ok(fs.existsSync(altPath));
+    assert.match(fs.readFileSync(altPath, "utf8"), /source: a\.wav \|/);
+
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.exportedPath, altPath);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("export: a marker string buried past the 512-byte head window is not treated as ours", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-export-buried-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  writeTinyWav(wavPath);
+  const mdPath = path.join(tmpDir, "source.md");
+  const filler = "y".repeat(600); // pushes the needle past EXPORT_MARKER_HEAD_BYTES (512)
+  const buriedMarkerLine = "openwhispr-whisperx export | source: source.wav | buried, not a real export\n";
+  const originalContent = `${filler}\n${buriedMarkerLine}`;
+  fs.writeFileSync(mdPath, originalContent);
+  const stubPath = writeStubWorker(tmpDir);
+  const homeDir = mkTempHome();
+
+  try {
+    const result = await runCli(["transcribe", wavPath, "--local"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "export-plain",
+    });
+    assert.equal(result.code, 0, result.stderr);
+
+    assert.equal(fs.readFileSync(mdPath, "utf8"), originalContent, "source.md was modified despite the marker being outside the head window");
+    const altPath = path.join(tmpDir, "source.transcript.md");
+    assert.ok(fs.existsSync(altPath));
+
+    const parsed = JSON.parse(result.stdout);
+    assert.equal(parsed.exportedPath, altPath);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("exportTranscriptMarkdown — destination occupied by a directory fails loud, no tmp leftover", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-export-dircollision-"));
+  const jobDir = path.join(tmpDir, "job");
+  try {
+    fs.mkdirSync(jobDir, { recursive: true });
+    fs.writeFileSync(path.join(jobDir, "transcript.raw.txt"), "hi\n");
+
+    const sourcePath = path.join(tmpDir, "source.wav");
+    fs.mkdirSync(path.join(tmpDir, "source.md")); // occupies the first candidate as a directory
+
+    const result = cli.exportTranscriptMarkdown({
+      jobDir,
+      sourcePath,
+      displayName: "source.wav",
+      jobId: "job-dircollision",
+    });
+    assert.equal(result.status, "failed");
+    assert.equal(result.path, null);
+    assert.match(result.reason, /not a regular file/);
+
+    const leftovers = fs.readdirSync(tmpDir).filter((f) => f.includes(".tmp-"));
+    assert.deepEqual(leftovers, [], "no .tmp-* file should be left behind");
+    assert.ok(fs.existsSync(path.join(tmpDir, "source.md")), "the pre-existing directory itself is untouched");
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("export: diarized body is marker + exact transcript.speakers.md bytes; raw body is marker + heading + exact raw.txt bytes", async () => {
+  const tmpDirDiarized = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-export-bodydiarized-"));
+  const tmpDirPlain = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-export-bodyplain-"));
+  const homeDir = mkTempHome();
+  try {
+    const wavDiarized = path.join(tmpDirDiarized, "source.wav");
+    writeTinyWav(wavDiarized);
+    const stubDiarized = writeStubWorker(tmpDirDiarized);
+    const diarizedResult = await runCli(["transcribe", wavDiarized, "--local"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubDiarized}`,
+      STUB_MODE: "export-diarized",
+    });
+    assert.equal(diarizedResult.code, 0, diarizedResult.stderr);
+    const diarizedContent = fs.readFileSync(path.join(tmpDirDiarized, "source.md"), "utf8");
+    const diarizedLines = diarizedContent.split("\n");
+    const diarizedMarkerLine = diarizedLines[0] + "\n";
+    const diarizedBody = diarizedContent.slice(diarizedMarkerLine.length);
+    assert.equal(diarizedBody, "**Speaker 1:** hello from the stub transcript\n");
+
+    const wavPlain = path.join(tmpDirPlain, "source.wav");
+    writeTinyWav(wavPlain);
+    const stubPlain = writeStubWorker(tmpDirPlain);
+    const plainResult = await runCli(["transcribe", wavPlain, "--local"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPlain}`,
+      STUB_MODE: "export-plain",
+    });
+    assert.equal(plainResult.code, 0, plainResult.stderr);
+    const plainContent = fs.readFileSync(path.join(tmpDirPlain, "source.md"), "utf8");
+    const plainLines = plainContent.split("\n");
+    const plainMarkerLine = plainLines[0] + "\n";
+    const plainBody = plainContent.slice(plainMarkerLine.length);
+    assert.equal(plainBody, "# source.wav\n\nhello from the stub transcript\n");
+  } finally {
+    fs.rmSync(tmpDirDiarized, { recursive: true, force: true });
+    fs.rmSync(tmpDirPlain, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("export: --text stdout stays transcript-only while the export file still appears", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-export-textpurity-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  writeTinyWav(wavPath);
+  const stubPath = writeStubWorker(tmpDir);
+  const homeDir = mkTempHome();
+
+  try {
+    const result = await runCli(["transcribe", wavPath, "--local", "--text"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "export-plain",
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.stdout, "hello from the stub transcript\n");
+
+    const mdPath = path.join(tmpDir, "source.md");
+    assert.ok(fs.existsSync(mdPath));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
     fs.rmSync(homeDir, { recursive: true, force: true });
