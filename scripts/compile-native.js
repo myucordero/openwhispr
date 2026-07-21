@@ -8,11 +8,17 @@ const PLATFORM_SCRIPTS = {
     "compile:fast-paste",
     "compile:text-monitor",
     "compile:media-remote",
+    "compile:mediaremote-adapter",
     "compile:mic-listener",
     "compile:audio-tap",
   ],
   win32: ["compile:winkeys", "compile:winpaste", "compile:text-monitor"],
-  linux: ["compile:linux-paste", "compile:text-monitor"],
+  linux: [
+    "compile:linuxkeys",
+    "compile:linux-paste",
+    "compile:linux-system-audio",
+    "compile:text-monitor",
+  ],
 };
 
 const scripts = PLATFORM_SCRIPTS[process.platform] || [];

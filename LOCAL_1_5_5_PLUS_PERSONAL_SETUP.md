@@ -8,6 +8,25 @@ It is optimized for your local-first workflow and the dual-clone model:
 - Windows clone for Electron runtime and Windows packaging
 - Sync only through Git
 
+## Automated Pipeline (Current)
+
+The manual phases below predate the automated build pipeline, which now
+supersedes them for day-to-day use. See the `openwhispr-local-build` skill
+(`.claude/skills/openwhispr-local-build`) for the full flow:
+
+- **WSL**: `npm run ship:local` validates (lint/typecheck/i18n/tests) and pushes.
+- **Windows**: `scripts/update-local-app.ps1` pulls, refreshes deps/runtime only
+  on lockfile change, provisions native binaries only when missing/changed, runs
+  an offline packaged build, and prints a doctor summary.
+
+With `VITE_LOCAL_ONLY=1` the build is fully offline and no-account: all cloud
+surfaces are hidden and an auto-seeder writes a ready-to-use local config on
+first launch (Whisper `turbo` live dictation, WhisperX `large-v3-turbo`
+uploads, local Qwen cleanup/chat, Claude-CLI notes/agent) — no manual model
+setup needed. Note formatting and the dictation agent can use the local
+`claude`/`codex` CLI (subscription auth), and the notes Upload screen accepts
+`.mp4` video. See `CLAUDE.md` §18–21 for detail.
+
 ## Target Outcome
 
 After this setup, you will have:
@@ -19,8 +38,9 @@ After this setup, you will have:
 
 ## Current Baseline
 
-- App line: `v1.5.5+`
-- Node: `22.x` (`.nvmrc`)
+- App line: `v1.7.5+` (synced from upstream)
+- Node: `24.x` (`.nvmrc`) — run `npm install`/`npm ci` under Node 24 to match CI
+- Local-only build flag: `VITE_LOCAL_ONLY=1` (hides all cloud surfaces; see above)
 - Personal/local build command: `npm run build:local:win`
 - Optional GPU bootstrap: `LOCAL_AUTO_ENABLE_GPU=1`
 
@@ -64,6 +84,10 @@ git push --force-with-lease origin main
 In your Windows runtime clone (`C:\dev\openwhispr`), create/update `.env`:
 
 ```env
+# Fully offline, no-account build: hides all cloud surfaces and auto-seeds
+# a ready-to-use local config on first launch.
+VITE_LOCAL_ONLY=1
+
 VITE_DEV_SERVER_PORT=5191
 OPENWHISPR_DEV_SERVER_PORT=5191
 UI_LANGUAGE=en
@@ -129,6 +153,14 @@ Validate this exact checklist:
 - No forced cloud/account blocker in your intended local path
 
 ## Maintenance Routine
+
+> Note: once the fork's feature branch is merged into `main`, `main` carries the
+> fork commits and no longer fast-forwards to upstream. Upstream version syncs
+> become **merge-based** (`git fetch upstream && git merge upstream/main` on the
+> working branch), not the rebase/force-push shown below. The
+> `openwhispr-local-build` skill's "Update flows" is the current source of truth;
+> the rebase commands here apply only if you keep `main` as a clean upstream
+> mirror.
 
 Weekly sync:
 

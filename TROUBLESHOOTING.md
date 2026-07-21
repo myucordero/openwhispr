@@ -74,9 +74,19 @@
 **Fix:**
 
 1. Reinstall dependencies: `rm -rf node_modules && npm ci`
-2. Run `npm run doctor:local` to verify local prerequisites
-3. If using packaged app, try reinstalling
-4. **Windows:** check that antivirus / Windows Defender hasn't quarantined the bundled FFmpeg binary
+2. If using packaged app, try reinstalling
+3. **Windows:** check that antivirus / Windows Defender hasn't quarantined the bundled FFmpeg binary
+
+### Electron Failed to Install Correctly
+
+**Symptoms:** Running `npm run dev` fails with "Electron failed to install correctly".
+
+**Fix:**
+
+1. Use Node.js 24: `node -v`
+2. Ensure npm install scripts are enabled: `npm config set ignore-scripts false`
+3. Rebuild Electron's platform binary: `npm rebuild electron`
+4. If `ELECTRON_SKIP_BINARY_DOWNLOAD` is set, unset it and run `npm install` again
 
 ### whisper.cpp Issues
 
@@ -109,26 +119,39 @@
 
 OpenWhispr tries clipboard methods in order: `wl-copy` (most reliable) → renderer `navigator.clipboard` → X11 fallback.
 
-### Linux System Audio Portal Issues
+### Linux System Audio PipeWire Issues
 
-**Symptoms:** The Linux share dialog keeps appearing, system audio does not stay granted, or onboarding does not show a system-audio grant step.
+**Symptoms:** Meeting transcription captures the microphone but not other participants, browser audio, or other system audio.
 
 **Fix:**
-1. Update `xdg-desktop-portal` and the matching desktop backend for your session (`xdg-desktop-portal-gnome`, `xdg-desktop-portal-kde`, `xdg-desktop-portal-wlr`, etc.)
-2. Sign out and back in after updating portal packages
-3. Re-run system audio capture and complete the chooser again
-4. Expect the chooser to appear on Linux while OpenWhispr is using the standard browser portal path; some desktops may support more persistent portal behavior later, but fallback capture should still work
+
+1. Install PipeWire runtime libraries if they are not already present:
+   - Debian/Ubuntu: `sudo apt install pipewire libpipewire-0.3-0`
+   - Fedora/RHEL: `sudo dnf install pipewire pipewire-libs`
+   - Arch: `sudo pacman -S pipewire`
+2. Make sure the PipeWire user service is running for the current session
+3. Sign out and back in after installing or updating PipeWire packages
+4. Restart OpenWhispr and start meeting transcription again
+5. No screen-share chooser is expected for Linux system audio; OpenWhispr captures the default sink monitor directly through PipeWire
 
 ### Meeting Transcription Issues
 
 **Symptoms:** Meeting detection not working, no transcription, audio not captured
 
 **macOS:**
+
 1. Grant Screen Recording permission: System Settings → Privacy & Security → Screen Recording → enable OpenWhispr
 2. Restart the app after granting permission
 3. Ensure Google Calendar is connected in Integrations
 
+**Windows:**
+
+1. System audio is captured by `windows-system-audio-helper.exe` (WASAPI process loopback), which hears every app on every output device — no permission prompt is needed
+2. If the helper is missing or fails (requires Windows 10 2004+), OpenWhispr automatically falls back to Chromium loopback, which only hears the _default_ output device — make sure your meeting app plays through the default device in that case
+3. If transcription shows "Continuing with microphone only", system audio capture failed entirely; check debug logs for `windows-system-audio-helper` entries
+
 **All Platforms:**
+
 1. Check that meeting detection is enabled in settings
 2. Verify your OpenAI API key is valid (required for Realtime API transcription)
 3. Ensure your meeting app (Zoom, Teams, FaceTime) is running — process detection looks for known meeting applications
@@ -139,6 +162,7 @@ OpenWhispr tries clipboard methods in order: `wl-copy` (most reliable) → rende
 **Symptoms:** Agent overlay not appearing, no AI responses, streaming errors
 
 **Fix:**
+
 1. Ensure Agent Mode is enabled in Settings → Agent Mode
 2. Check that you have a valid API key for your selected provider
 3. Verify the agent hotkey doesn't conflict with other global shortcuts
@@ -147,10 +171,38 @@ OpenWhispr tries clipboard methods in order: `wl-copy` (most reliable) → rende
 
 ### Windows-Specific Issues
 
-See [WINDOWS_TROUBLESHOOTING.md](WINDOWS_TROUBLESHOOTING.md) for:
+**No window appears (process running in Task Manager but invisible):**
 
-- Window visibility issues
-- FFmpeg permission problems
+1. Check the system tray (click the `^` caret) for the OpenWhispr icon
+2. Run with debug logging: `OpenWhispr.exe --log-level=debug`
+3. Try disabling GPU acceleration: `OpenWhispr.exe --disable-gpu`
+
+**Antivirus / Windows Defender blocking binaries:**
+
+whisper.cpp and FFmpeg may be quarantined silently. Add OpenWhispr to exclusions: Settings → Virus & threat protection → Exclusions.
+
+**Permission errors:**
+
+Right-click OpenWhispr → Run as administrator (or set permanently in Properties → Compatibility).
+
+**Firewall blocking cloud mode:**
+
+Allow OpenWhispr through Windows Firewall when using cloud transcription providers.
+
+**Firewall prompt for sherpa-onnx (local Parakeet transcription):**
+
+Windows may ask whether to allow `sherpa-onnx-ws-win32-x64` on public and private networks the first time local Parakeet transcription starts. The bundled sherpa-onnx server only serves OpenWhispr itself over `127.0.0.1`, but it has no loopback-only bind option, so Windows sees it listening on all interfaces. Either choice is safe — Windows never filters loopback traffic, so transcription works even if you click Cancel. All-users installs register a firewall rule that blocks outside access and suppresses the prompt entirely; per-user and portable builds may still see it once.
+
+**Complete reset (after uninstalling):**
+
+```batch
+rd /s /q "%APPDATA%\OpenWhispr"
+rd /s /q "%LOCALAPPDATA%\OpenWhispr"
+```
+
+Then reinstall.
+
+**Logs location:** `%APPDATA%\OpenWhispr\logs\`
 
 ## Enable Debug Mode
 

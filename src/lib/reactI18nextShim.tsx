@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import i18nInstance, { type SimpleI18n } from "./simpleI18n";
+import i18nInstance, { type SimpleI18n, type TFunction } from "./simpleI18n";
 
 type TranslationContextValue = {
   i18n: SimpleI18n;
@@ -40,10 +40,7 @@ export function useTranslation(ns?: string) {
   const t = useMemo(
     () =>
       ((key: string, options: Record<string, unknown> = {}) =>
-        i18n.t(key, ns ? { ...options, ns } : options)) as ((
-        key: string,
-        options?: Record<string, unknown>
-      ) => string),
+        i18n.t(key, ns ? { ...options, ns } : options)) as TFunction,
     [i18n, ns]
   );
 

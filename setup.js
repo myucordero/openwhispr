@@ -6,7 +6,11 @@ console.log("Setting up OpenWhispr local environment...");
 const envPath = path.join(process.cwd(), ".env");
 const envExamplePath = path.join(process.cwd(), ".env.example");
 
-const fallbackTemplate = `# Local-first development defaults
+const fallbackTemplate = `# Local-only build: hide all cloud surfaces (sign-in, cloud transcription,
+# cloud reasoning/agent providers). Set to 0/unset to offer cloud.
+VITE_LOCAL_ONLY=1
+
+# Local-first development defaults
 VITE_DEV_SERVER_PORT=5191
 OPENWHISPR_DEV_SERVER_PORT=5191
 

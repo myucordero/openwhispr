@@ -1,0 +1,460 @@
+{
+  "schemaVersion": 1,
+  "jobId": "job-fixture-001",
+  "source": {
+    "displayName": "Atlas planning sync.wav",
+    "sha256": "3876f3d57dad68c1293f9458d7d15bf77c0fc8dacb4e40fabbfbb3ffafd2a789",
+    "durationSeconds": 21.3
+  },
+  "provenance": {
+    "engine": "whisperx",
+    "whisperxVersion": "3.1.1",
+    "model": "large-v3-turbo",
+    "device": "cuda",
+    "computeType": "float16",
+    "batchSize": 4,
+    "languageRequested": "es",
+    "createdAt": "2026-07-16T14:32:05Z"
+  },
+  "speakers": [
+    {
+      "id": "SPEAKER_00",
+      "label": "Speaker 1"
+    },
+    {
+      "id": "SPEAKER_01",
+      "label": "Speaker 2"
+    }
+  ],
+  "segments": [
+    {
+      "id": "seg-0001",
+      "sequence": 0,
+      "start": 0,
+      "end": 4.2,
+      "speakerId": "SPEAKER_00",
+      "text": "Buenos dias a todos, empecemos con el proyecto Atlas.",
+      "words": [
+        {
+          "text": "Buenos",
+          "start": 0,
+          "end": 0.3,
+          "score": 0.95
+        },
+        {
+          "text": "dias",
+          "start": 0.3,
+          "end": 0.6,
+          "score": 0.93
+        },
+        {
+          "text": "a",
+          "start": 0.6,
+          "end": 0.7,
+          "score": null
+        },
+        {
+          "text": "todos,",
+          "start": 0.7,
+          "end": 1.1,
+          "score": 0.9
+        },
+        {
+          "text": "empecemos",
+          "start": 1.1,
+          "end": 1.6,
+          "score": 0.88
+        },
+        {
+          "text": "con",
+          "start": 1.6,
+          "end": 1.8,
+          "score": 0.91
+        },
+        {
+          "text": "el",
+          "start": 1.8,
+          "end": 1.9,
+          "score": null
+        },
+        {
+          "text": "proyecto",
+          "start": 1.9,
+          "end": 2.4,
+          "score": 0.94
+        },
+        {
+          "text": "Atlas.",
+          "start": 2.4,
+          "end": 2.9,
+          "score": 0.97
+        }
+      ],
+      "quality": {
+        "averageLogProb": -0.21,
+        "noSpeechProb": 0.02
+      },
+      "flags": []
+    },
+    {
+      "id": "seg-0002",
+      "sequence": 1,
+      "start": 4,
+      "end": 9.5,
+      "speakerId": "SPEAKER_01",
+      "text": "Sounds good. I think we should finalize the database choice today.",
+      "words": [
+        {
+          "text": "Sounds",
+          "start": 4,
+          "end": 4.3,
+          "score": 0.92
+        },
+        {
+          "text": "good.",
+          "start": 4.3,
+          "end": 4.6,
+          "score": 0.9
+        },
+        {
+          "text": "I",
+          "start": 4.6,
+          "end": 4.7,
+          "score": null
+        },
+        {
+          "text": "think",
+          "start": 4.7,
+          "end": 4.9,
+          "score": 0.89
+        },
+        {
+          "text": "we",
+          "start": 4.9,
+          "end": 5,
+          "score": 0.91
+        },
+        {
+          "text": "should",
+          "start": 5,
+          "end": 5.3,
+          "score": 0.88
+        },
+        {
+          "text": "finalize",
+          "start": 5.3,
+          "end": 5.9,
+          "score": 0.85
+        },
+        {
+          "text": "the",
+          "start": 5.9,
+          "end": 6,
+          "score": null
+        },
+        {
+          "text": "database",
+          "start": 6,
+          "end": 6.6,
+          "score": 0.93
+        },
+        {
+          "text": "choice",
+          "start": 6.6,
+          "end": 7,
+          "score": 0.9
+        },
+        {
+          "text": "today.",
+          "start": 7,
+          "end": 7.5,
+          "score": 0.94
+        }
+      ],
+      "flags": [
+        "possible-overlap"
+      ]
+    },
+    {
+      "id": "seg-0003",
+      "sequence": 2,
+      "start": 9.5,
+      "end": 15,
+      "speakerId": "SPEAKER_00",
+      "text": "De acuerdo. Decidimos usar SQLite para mantener la implementacion simple y portable.",
+      "words": [
+        {
+          "text": "De",
+          "start": 9.5,
+          "end": 9.7,
+          "score": 0.9
+        },
+        {
+          "text": "acuerdo.",
+          "start": 9.7,
+          "end": 10.2,
+          "score": 0.92
+        },
+        {
+          "text": "Decidimos",
+          "start": 10.2,
+          "end": 10.8,
+          "score": 0.89
+        },
+        {
+          "text": "usar",
+          "start": 10.8,
+          "end": 11.1,
+          "score": 0.91
+        },
+        {
+          "text": "SQLite",
+          "start": 11.1,
+          "end": 11.6,
+          "score": 0.97
+        },
+        {
+          "text": "para",
+          "start": 11.6,
+          "end": 11.9,
+          "score": null
+        },
+        {
+          "text": "mantener",
+          "start": 11.9,
+          "end": 12.4,
+          "score": 0.88
+        },
+        {
+          "text": "la",
+          "start": 12.4,
+          "end": 12.5,
+          "score": null
+        },
+        {
+          "text": "implementacion",
+          "start": 12.5,
+          "end": 13.3,
+          "score": 0.86
+        },
+        {
+          "text": "simple",
+          "start": 13.3,
+          "end": 13.7,
+          "score": 0.9
+        },
+        {
+          "text": "y",
+          "start": 13.7,
+          "end": 13.8,
+          "score": null
+        },
+        {
+          "text": "portable.",
+          "start": 13.8,
+          "end": 14.4,
+          "score": 0.93
+        }
+      ],
+      "quality": {
+        "averageLogProb": -0.18,
+        "noSpeechProb": 0.01
+      },
+      "flags": []
+    },
+    {
+      "id": "seg-0004",
+      "sequence": 3,
+      "start": 15,
+      "end": 21.3,
+      "speakerId": "SPEAKER_01",
+      "text": "Great. Then the action item is to prepare a migration plan before next sprint. Also, what happens if the audio file is larger than expected is still an open question.",
+      "words": [
+        {
+          "text": "Great.",
+          "start": 15,
+          "end": 15.3,
+          "score": 0.95
+        },
+        {
+          "text": "Then",
+          "start": 15.3,
+          "end": 15.5,
+          "score": 0.9
+        },
+        {
+          "text": "the",
+          "start": 15.5,
+          "end": 15.6,
+          "score": null
+        },
+        {
+          "text": "action",
+          "start": 15.6,
+          "end": 15.9,
+          "score": 0.92
+        },
+        {
+          "text": "item",
+          "start": 15.9,
+          "end": 16.1,
+          "score": 0.91
+        },
+        {
+          "text": "is",
+          "start": 16.1,
+          "end": 16.2,
+          "score": null
+        },
+        {
+          "text": "to",
+          "start": 16.2,
+          "end": 16.3,
+          "score": 0.9
+        },
+        {
+          "text": "prepare",
+          "start": 16.3,
+          "end": 16.7,
+          "score": 0.88
+        },
+        {
+          "text": "a",
+          "start": 16.7,
+          "end": 16.8,
+          "score": null
+        },
+        {
+          "text": "migration",
+          "start": 16.8,
+          "end": 17.4,
+          "score": 0.93
+        },
+        {
+          "text": "plan",
+          "start": 17.4,
+          "end": 17.7,
+          "score": 0.92
+        },
+        {
+          "text": "before",
+          "start": 17.7,
+          "end": 18,
+          "score": 0.89
+        },
+        {
+          "text": "next",
+          "start": 18,
+          "end": 18.2,
+          "score": 0.9
+        },
+        {
+          "text": "sprint.",
+          "start": 18.2,
+          "end": 18.6,
+          "score": 0.94
+        },
+        {
+          "text": "Also,",
+          "start": 18.6,
+          "end": 18.9,
+          "score": 0.85
+        },
+        {
+          "text": "what",
+          "start": 18.9,
+          "end": 19.1,
+          "score": 0.87
+        },
+        {
+          "text": "happens",
+          "start": 19.1,
+          "end": 19.5,
+          "score": 0.86
+        },
+        {
+          "text": "if",
+          "start": 19.5,
+          "end": 19.6,
+          "score": null
+        },
+        {
+          "text": "the",
+          "start": 19.6,
+          "end": 19.7,
+          "score": null
+        },
+        {
+          "text": "audio",
+          "start": 19.7,
+          "end": 20,
+          "score": 0.9
+        },
+        {
+          "text": "file",
+          "start": 20,
+          "end": 20.2,
+          "score": 0.91
+        },
+        {
+          "text": "is",
+          "start": 20.2,
+          "end": 20.3,
+          "score": null
+        },
+        {
+          "text": "larger",
+          "start": 20.3,
+          "end": 20.6,
+          "score": 0.88
+        },
+        {
+          "text": "than",
+          "start": 20.6,
+          "end": 20.8,
+          "score": 0.87
+        },
+        {
+          "text": "expected",
+          "start": 20.8,
+          "end": 21.1,
+          "score": 0.89
+        },
+        {
+          "text": "is",
+          "start": 21.1,
+          "end": 21.15,
+          "score": null
+        },
+        {
+          "text": "still",
+          "start": 21.15,
+          "end": 21.2,
+          "score": 0.8
+        },
+        {
+          "text": "an",
+          "start": 21.2,
+          "end": 21.22,
+          "score": null
+        },
+        {
+          "text": "open",
+          "start": 21.22,
+          "end": 21.26,
+          "score": 0.82
+        },
+        {
+          "text": "question.",
+          "start": 21.26,
+          "end": 21.3,
+          "score": 0.9
+        }
+      ],
+      "flags": [
+        "low-confidence"
+      ]
+    }
+  ],
+  "warnings": []
+}

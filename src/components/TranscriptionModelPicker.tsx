@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { Download, Trash2, Cloud, Lock, X, Zap, Check } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Download, Trash2, Cloud, Lock, X, Zap, Check, AlertCircle, Loader2 } from "lucide-react";
 import { ProviderIcon } from "./ui/ProviderIcon";
 import { ProviderTabs } from "./ui/ProviderTabs";
 import ModelCardList from "./ui/ModelCardList";
@@ -24,11 +25,15 @@ import {
   type ModelPickerStyles,
 } from "../utils/modelPickerStyles";
 import { useSettingsStore } from "../stores/settingsStore";
-import { getProviderIcon, isMonochromeProvider } from "../utils/providerIcons";
-import { API_ENDPOINTS, normalizeBaseUrl } from "../config/constants";
+import { getRemoteProviderIcon } from "../utils/providerIcons";
 import { createExternalLinkHandler } from "../utils/externalLinks";
+import { API_ENDPOINTS, normalizeBaseUrl } from "../config/constants";
+import { GetApiKeyLink } from "./ui/GetApiKeyLink";
 import { getCachedPlatform } from "../utils/platform";
 import type { CudaWhisperStatus } from "../types/electron";
+import type { WhisperXReadiness, WhisperXModel } from "../types/whisperx";
+import { Badge } from "./ui/badge";
+import { LOCAL_ONLY_MODE } from "../lib/features";
 import logger from "../utils/logger";
 
 interface LocalModel {
@@ -201,16 +206,388 @@ interface TranscriptionModelPickerProps {
 const CLOUD_PROVIDER_TABS = [
   { id: "openai", name: "OpenAI" },
   { id: "groq", name: "Groq" },
+  { id: "xai", name: "xAI" },
   { id: "mistral", name: "Mistral" },
+  { id: "corti", name: "Corti" },
+  { id: "tinfoil", name: "Tinfoil" },
   { id: "custom", name: "Custom" },
 ];
 
+interface ProviderCredentialField {
+  key:
+    | "openaiApiKey"
+    | "groqApiKey"
+    | "xaiApiKey"
+    | "mistralApiKey"
+    | "cortiClientId"
+    | "cortiClientSecret"
+    | "cortiEnvironment"
+    | "cortiTenant"
+    | "tinfoilApiKey";
+  input: "secret" | "text" | "select";
+  labelKey?: string;
+  placeholder?: string;
+  options?: Array<{ value: string; label: string }>;
+}
+
+const PROVIDER_CREDENTIALS: Record<
+  string,
+  { consoleUrl: string; fields: ProviderCredentialField[] }
+> = {
+  openai: {
+    consoleUrl: "https://platform.openai.com/api-keys",
+    fields: [{ key: "openaiApiKey", input: "secret" }],
+  },
+  groq: {
+    consoleUrl: "https://console.groq.com/keys",
+    fields: [{ key: "groqApiKey", input: "secret" }],
+  },
+  xai: {
+    consoleUrl: "https://console.x.ai",
+    fields: [{ key: "xaiApiKey", input: "secret" }],
+  },
+  mistral: {
+    consoleUrl: "https://console.mistral.ai/api-keys",
+    fields: [{ key: "mistralApiKey", input: "secret" }],
+  },
+  corti: {
+    consoleUrl: "https://www.corti.ai/?utm_source=referral&utm_content=&utm_campaign=openwhispr",
+    fields: [
+      { key: "cortiClientId", input: "secret", labelKey: "transcription.corti.clientId" },
+      { key: "cortiClientSecret", input: "secret", labelKey: "transcription.corti.clientSecret" },
+      {
+        key: "cortiEnvironment",
+        input: "select",
+        labelKey: "transcription.corti.environment",
+        options: [
+          { value: "us", label: "US" },
+          { value: "eu", label: "EU" },
+        ],
+      },
+      {
+        key: "cortiTenant",
+        input: "text",
+        labelKey: "transcription.corti.tenant",
+        placeholder: "base",
+      },
+    ],
+  },
+  tinfoil: {
+    consoleUrl: "https://tinfoil.sh/inference?utm_source=referral&utm_campaign=openwhispr",
+    fields: [{ key: "tinfoilApiKey", input: "secret" }],
+  },
+};
+
 const VALID_CLOUD_PROVIDER_IDS = CLOUD_PROVIDER_TABS.map((p) => p.id);
+
+const TINFOIL_AUDIO_DOCS_URL = "https://docs.tinfoil.sh/models/audio";
 
 const LOCAL_PROVIDER_TABS: Array<{ id: string; name: string; disabled?: boolean }> = [
   { id: "whisper", name: "OpenAI" },
   { id: "nvidia", name: "NVIDIA" },
+  { id: "whisperx", name: "WhisperX" },
 ];
+
+const WHISPERX_MODELS: WhisperXModel[] = ["large-v3-turbo", "large-v3"];
+
+interface WhisperXPanelProps {
+  styles: ModelPickerStyles;
+}
+
+/**
+ * WhisperX local-provider panel: readiness summary + one-click runtime
+ * provisioning + model selection. All whisperx* preload methods are optional,
+ * so every call is guarded and the panel degrades to an "unavailable" state.
+ */
+function WhisperXPanel({ styles }: WhisperXPanelProps) {
+  const { t } = useTranslation();
+  const whisperxModel = useSettingsStore((s) => s.whisperxModel);
+  const setWhisperxModel = useSettingsStore((s) => s.setWhisperxModel);
+
+  const [readiness, setReadiness] = useState<
+    (Partial<WhisperXReadiness> & { success?: boolean; error?: string }) | null
+  >(null);
+  const [checking, setChecking] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+  const [provisioning, setProvisioning] = useState(false);
+  const [provisionLog, setProvisionLog] = useState<string[]>([]);
+  const [tokenInput, setTokenInput] = useState("");
+  const [tokenBusy, setTokenBusy] = useState(false);
+
+  const checkReadiness = useCallback(async () => {
+    if (!window.electronAPI?.whisperxGetReadiness) {
+      setUnavailable(true);
+      return;
+    }
+    setChecking(true);
+    try {
+      const res = await window.electronAPI.whisperxGetReadiness();
+      setReadiness(res ?? null);
+    } catch (error) {
+      logger.error("Failed to check WhisperX readiness", { error }, "whisperx");
+      setReadiness(null);
+    } finally {
+      setChecking(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkReadiness();
+  }, [checkReadiness]);
+
+  const handleSaveToken = useCallback(async () => {
+    const value = tokenInput.trim();
+    if (!value || !window.electronAPI?.saveHuggingFaceToken) return;
+    setTokenBusy(true);
+    try {
+      await window.electronAPI.saveHuggingFaceToken(value);
+      setTokenInput("");
+      await checkReadiness();
+    } catch (error) {
+      logger.error("Failed to save HF token", { error }, "whisperx");
+    } finally {
+      setTokenBusy(false);
+    }
+  }, [tokenInput, checkReadiness]);
+
+  const handleRemoveToken = useCallback(async () => {
+    if (!window.electronAPI?.deleteHuggingFaceToken) return;
+    setTokenBusy(true);
+    try {
+      await window.electronAPI.deleteHuggingFaceToken();
+      await checkReadiness();
+    } catch (error) {
+      logger.error("Failed to remove HF token", { error }, "whisperx");
+    } finally {
+      setTokenBusy(false);
+    }
+  }, [checkReadiness]);
+
+  const handleProvision = useCallback(async () => {
+    if (!window.electronAPI?.whisperxProvisionRuntime) return;
+    setProvisioning(true);
+    setProvisionLog([]);
+    const cleanup = window.electronAPI.onWhisperxProvisionProgress?.((p) => {
+      setProvisionLog((prev) => [...prev, p.message]);
+    });
+    try {
+      await window.electronAPI.whisperxProvisionRuntime();
+    } catch (error) {
+      logger.error("WhisperX provisioning failed", { error }, "whisperx");
+    } finally {
+      cleanup?.();
+      setProvisioning(false);
+      await checkReadiness();
+    }
+  }, [checkReadiness]);
+
+  if (unavailable) {
+    return (
+      <div className="rounded-md border border-border bg-surface-1 p-3">
+        <div className="flex items-start gap-2">
+          <AlertCircle size={13} className="text-warning shrink-0 mt-0.5" />
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {t("whisperx.readiness.unavailable")}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const runtimeInstalled = readiness?.runtimeInstalled ?? false;
+  const cudaAvailable = readiness?.cudaAvailable ?? false;
+  const asrReady = readiness?.asrModelReady ?? false;
+  const tokenConfigured = readiness?.diarizationTokenConfigured ?? false;
+
+  const readyBadge = (label: string, ok: boolean, detail?: string | null) => (
+    <Badge variant={ok ? "success" : "outline"} className="gap-1">
+      {ok ? <Check size={10} /> : <X size={10} />}
+      {label}
+      {detail ? <span className="opacity-60">· {detail}</span> : null}
+    </Badge>
+  );
+
+  return (
+    <div className="space-y-2">
+      <div className="rounded-md border border-border bg-surface-1 p-2.5 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-foreground">
+            {t("whisperx.readiness.title")}
+          </span>
+          <Button
+            onClick={checkReadiness}
+            disabled={checking}
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+          >
+            {checking ? (
+              <Loader2 size={11} className="animate-spin" />
+            ) : (
+              t("whisperx.readiness.recheck")
+            )}
+          </Button>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {readyBadge(
+            t("whisperx.readiness.runtime"),
+            runtimeInstalled,
+            readiness?.runtimeVersion ?? null
+          )}
+          {readyBadge(
+            t("whisperx.readiness.cuda"),
+            cudaAvailable,
+            cudaAvailable ? (readiness?.gpuName ?? null) : t("whisperx.readiness.cpuOnly")
+          )}
+          {readyBadge(t("whisperx.readiness.models"), asrReady)}
+          {readyBadge(t("whisperx.readiness.token"), tokenConfigured)}
+        </div>
+
+        {!runtimeInstalled && (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {t("whisperx.readiness.setupHint")}
+            </p>
+            <Button
+              onClick={handleProvision}
+              disabled={provisioning}
+              size="sm"
+              variant="default"
+              className="h-7 px-3 text-xs"
+            >
+              {provisioning ? (
+                <>
+                  <Loader2 size={11} className="mr-1.5 animate-spin" />
+                  {t("whisperx.readiness.settingUp")}
+                </>
+              ) : (
+                t("whisperx.readiness.setUp")
+              )}
+            </Button>
+          </div>
+        )}
+
+        {provisionLog.length > 0 && (
+          <div
+            role="log"
+            aria-live="polite"
+            className="max-h-28 overflow-y-auto rounded-sm bg-background/60 border border-border/60 p-2 font-mono text-[10px] leading-relaxed text-muted-foreground"
+          >
+            {provisionLog.map((line, i) => (
+              <div key={i} className="truncate">
+                {line}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-foreground">{t("whisperx.upload.model")}</label>
+        <div className="space-y-0.5">
+          {WHISPERX_MODELS.map((modelId) => {
+            const isSelected = modelId === whisperxModel;
+            return (
+              <button
+                key={modelId}
+                type="button"
+                onClick={() => setWhisperxModel(modelId)}
+                aria-pressed={isSelected}
+                className={`relative w-full text-left overflow-hidden rounded-md border transition-colors duration-200 ${
+                  isSelected ? styles.modelCard.selected : styles.modelCard.default
+                } cursor-pointer`}
+              >
+                <div className="flex items-center gap-1.5 p-2">
+                  <div className="shrink-0">
+                    <div
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        isSelected ? "bg-primary" : "bg-muted-foreground/20"
+                      }`}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                    <span className="font-semibold text-sm text-foreground truncate tracking-tight">
+                      {t(`whisperx.upload.models.${modelId}.name`)}
+                    </span>
+                    <span className="text-xs text-muted-foreground/50 tabular-nums shrink-0">
+                      {t(`whisperx.upload.models.${modelId}.size`)}
+                    </span>
+                    {modelId === "large-v3-turbo" && (
+                      <span className={styles.badges.recommended}>{t("common.recommended")}</span>
+                    )}
+                  </div>
+                  {isSelected && (
+                    <span className="text-xs font-medium text-primary px-2 py-0.5 bg-primary/10 rounded-sm shrink-0">
+                      {t("common.active")}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="rounded-md border border-border bg-surface-1 p-2.5 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-foreground">
+            {t("whisperx.diarization.title")}
+          </span>
+          {tokenConfigured && (
+            <Badge variant="success" className="gap-1">
+              <Check size={10} />
+              {t("whisperx.diarization.configured")}
+            </Badge>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          {t("whisperx.diarization.hint")}
+        </p>
+        {tokenConfigured ? (
+          <Button
+            onClick={handleRemoveToken}
+            disabled={tokenBusy}
+            size="sm"
+            variant="outline"
+            className="h-7 px-3 text-xs"
+          >
+            {tokenBusy ? (
+              <Loader2 size={11} className="animate-spin" />
+            ) : (
+              t("whisperx.diarization.remove")
+            )}
+          </Button>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="password"
+              value={tokenInput}
+              onChange={(e) => setTokenInput(e.target.value)}
+              placeholder={t("whisperx.diarization.placeholder")}
+              aria-label={t("whisperx.diarization.title")}
+              className="h-7 text-xs flex-1"
+              autoComplete="off"
+            />
+            <Button
+              onClick={handleSaveToken}
+              disabled={tokenBusy || tokenInput.trim().length === 0}
+              size="sm"
+              variant="default"
+              className="h-7 px-3 text-xs shrink-0"
+            >
+              {tokenBusy ? (
+                <Loader2 size={11} className="animate-spin" />
+              ) : (
+                t("whisperx.diarization.save")
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface ModeToggleProps {
   useLocalWhisper: boolean;
@@ -271,24 +648,43 @@ export default function TranscriptionModelPicker({
   const setOpenaiApiKey = useSettingsStore((s) => s.setOpenaiApiKey);
   const groqApiKey = useSettingsStore((s) => s.groqApiKey);
   const setGroqApiKey = useSettingsStore((s) => s.setGroqApiKey);
+  const xaiApiKey = useSettingsStore((s) => s.xaiApiKey);
+  const setXaiApiKey = useSettingsStore((s) => s.setXaiApiKey);
   const mistralApiKey = useSettingsStore((s) => s.mistralApiKey);
   const setMistralApiKey = useSettingsStore((s) => s.setMistralApiKey);
+  const cortiClientId = useSettingsStore((s) => s.cortiClientId);
+  const setCortiClientId = useSettingsStore((s) => s.setCortiClientId);
+  const cortiClientSecret = useSettingsStore((s) => s.cortiClientSecret);
+  const setCortiClientSecret = useSettingsStore((s) => s.setCortiClientSecret);
+  const cortiEnvironment = useSettingsStore((s) => s.cortiEnvironment);
+  const setCortiEnvironment = useSettingsStore((s) => s.setCortiEnvironment);
+  const cortiTenant = useSettingsStore((s) => s.cortiTenant);
+  const setCortiTenant = useSettingsStore((s) => s.setCortiTenant);
+  const tinfoilApiKey = useSettingsStore((s) => s.tinfoilApiKey);
+  const setTinfoilApiKey = useSettingsStore((s) => s.setTinfoilApiKey);
   const customTranscriptionApiKey = useSettingsStore((s) => s.customTranscriptionApiKey);
   const setCustomTranscriptionApiKey = useSettingsStore((s) => s.setCustomTranscriptionApiKey);
-  const effectiveLocal = mode === "local" ? true : mode === "cloud" ? false : useLocalWhisper;
+  const effectiveLocal = LOCAL_ONLY_MODE
+    ? true
+    : mode === "local"
+      ? true
+      : mode === "cloud"
+        ? false
+        : useLocalWhisper;
   const [localModels, setLocalModels] = useState<LocalModel[]>([]);
   const [parakeetModels, setParakeetModels] = useState<LocalModel[]>([]);
   const [internalLocalProvider, setInternalLocalProvider] = useState(selectedLocalProvider);
   const hasLoadedRef = useRef(false);
   const hasLoadedParakeetRef = useRef(false);
-  const [cudaStatus, setCudaStatus] = useState<CudaWhisperStatus | null>(null);
-  const [cudaDownloading, setCudaDownloading] = useState(false);
-  const [cudaProgress, setCudaProgress] = useState<DownloadProgress>({
+  const [gpuBackend, setGpuBackend] = useState<"cuda" | "vulkan" | null>(null);
+  const [gpuDownloaded, setGpuDownloaded] = useState(false);
+  const [gpuDownloading, setGpuDownloading] = useState(false);
+  const [gpuProgress, setGpuProgress] = useState<DownloadProgress>({
     downloadedBytes: 0,
     totalBytes: 0,
     percentage: 0,
   });
-  const [cudaDismissed, setCudaDismissed] = useState(false);
+  const [gpuDismissed, setGpuDismissed] = useState(false);
 
   useEffect(() => {
     if (selectedLocalProvider !== internalLocalProvider) {
@@ -453,42 +849,58 @@ export default function TranscriptionModelPicker({
   useEffect(() => {
     if (!effectiveLocal || internalLocalProvider !== "whisper") return;
     if (getCachedPlatform() === "darwin") return;
-    window.electronAPI
-      ?.getCudaWhisperStatus?.()
-      ?.then(setCudaStatus)
-      .catch(() => {});
+    const detect = async () => {
+      try {
+        const cuda = await window.electronAPI?.getCudaWhisperStatus?.();
+        if (cuda?.gpuInfo.hasNvidiaGpu) {
+          setGpuBackend("cuda");
+          setGpuDownloaded(cuda.downloaded);
+          return;
+        }
+        const vulkan = await window.electronAPI?.getVulkanWhisperStatus?.();
+        if (vulkan?.vulkan.available) {
+          setGpuBackend("vulkan");
+          setGpuDownloaded(vulkan.downloaded);
+        }
+      } catch {}
+    };
+    detect();
   }, [effectiveLocal, internalLocalProvider]);
 
   useEffect(() => {
-    if (!cudaDownloading) return;
-    const cleanup = window.electronAPI?.onCudaDownloadProgress?.((data) => {
-      setCudaProgress(data);
-    });
-    return cleanup;
-  }, [cudaDownloading]);
+    if (!gpuDownloading || !gpuBackend) return;
+    const subscribe =
+      gpuBackend === "cuda"
+        ? window.electronAPI?.onCudaDownloadProgress
+        : window.electronAPI?.onVulkanWhisperDownloadProgress;
+    return subscribe?.((data) => setGpuProgress(data));
+  }, [gpuDownloading, gpuBackend]);
 
-  const handleCudaDownload = async () => {
-    setCudaDownloading(true);
+  const handleGpuDownload = async () => {
+    setGpuDownloading(true);
     try {
-      const result = await window.electronAPI?.downloadCudaWhisperBinary?.();
-      if (result?.success) {
-        const status = await window.electronAPI?.getCudaWhisperStatus?.();
-        setCudaStatus(status || null);
-      }
+      const result =
+        gpuBackend === "cuda"
+          ? await window.electronAPI?.downloadCudaWhisperBinary?.()
+          : await window.electronAPI?.downloadVulkanWhisperBinary?.();
+      if (result?.success) setGpuDownloaded(true);
     } finally {
-      setCudaDownloading(false);
+      setGpuDownloading(false);
     }
   };
 
-  const handleCudaDelete = async () => {
-    await window.electronAPI?.deleteCudaWhisperBinary?.();
-    const status = await window.electronAPI?.getCudaWhisperStatus?.();
-    setCudaStatus(status || null);
+  const handleGpuDelete = async () => {
+    const result =
+      gpuBackend === "cuda"
+        ? await window.electronAPI?.deleteCudaWhisperBinary?.()
+        : await window.electronAPI?.deleteVulkanWhisperBinary?.();
+    if (result?.success) setGpuDownloaded(false);
   };
 
-  const handleCudaCancel = async () => {
-    await window.electronAPI?.cancelCudaWhisperDownload?.();
-    setCudaDownloading(false);
+  const handleGpuCancel = async () => {
+    if (gpuBackend === "cuda") await window.electronAPI?.cancelCudaWhisperDownload?.();
+    else await window.electronAPI?.cancelVulkanWhisperDownload?.();
+    setGpuDownloading(false);
   };
 
   const {
@@ -630,16 +1042,42 @@ export default function TranscriptionModelPicker({
     [cloudProviders, selectedCloudProvider]
   );
 
+  const providerCredentials =
+    PROVIDER_CREDENTIALS[selectedCloudProvider] ?? PROVIDER_CREDENTIALS.openai;
+  const credentialValues: Record<ProviderCredentialField["key"], string> = {
+    openaiApiKey,
+    groqApiKey,
+    xaiApiKey,
+    mistralApiKey,
+    cortiClientId,
+    cortiClientSecret,
+    cortiEnvironment,
+    cortiTenant,
+    tinfoilApiKey,
+  };
+  const credentialSetters: Record<ProviderCredentialField["key"], (value: string) => void> = {
+    openaiApiKey: setOpenaiApiKey,
+    groqApiKey: setGroqApiKey,
+    xaiApiKey: setXaiApiKey,
+    mistralApiKey: setMistralApiKey,
+    cortiClientId: setCortiClientId,
+    cortiClientSecret: setCortiClientSecret,
+    cortiEnvironment: setCortiEnvironment,
+    cortiTenant: setCortiTenant,
+    tinfoilApiKey: setTinfoilApiKey,
+  };
+
   const cloudModelOptions = useMemo(() => {
     if (!currentCloudProvider) return [];
+    const { icon, invertInDark } = getRemoteProviderIcon(selectedCloudProvider);
     return currentCloudProvider.models.map((m) => ({
       value: m.id,
       label: m.name,
       description: m.descriptionKey
         ? t(m.descriptionKey, { defaultValue: m.description })
         : m.description,
-      icon: getProviderIcon(selectedCloudProvider),
-      invertInDark: isMonochromeProvider(selectedCloudProvider),
+      icon,
+      invertInDark,
     }));
   }, [currentCloudProvider, selectedCloudProvider, t]);
 
@@ -810,7 +1248,9 @@ export default function TranscriptionModelPicker({
 
   return (
     <div className={`space-y-2 ${className}`}>
-      {!mode && <ModeToggle useLocalWhisper={effectiveLocal} onModeChange={handleModeChange} />}
+      {!mode && !LOCAL_ONLY_MODE && (
+        <ModeToggle useLocalWhisper={effectiveLocal} onModeChange={handleModeChange} />
+      )}
 
       {!effectiveLocal ? (
         <>
@@ -819,7 +1259,7 @@ export default function TranscriptionModelPicker({
             selectedId={selectedCloudProvider}
             onSelect={handleCloudProviderChange}
             colorScheme="purple"
-            scrollable
+            wrap
           />
 
           <div>
@@ -856,43 +1296,60 @@ export default function TranscriptionModelPicker({
                     className="h-8 text-sm"
                   />
                 </div>
+
+                {/azure\.com/i.test(cloudTranscriptionBaseUrl || "") && (
+                  <p className="text-xs text-muted-foreground">{t("transcription.azureHint")}</p>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-foreground">
-                      {t("common.apiKey")}
-                    </label>
-                    <button
-                      type="button"
-                      onClick={createExternalLinkHandler(
-                        {
-                          groq: "https://console.groq.com/keys",
-                          mistral: "https://console.mistral.ai/api-keys",
-                          openai: "https://platform.openai.com/api-keys",
-                        }[selectedCloudProvider] || "https://platform.openai.com/api-keys"
+                {providerCredentials.fields.map((field, index) => (
+                  <div key={field.key} className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-foreground">
+                        {field.labelKey ? t(field.labelKey) : t("common.apiKey")}
+                      </label>
+                      {index === 0 && (
+                        <GetApiKeyLink
+                          url={providerCredentials.consoleUrl}
+                          labelKey="transcription.getKey"
+                          className="text-xs text-primary/70 hover:text-primary transition-colors cursor-pointer"
+                        />
                       )}
-                      className="text-xs text-primary/70 hover:text-primary transition-colors cursor-pointer"
-                    >
-                      {t("transcription.getKey")}
-                    </button>
+                    </div>
+                    {field.input === "secret" ? (
+                      <ApiKeyInput
+                        apiKey={credentialValues[field.key]}
+                        setApiKey={credentialSetters[field.key]}
+                        label=""
+                        helpText=""
+                      />
+                    ) : field.input === "select" ? (
+                      <Select
+                        value={credentialValues[field.key]}
+                        onValueChange={credentialSetters[field.key]}
+                      >
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {field.options?.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        value={credentialValues[field.key]}
+                        onChange={(e) => credentialSetters[field.key](e.target.value)}
+                        placeholder={field.placeholder}
+                        className="h-8 text-sm"
+                      />
+                    )}
                   </div>
-                  <ApiKeyInput
-                    apiKey={
-                      { groq: groqApiKey, mistral: mistralApiKey, openai: openaiApiKey }[
-                        selectedCloudProvider
-                      ] || openaiApiKey
-                    }
-                    setApiKey={
-                      { groq: setGroqApiKey, mistral: setMistralApiKey, openai: setOpenaiApiKey }[
-                        selectedCloudProvider
-                      ] || setOpenaiApiKey
-                    }
-                    label=""
-                    helpText=""
-                  />
-                </div>
+                ))}
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-foreground">{t("common.model")}</label>
@@ -902,6 +1359,18 @@ export default function TranscriptionModelPicker({
                     onModelSelect={onCloudModelSelect}
                     colorScheme="purple"
                   />
+                  {selectedCloudProvider === "tinfoil" && (
+                    <p className="text-xs text-muted-foreground/70">
+                      {t("transcription.tinfoil.transportNote")}{" "}
+                      <a
+                        href={TINFOIL_AUDIO_DOCS_URL}
+                        onClick={createExternalLinkHandler(TINFOIL_AUDIO_DOCS_URL)}
+                        className="text-primary/70 hover:text-primary transition-colors"
+                      >
+                        {t("transcription.tinfoil.docsLink")}
+                      </a>
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -918,34 +1387,33 @@ export default function TranscriptionModelPicker({
 
           {progressDisplay}
 
-          {cudaDownloading && internalLocalProvider === "whisper" && (
+          {gpuDownloading && internalLocalProvider === "whisper" && (
             <div>
-              <DownloadProgressBar modelName="GPU acceleration" progress={cudaProgress} />
+              <DownloadProgressBar modelName="GPU acceleration" progress={gpuProgress} />
               <div className="px-2.5 pb-1 flex justify-end">
                 <button
-                  onClick={handleCudaCancel}
+                  onClick={handleGpuCancel}
                   className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Cancel
+                  {t("gpu.cancel")}
                 </button>
               </div>
             </div>
           )}
 
           {internalLocalProvider === "whisper" &&
-            !cudaDismissed &&
-            !cudaDownloading &&
-            getCachedPlatform() !== "darwin" &&
-            cudaStatus?.gpuInfo.hasNvidiaGpu && (
+            !gpuDismissed &&
+            !gpuDownloading &&
+            gpuBackend && (
               <div className="rounded-md border border-border bg-surface-1 p-2.5">
-                {cudaStatus.downloaded ? (
+                {gpuDownloaded ? (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <Check size={13} className="text-success" />
                       <span className="text-xs font-medium text-foreground">{t("gpu.active")}</span>
                     </div>
                     <Button
-                      onClick={handleCudaDelete}
+                      onClick={handleGpuDelete}
                       size="sm"
                       variant="ghost"
                       className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive"
@@ -962,7 +1430,7 @@ export default function TranscriptionModelPicker({
                       </p>
                       <div className="flex items-center gap-2 mt-1.5">
                         <Button
-                          onClick={handleCudaDownload}
+                          onClick={handleGpuDownload}
                           size="sm"
                           variant="default"
                           className="h-6 px-2.5 text-xs"
@@ -970,7 +1438,7 @@ export default function TranscriptionModelPicker({
                           {t("gpu.enableButton")}
                         </Button>
                         <button
-                          onClick={() => setCudaDismissed(true)}
+                          onClick={() => setGpuDismissed(true)}
                           className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                         >
                           {t("gpu.dismiss")}
@@ -985,6 +1453,7 @@ export default function TranscriptionModelPicker({
           <div>
             {internalLocalProvider === "whisper" && renderLocalModels()}
             {internalLocalProvider === "nvidia" && renderParakeetModels()}
+            {internalLocalProvider === "whisperx" && <WhisperXPanel styles={styles} />}
           </div>
         </>
       )}

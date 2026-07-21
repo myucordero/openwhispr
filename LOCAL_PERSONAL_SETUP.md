@@ -76,6 +76,72 @@ The dev server listens on the odd port `5191` (see `.env`) and is only needed fo
 - Keep cloud disabled unless needed for reasoning or specific models
 - Confirm microphone and accessibility permissions on your OS
 
+## WhisperX Accurate Recordings (optional)
+
+For high-accuracy transcription of existing recordings with speaker labels and
+evidence-grounded notes, provision the WhisperX runtime once:
+
+```bash
+npm run setup:whisperx
+npm run doctor:whisperx
+```
+
+Full setup, privacy/retention, troubleshooting, and license details:
+`docs/whisperx-reliable-notes.md`. Live hotkey dictation is unaffected.
+
+## Personal Build Pipeline (WSL dev → Windows app)
+
+Code lives in the WSL clone; the app you actually run is the local packaged
+build in `C:\dev\openwhispr\dist\win-unpacked`, launched from the Start Menu
+shortcut (**OpenWhispr**). Two commands close the loop:
+
+1. **WSL — validate and ship** (tests, lint, typecheck, i18n, then push the
+   current branch to origin):
+
+   ```bash
+   npm run ship:local
+   ```
+
+2. **Native Windows PowerShell — pull and rebuild** (fast-forward pull,
+   `npm ci` only when `package-lock.json` changed, WhisperX runtime repair
+   only when `uv.lock` changed, `build:local:win`, Start Menu shortcut
+   verified, doctor summary; closes a running OpenWhispr first):
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File C:\dev\openwhispr\scripts\update-local-app.ps1
+   ```
+
+Notes:
+
+- **First time only**: the update script itself arrives via git, so bootstrap
+  the Windows clone once with
+  `git -C C:\dev\openwhispr pull --ff-only origin <branch>` before the first
+  script run (or let the script's clone-if-missing path create the clone).
+- Whisper/Parakeet/WhisperX models, the WhisperX runtime, recordings, and the
+  encrypted secret store all live under `%APPDATA%\OpenWhispr` and
+  `~/.cache/openwhispr` — rebuilds never touch them.
+- **Native binaries** (whisper.cpp, llama-server, sherpa-onnx, qdrant, Windows
+  helpers) live in `resources\bin` (gitignored, stable across builds). The
+  Windows script downloads them from GitHub releases **only** when they're
+  missing or a `scripts/download-*.js` changed (an upstream binary bump);
+  routine builds run fully offline (`build:local:win --ignore-scripts`) and
+  make no GitHub calls, so they never hit the 60-req/hr API rate limit. For a
+  fresh clone or a bump, set `$env:GITHUB_TOKEN` (a classic PAT, no scopes
+  needed) before running the script for reliable downloads; force a
+  re-download with `-ForceProvision`.
+- The Windows clone must stay clean (the script refuses to pull over local
+  changes) — all editing happens in WSL, per the dual-clone rules above.
+- Upstream **OpenWhispr** updates: run the existing Fork Sync Routine below,
+  then `npm run ship:local` + the Windows update script as usual.
+- **WhisperX / Python dependency updates**: on a dedicated branch in WSL run
+  `cd tools/whisperx-sidecar && uv lock --upgrade`, re-run
+  `uv run pytest` and `npm test`, then ship — the Windows script sees the
+  changed `uv.lock` and repairs the runtime automatically. Torch stays on the
+  cu128 index for Windows (see `[tool.uv.sources]` in the sidecar
+  `pyproject.toml`); keep that block intact when upgrading.
+- Node/Electron/npm dependency updates flow through `package-lock.json` the
+  same way — the Windows script runs `npm ci` automatically when it changes.
+
 ## Preferred Daily Mode
 
 - Use local Whisper/Parakeet as your default

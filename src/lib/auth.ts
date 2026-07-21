@@ -1,22 +1,35 @@
 import { createAuthClient } from "better-auth/react";
+import { ssoClient } from "@better-auth/sso/client";
 import { OPENWHISPR_API_URL } from "../config/constants";
 import { openExternalLink } from "../utils/externalLinks";
+import { LOCAL_ONLY_MODE } from "./features";
 
-export const AUTH_URL = import.meta.env.VITE_AUTH_URL || "https://auth.openwhispr.com";
-export const authClient = createAuthClient({
-  baseURL: AUTH_URL,
-  fetchOptions: {
-    auth: {
-      type: "Bearer",
-      token: async () => (await window.electronAPI?.authGetToken?.()) ?? "",
-    },
-    headers: { "x-openwhispr-source": "desktop" },
-    onSuccess: async (ctx: { response: Response }) => {
-      const newToken = ctx.response.headers.get("set-auth-token");
-      if (newToken) await window.electronAPI?.authSetToken?.(newToken);
-    },
-  },
-});
+// Local-only builds have no cloud account: force AUTH_URL empty so every
+// `!AUTH_URL` guard (AuthenticationStep, Settings account/billing panels) takes
+// its already-present "not configured" path and the sign-in UI never renders.
+export const AUTH_URL = LOCAL_ONLY_MODE
+  ? ""
+  : import.meta.env.VITE_AUTH_URL || "https://auth.openwhispr.com";
+// Local-only builds never sign in. Skip client construction entirely: an empty
+// baseURL makes better-auth throw at construction (crashing the renderer), and
+// useAuth already falls back to a no-network static session when this is null.
+export const authClient = LOCAL_ONLY_MODE
+  ? null
+  : createAuthClient({
+      baseURL: AUTH_URL,
+      plugins: [ssoClient()],
+      fetchOptions: {
+        auth: {
+          type: "Bearer",
+          token: async () => (await window.electronAPI?.authGetToken?.()) ?? "",
+        },
+        headers: { "x-openwhispr-source": "desktop" },
+        onSuccess: async (ctx: { response: Response }) => {
+          const newToken = ctx.response.headers.get("set-auth-token");
+          if (newToken) await window.electronAPI?.authSetToken?.(newToken);
+        },
+      },
+    });
 
 export type SocialProvider = "google" | "microsoft" | "apple";
 
@@ -201,8 +214,34 @@ export async function signInWithSocial(provider: SocialProvider): Promise<{ erro
   }
 }
 
+export async function signInWithSSO(email: string): Promise<{ error?: Error }> {
+  try {
+    const isElectron = Boolean((window as any).electronAPI);
+
+    if (isElectron) {
+      // Same browser-handoff rationale as signInWithSocial: the SSO state cookie
+      // must land in the browser's cookie jar. The /sso shim routes by work-email
+      // domain and 302s to the workspace's IdP with the cookies attached.
+      const protocol = (await window.electronAPI?.getOAuthProtocol?.()) || "openwhispr";
+      const url = new URL(`${AUTH_URL}/api/desktop-signin/sso`);
+      url.searchParams.set("email", email);
+      url.searchParams.set("callbackURL", getDesktopOAuthCallbackURL(protocol));
+      openExternalLink(url.toString());
+      return {};
+    }
+
+    if (!authClient) return { error: new Error("Auth is not available in this build") };
+    const callbackURL = `${window.location.href.split("?")[0].split("#")[0]}?panel=true`;
+    await authClient.signIn.sso({ email, callbackURL });
+    return {};
+  } catch (error) {
+    return { error: error instanceof Error ? error : new Error("Single sign-on failed") };
+  }
+}
+
 export async function requestPasswordReset(email: string): Promise<{ error?: Error }> {
   try {
+    if (!authClient) return { error: new Error("Auth is not available in this build") };
     await authClient.requestPasswordReset({
       email: email.trim(),
       redirectTo: "https://openwhispr.com/reset-password",

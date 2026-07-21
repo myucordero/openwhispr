@@ -21,11 +21,21 @@ import {
   getCloudModel,
   getLocalModel,
 } from "../../models/ModelRegistry";
+import { LOCAL_ONLY_MODE } from "../../lib/features";
+
+// Inference modes that reach a cloud service — hidden in local-only builds.
+// "self-hosted" (your own OpenAI-compatible endpoint, e.g. localhost Ollama) and
+// "local" (bundled llama.cpp) stay available.
+const LOCAL_ONLY_ALLOWED_MODES = new Set<InferenceMode>(["local", "self-hosted"]);
 
 function isProviderValidForMode(provider: string, mode: InferenceMode): boolean {
   switch (mode) {
     case "providers":
-      return modelRegistry.getCloudProviders().some((p) => p.id === provider);
+      return (
+        provider === "custom" ||
+        provider === "openrouter" ||
+        modelRegistry.getCloudProviders().some((p) => p.id === provider)
+      );
     case "local":
       return modelRegistry.getAllProviders().some((p) => p.id === provider);
     case "enterprise":
@@ -40,6 +50,7 @@ const MODE_LABEL_PREFIX: Record<InferenceScope, string> = {
   noteFormatting: "settingsPage.aiModels.modes",
   dictationAgent: "dictationAgent.modes",
   chatIntelligence: "agentMode.settings.modes",
+  dictationTranslation: "settingsPage.aiModels.modes",
 };
 
 function startCloudOnboarding() {
@@ -60,7 +71,7 @@ export default function InferenceConfigEditor({ scope, onModeChange }: Inference
   const isSignedIn = useSettingsStore((s) => s.isSignedIn);
 
   const prefix = MODE_LABEL_PREFIX[scope];
-  const modes: InferenceModeOption[] = [
+  const allModes: InferenceModeOption[] = [
     {
       id: "openwhispr",
       label: t(`${prefix}.openwhispr`),
@@ -94,6 +105,9 @@ export default function InferenceConfigEditor({ scope, onModeChange }: Inference
       icon: <Building2 className="w-4 h-4" />,
     },
   ];
+  const modes: InferenceModeOption[] = LOCAL_ONLY_MODE
+    ? allModes.filter((m) => LOCAL_ONLY_ALLOWED_MODES.has(m.id))
+    : allModes;
 
   const setField = useCallback(
     <K extends keyof Omit<typeof config, "scope">>(field: K) =>
@@ -152,7 +166,9 @@ export default function InferenceConfigEditor({ scope, onModeChange }: Inference
   const showThinkingToggle =
     config.mode === "self-hosted" ||
     (config.mode === "providers" &&
-      (config.provider === "custom" || !!getCloudModel(config.model)?.supportsThinking)) ||
+      (config.provider === "custom" ||
+        config.provider === "openrouter" ||
+        !!getCloudModel(config.model)?.supportsThinking)) ||
     (config.mode === "local" && !!getLocalModel(config.model)?.supportsThinking);
 
   return (
