@@ -5,6 +5,30 @@ description: Use this skill whenever the user wants to transcribe an audio or vi
 
 # OpenWhispr WhisperX CLI
 
+Local, private transcription of recordings (audio + MP4 video) through the OpenWhispr WhisperX pipeline. Two modes:
+
+- **Local mode** (`--local`): spawns the WhisperX sidecar worker directly — no desktop app, no Windows process. Best for WSL/agent use.
+- **Bridge mode** (default): talks to a running OpenWhispr desktop app over its loopback bridge. Needed for `jobs`/`transcript`/`notes` commands and note generation.
+
+## WSL-native local mode (no desktop app)
+
+Run transcription directly against the in-repo WhisperX sidecar (`tools/whisperx-sidecar`), from any project/terminal on the same machine — no Windows process required.
+
+```bash
+openwhispr-whisperx transcribe meeting.m4a --profile meeting --language es --local --text
+```
+
+- **Requirements**: `uv` on PATH and the sidecar provisioned (`tools/whisperx-sidecar/.venv`, via `scripts/setup-whisperx.js`). If the desktop bridge is unreachable and the sidecar dir exists, plain `transcribe` (no `--local`) auto-falls-back to local mode with a one-line stderr notice.
+- **First run**: pass `--allow-model-download` once to fetch ASR weights (~2–3 GB) into the model cache; subsequent runs are offline by default.
+- **Diarization** (`meeting`/`critical-interview` profiles, or `--diarize`): needs a Hugging Face token — export `HF_TOKEN` (or `HUGGINGFACE_TOKEN`) in the environment. Never pass it as a CLI flag or in a request file.
+- **Paths**: `/mnt/c/Users/.../recording.m4a`-style WSL paths work fine as the `<file>` argument.
+- **Output**: artifacts land in `~/.cache/openwhispr/headless-jobs/<job-id>/` (transcript, subtitles, `manifest.json`); model cache defaults to `~/.cache/openwhispr/whisperx-models` (override with `OPENWHISPR_MODEL_CACHE`).
+- **Extra flags**: `--device cuda|cpu` (default `cuda`); on CUDA out-of-memory the CLI automatically retries at `--compute-type int8`, then `--device cpu` (max 2 retries), logging each attempt to stderr and recording them in the job's `manifest.json`. `--worker-timeout SECONDS` (default 600, `0` disables) kills a worker that goes silent (no stdout events) for that long.
+- `--wait`/`--poll`/`--timeout` are bridge-only and ignored in local mode (local mode is synchronous — the command doesn't return until the job finishes).
+- Override the sidecar location with `OPENWHISPR_SIDECAR_DIR` if not running from the repo.
+
+## Bridge mode (desktop app required)
+
 Local, private transcription of recordings (audio + MP4 video) through the OpenWhispr desktop app's WhisperX pipeline. The heavy lifting (CUDA WhisperX, alignment, pyannote diarization, evidence-grounded notes) runs inside the desktop app; this CLI submits jobs and retrieves results over the loopback HTTP bridge.
 
 ## Requirements
@@ -44,7 +68,7 @@ openwhispr-whisperx notes get <id>              # rendered notes.md
 
 Fine-tune with flags (each maps to an engine override): `--language <code>`, `--diarize` / `--no-diarize`, `--speakers N` (exact), `--min-speakers N --max-speakers N`, `--model <id>`, `--compute-type float16|int8`, `--batch-size N`, `--no-align`, `--dictionary word1,word2` (hotwords/custom vocabulary).
 
-Other flags: `--display-name <s>`, `--allow-model-download` (permit a one-time model fetch on an offline-default setup), `--notes-provider/--notes-model` (queue note generation after transcription, e.g. `--notes-provider claude-cli`).
+Other flags: `--display-name <s>`, `--allow-model-download` (permit a one-time model fetch on an offline-default setup), `--notes-provider/--notes-model` (queue note generation after transcription, e.g. `--notes-provider claude-cli`), `--local` (headless, no desktop app — see above), `--device cuda|cpu` (local mode only, default `cuda`).
 
 ## Waiting and output
 

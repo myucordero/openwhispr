@@ -736,6 +736,15 @@ CLI bridge:
 - **HF token**: `environment.js getHuggingFaceToken()` accepts `HF_TOKEN`
   (.env convention) as fallback to the secure-storage `HUGGINGFACE_TOKEN`.
 - **Tests**: `tests/whisperx/cliBridgeRecordings.test.cjs`.
+- **Headless local mode** (no desktop app): `transcribe <file> --local` spawns
+  the `tools/whisperx-sidecar` worker directly via `uv run`, one-shot, with
+  auto-fallback from bridge mode when the bridge is unreachable and the
+  sidecar dir exists. Env: `OPENWHISPR_SIDECAR_DIR` (sidecar location
+  override), `OPENWHISPR_MODEL_CACHE` (model cache override, default
+  `~/.cache/openwhispr/whisperx-models`), and an `LD_LIBRARY_PATH` guard that
+  prepends the venv's `nvidia/*/lib` dirs to work around CTranslate2's cuDNN
+  dlopen-by-soname discovery on Linux/WSL2. Tests:
+  `tests/whisperx/cliHeadless.test.cjs`.
 
 ## Development Guidelines
 
