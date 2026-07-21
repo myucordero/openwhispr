@@ -732,7 +732,8 @@ CLI bridge:
   text|srt|vtt|md|json`, `notes generate/list/get`. Upstream `@openwhispr/cli`
   conventions: bare JSON on pipes, exit codes 0/1/2/3/4, reads
   `~/.openwhispr/cli-bridge.json` (override: `OPENWHISPR_BRIDGE_FILE`).
-- **Agent skill**: `agent-skills/openwhispr-whisperx-cli/SKILL.md`.
+- **Agent skill**: installed globally as `openwhispr-whisperx-cli` (not
+  checked into this repo — see `~/.claude/skills/openwhispr-whisperx-cli/SKILL.md`).
 - **HF token**: `environment.js getHuggingFaceToken()` accepts `HF_TOKEN`
   (.env convention) as fallback to the secure-storage `HUGGINGFACE_TOKEN`.
 - **Tests**: `tests/whisperx/cliBridgeRecordings.test.cjs`.
