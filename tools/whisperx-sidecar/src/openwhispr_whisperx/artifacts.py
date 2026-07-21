@@ -100,16 +100,30 @@ def confine(root: str, relative_path: str) -> str:
 
 
 def write_artifact(root: str, relative_path: str, content: str) -> tuple[str, str, int]:
-    """Write ``content`` (utf-8) to a confined path; return (rel, sha256, bytes)."""
+    """Atomically write ``content`` (utf-8) to a confined path.
+
+    Writes to a sibling temp file and ``os.replace``s it into place so a crash
+    mid-write can never leave a truncated artifact (spec §21: per-file
+    atomicity in addition to the staging-directory promotion).
+    Returns (rel, sha256, bytes).
+    """
     target = confine(root, relative_path)
     os.makedirs(os.path.dirname(target), exist_ok=True)
     data = content.encode("utf-8")
+    # Unique suffix for parity with recordingArtifactStore.js (`.tmp-<pid>-…`);
+    # the worker is single-process per job, so this is robustness, not a fix.
+    temporary = f"{target}.tmp-{os.getpid()}"
     try:
-        with open(target, "wb") as handle:
+        with open(temporary, "wb") as handle:
             handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())
+        os.replace(temporary, target)
     except OSError as exc:
+        try:
+            os.unlink(temporary)
+        except OSError:
+            pass
         raise WorkerError("ARTIFACT_WRITE_FAILED", "failed to write artifact") from exc
     sha256 = hashlib.sha256(data).hexdigest()
     return relative_path, sha256, len(data)

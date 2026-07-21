@@ -133,12 +133,13 @@ async function main() {
     `${modelDir} ${modelDirWritable ? "is writable" : "is not writable"}`
   );
 
-  const hfTokenPresent = Boolean(process.env.HUGGINGFACE_TOKEN);
+  // Same fallback order as environment.js getHuggingFaceToken().
+  const hfTokenPresent = Boolean(process.env.HUGGINGFACE_TOKEN || process.env.HF_TOKEN);
   push(
     "huggingface-token",
     hfTokenPresent ? "PASS" : "WARN",
     hfTokenPresent
-      ? "HUGGINGFACE_TOKEN present (from env) — diarization can use it"
+      ? "Hugging Face token present (HUGGINGFACE_TOKEN/HF_TOKEN env) — diarization can use it"
       : "not configured — not visible outside the running app; configure in Settings (blocks diarization only, ASR still works)"
   );
 

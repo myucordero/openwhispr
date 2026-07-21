@@ -70,6 +70,8 @@ test("renderNotesMarkdown golden output", () => {
   });
 
   const expected = [
+    "> Generated from automated transcription. Evidence-linked does not mean human-verified.",
+    "",
     "## Summary",
     "",
     "The team kicked off Atlas and discussed the database choice. " +

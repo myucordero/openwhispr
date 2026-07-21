@@ -123,7 +123,7 @@ OpenWhispr is an Electron-based desktop dictation application that uses whisper.
 - **vectorIndex.js**: Qdrant collection management — upsert, delete, search, batch reindex
 - **windowConfig.js**: Centralized window configuration
 - **windowManager.js**: Window creation and lifecycle management
-- **cliBridge.js**: Loopback HTTP server on ports 8200–8219, bearer-token auth (token at `~/.openwhispr/cli-bridge.json`), 127.0.0.1-only. Used by the unified CLI to talk to a running desktop app.
+- **cliBridge.js**: Loopback HTTP server on ports 8200–8219, bearer-token auth (token at `~/.openwhispr/cli-bridge.json`), 127.0.0.1-only. Used by the unified CLI to talk to a running desktop app. Fork addition: `/v1/recordings/*` routes expose the WhisperX recording-job pipeline (§18) to CLI/agent clients — see §22.
 - **postMigrationDetector.js**: Detects users returning from the pre-Gizmo bundle ID via a `.bundle-migrated` sentinel in userData; consumed by `ipcHandlers.js` to drive the `PostMigrationOnboarding` modal
 - **whisperx/** (fork feature): WhisperX reliable-notes pipeline — `whisperxMain.js` (orchestration, ffmpeg normalization, source playback), `recordingJobManager.js`, `jobStateMachine.js`, `recordingJobsRepo.js`, `contracts.js`, `noteChunker.js`, `noteCompiler.js`. See §18
 - **cliInference.js** (fork feature): main-process bridge that runs the local `claude`/`codex` CLI as a reasoning backend (subscription auth). See §20
@@ -712,6 +712,40 @@ container and discards video. Gating lives in the UI/dialog only:
 Scoped to the MP4 family — the one video container cloud providers accept and
 Chromium's `<audio>` can decode. Other containers would transcribe but break
 BYOK transcription and playback, so they're excluded.
+
+### 22. WhisperX CLI for Agentic Use (fork feature)
+
+The WhisperX pipeline (§18) is drivable from any terminal/project through the
+CLI bridge:
+
+- **Bridge routes** (`src/helpers/cliBridge.js` → `_buildRecordingRoutes`):
+  `/v1/recordings/{readiness,list,create}` and per-job
+  `/{id}{,/cancel,/retry,/transcript,/artifact?path=,/notes}` — thin HTTP
+  mapping onto `whisperxMain` (which owns validation, path confinement, GPU
+  lease, redaction). The bridge itself gates the source extension (audio +
+  mp4/m4v) and requires absolute `source_path`, since no file dialog fronts
+  this entry point. WhisperX error codes map to HTTP statuses
+  (`WHISPERX_HTTP_ERRORS`).
+- **CLI**: `cli/openwhispr-whisperx.mjs` (zero-dep Node 20+, bin
+  `openwhispr-whisperx`) — `transcribe <file> [--profile] [--diarize] [--wait]
+  [--text]`, `jobs list/get/cancel/retry/delete`, `transcript <id> --format
+  text|srt|vtt|md|json`, `notes generate/list/get`. Upstream `@openwhispr/cli`
+  conventions: bare JSON on pipes, exit codes 0/1/2/3/4, reads
+  `~/.openwhispr/cli-bridge.json` (override: `OPENWHISPR_BRIDGE_FILE`).
+- **Agent skill**: installed globally as `openwhispr-whisperx-cli` (not
+  checked into this repo — see `~/.claude/skills/openwhispr-whisperx-cli/SKILL.md`).
+- **HF token**: `environment.js getHuggingFaceToken()` accepts `HF_TOKEN`
+  (.env convention) as fallback to the secure-storage `HUGGINGFACE_TOKEN`.
+- **Tests**: `tests/whisperx/cliBridgeRecordings.test.cjs`.
+- **Headless local mode** (no desktop app): `transcribe <file> --local` spawns
+  the `tools/whisperx-sidecar` worker directly via `uv run`, one-shot, with
+  auto-fallback from bridge mode when the bridge is unreachable and the
+  sidecar dir exists. Env: `OPENWHISPR_SIDECAR_DIR` (sidecar location
+  override), `OPENWHISPR_MODEL_CACHE` (model cache override, default
+  `~/.cache/openwhispr/whisperx-models`), and an `LD_LIBRARY_PATH` guard that
+  prepends the venv's `nvidia/*/lib` dirs to work around CTranslate2's cuDNN
+  dlopen-by-soname discovery on Linux/WSL2. Tests:
+  `tests/whisperx/cliHeadless.test.cjs`.
 
 ## Development Guidelines
 

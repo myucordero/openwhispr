@@ -1,0 +1,14 @@
+{
+  "name": "openwhispr-whisperx-cli",
+  "version": "0.1.0",
+  "description": "CLI for the OpenWhispr WhisperX recording-job pipeline (talks to the running desktop app over the loopback CLI bridge)",
+  "type": "module",
+  "bin": {
+    "openwhispr-whisperx": "./openwhispr-whisperx.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "private": true
+}

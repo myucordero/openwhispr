@@ -10,6 +10,7 @@ module.exports = [
       "*.min.js",
       "build/**",
       "src/**", // src has its own config
+      "tools/whisperx-sidecar/.venv/**", // uv-managed Python venv (gitignored)
     ],
   },
   // Main process files (CommonJS)

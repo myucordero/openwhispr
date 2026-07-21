@@ -33,6 +33,10 @@ const SECTION_ORDER = [
 // unused categories empty and empty sections are omitted anyway).
 const REVIEW_MARKER = "⚠️ *Needs review*";
 
+// Permanent provenance notice (spec §20): evidence-linked ≠ human-verified.
+const PROVENANCE_NOTICE =
+  "> Generated from automated transcription. Evidence-linked does not mean human-verified.";
+
 class NoteRenderError extends Error {
   constructor(message, itemId) {
     super(message);
@@ -90,6 +94,7 @@ function renderNotesMarkdown(extraction, options) {
   if (title) {
     lines.push(`# ${title}`, "");
   }
+  lines.push(PROVENANCE_NOTICE, "");
 
   for (const section of SECTION_ORDER) {
     const items = extraction[section.category];
@@ -137,5 +142,6 @@ module.exports = {
   NoteRenderError,
   SECTION_ORDER,
   REVIEW_MARKER,
+  PROVENANCE_NOTICE,
   NOTE_EXTRACTION_CATEGORIES,
 };

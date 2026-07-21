@@ -262,7 +262,10 @@ async function runOne({
     };
   }
 
-  const hfToken = configuration.diarization ? process.env.HUGGINGFACE_TOKEN || null : null;
+  // Same fallback order as environment.js getHuggingFaceToken().
+  const hfToken = configuration.diarization
+    ? process.env.HUGGINGFACE_TOKEN || process.env.HF_TOKEN || null
+    : null;
   const run = new WhisperXProcessRun({
     command: invocation.command,
     args: invocation.args,

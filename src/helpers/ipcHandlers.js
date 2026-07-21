@@ -2142,8 +2142,11 @@ class IPCHandlers {
       }
     };
 
+    // Readiness fields spread at the top level of the response — the renderer
+    // type is `{ success } & Partial<WhisperXReadiness>` and UploadAudioView
+    // reads `asrModelReady` directly to gate the model-download confirmation.
     ipcMain.handle("whisperx-get-readiness", async (event) =>
-      whisperxCall(event, async () => ({ readiness: await this.whisperxMain.getReadiness() }))
+      whisperxCall(event, () => this.whisperxMain.getReadiness())
     );
 
     ipcMain.handle("whisperx-provision-runtime", async (event) =>

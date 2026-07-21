@@ -48,9 +48,12 @@ Speaker diarization uses `pyannote/speaker-diarization-community-1`:
 2. Paste it in Settings → WhisperX → Diarization. It is encrypted with the
    OS keychain/safeStorage, is never written to `.env`, job files, logs, or
    command lines, and the UI can only ever read back "configured: yes/no".
-3. ASR works fully without the token; only diarization is blocked. The
-   existing sherpa-onnx local diarization remains the documented fallback
-   provider (`openwhispr-local`).
+3. ASR works fully without the token; only diarization is blocked. pyannote
+   is the only implemented diarization backend today: when it cannot run, the
+   job completes without speaker labels and surfaces a
+   `DIARIZATION_UNAVAILABLE` warning. The `openwhispr-local` provider id is
+   reserved in the contracts for a future sherpa-onnx handoff but is not
+   implemented — selecting it behaves like diarization-unavailable.
 
 ## Job storage and retention
 
@@ -126,5 +129,9 @@ upgrades happen only through an explicit repair, never automatically.
 ```bash
 npm test                                   # includes tests/whisperx/* (contracts, orchestration, notes)
 cd tools/whisperx-sidecar && uv run pytest # Python side (offline, mocked backends)
-RUN_WHISPERX_GPU_TESTS=1 uv run pytest     # opt-in real-model smoke (CUDA + models required)
+node scripts/benchmark-whisperx.js …       # real-model runs (CUDA + models required)
 ```
+
+A dedicated opt-in real-GPU pytest smoke does not exist yet; real-model
+verification currently goes through the benchmark harness on the native
+Windows machine.
