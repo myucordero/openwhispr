@@ -559,6 +559,111 @@ function runWorkerAttempt(request, sidecarDir, cliDir, workerTimeoutSeconds = LO
   });
 }
 
+// Markdown transcript export: after a successful local-mode transcription,
+// writes a copy of the transcript NEXT TO THE SOURCE FILE (default on; disable
+// with --no-export). Pure-ish (no stderr writes — the caller decides what to
+// surface) so it's directly unit-testable as well as exercised via full CLI
+// runs. See CLAUDE.md §22.
+const EXPORT_MARKER_TAG = "openwhispr-whisperx export";
+const EXPORT_MARKER_HEAD_BYTES = 512;
+
+export function exportTranscriptMarkdown({ jobDir, sourcePath, displayName, jobId, disabled }) {
+  if (disabled) return { status: "disabled", path: null, source: null };
+
+  const sourceFileName = path.basename(sourcePath);
+  const dir = path.dirname(sourcePath);
+  const stem = path.parse(sourcePath).name; // strips only the FINAL extension; keeps leading dot on hidden files
+  const candidates = [path.join(dir, `${stem}.md`), path.join(dir, `${stem}.transcript.md`)];
+
+  let body;
+  let source;
+  try {
+    const speakersPath = path.join(jobDir, TRANSCRIPT_ARTIFACTS.md);
+    if (fs.existsSync(speakersPath)) {
+      body = fs.readFileSync(speakersPath, "utf8");
+      source = "speakers";
+    } else {
+      const rawText = fs.readFileSync(path.join(jobDir, TRANSCRIPT_ARTIFACTS.text), "utf8");
+      body = `# ${displayName}\n\n${rawText}`;
+      source = "raw";
+    }
+  } catch (err) {
+    return { status: "failed", path: null, source: null, reason: err instanceof Error ? err.message : String(err) };
+  }
+
+  const marker = `<!-- ${EXPORT_MARKER_TAG} | source: ${sourceFileName} | job: ${jobId} -->\n`;
+  // Trailing " |" delimits the source basename so "a.m4a" never matches a
+  // marker written for "a.m4a.old" or any other name that merely starts the
+  // same. Only the first EXPORT_MARKER_HEAD_BYTES are inspected: our own
+  // exports always put the marker on line 1, so a marker string appearing
+  // deeper in a file is, by design, not treated as ours (it's someone else's
+  // content that happens to quote/embed it).
+  const markerNeedle = `${EXPORT_MARKER_TAG} | source: ${sourceFileName} |`;
+  const content = marker + body;
+
+  try {
+    for (const candidate of candidates) {
+      let writable = true;
+      if (fs.existsSync(candidate)) {
+        // A directory (or other non-regular entry) occupying our candidate
+        // name is an unexpected environment condition, not a "someone else's
+        // notes" content collision — fail loud instead of silently trying
+        // the next candidate (and it also can't be read for a marker check).
+        let statInfo;
+        try {
+          statInfo = fs.statSync(candidate);
+        } catch (err) {
+          return { status: "failed", path: null, source: null, reason: err instanceof Error ? err.message : String(err) };
+        }
+        if (!statInfo.isFile()) {
+          return {
+            status: "failed",
+            path: null,
+            source: null,
+            reason: `${path.basename(candidate)} exists and is not a regular file`,
+          };
+        }
+        let head = "";
+        try {
+          const fd = fs.openSync(candidate, "r");
+          try {
+            const buf = Buffer.alloc(EXPORT_MARKER_HEAD_BYTES);
+            const bytesRead = fs.readSync(fd, buf, 0, EXPORT_MARKER_HEAD_BYTES, 0);
+            head = buf.subarray(0, bytesRead).toString("utf8");
+          } finally {
+            fs.closeSync(fd);
+          }
+        } catch {
+          head = "";
+        }
+        writable = head.includes(markerNeedle);
+      }
+      if (!writable) continue;
+      const tmpPath = `${candidate}.tmp-${process.pid}`;
+      try {
+        fs.writeFileSync(tmpPath, content, "utf8");
+        fs.renameSync(tmpPath, candidate);
+      } catch (err) {
+        try {
+          fs.unlinkSync(tmpPath);
+        } catch {
+          /* best-effort cleanup; the write/rename error is what we report */
+        }
+        return { status: "failed", path: null, source: null, reason: err instanceof Error ? err.message : String(err) };
+      }
+      return { status: "written", path: candidate, source };
+    }
+    return {
+      status: "skipped",
+      path: null,
+      source: null,
+      reason: `${candidates.map((c) => path.basename(c)).join(" and ")} already exist and are not openwhispr-whisperx exports`,
+    };
+  } catch (err) {
+    return { status: "failed", path: null, source: null, reason: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 async function cmdTranscribeLocal(positional, flags) {
   const file = positional[0];
   if (!file) throw new CliError("Usage: openwhispr-whisperx transcribe <file> --local [options]");
@@ -702,21 +807,55 @@ async function cmdTranscribeLocal(positional, flags) {
     throw new CliError(message, EXIT.USER);
   }
 
+  let exportResult;
+  try {
+    exportResult = exportTranscriptMarkdown({
+      jobDir: jobDirectory,
+      sourcePath,
+      displayName,
+      jobId,
+      disabled: Boolean(flags["no-export"]),
+    });
+  } catch (err) {
+    exportResult = {
+      status: "failed",
+      path: null,
+      source: null,
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
+  if (exportResult.status === "failed") {
+    process.stderr.write(`warning: transcript export failed: ${exportResult.reason}\n`);
+  } else if (exportResult.status === "skipped") {
+    process.stderr.write(`warning: transcript export skipped: ${exportResult.reason}\n`);
+  }
+
   const manifest = {
     jobId,
     createdAt: new Date().toISOString(),
     source: baseRequest.source,
     settings: attempts,
     result: outcome.result,
+    export: {
+      status: exportResult.status,
+      path: exportResult.path,
+      source: exportResult.source,
+      ...(exportResult.reason !== undefined ? { reason: exportResult.reason } : {}),
+    },
   };
   fs.writeFileSync(path.join(jobDirectory, "manifest.json"), JSON.stringify(manifest, null, 2));
 
   if (flags.text) {
     const text = fs.readFileSync(path.join(jobDirectory, TRANSCRIPT_ARTIFACTS.text), "utf8");
     process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
+    if (process.stderr.isTTY && exportResult.path) process.stderr.write(`exported: ${exportResult.path}\n`);
     return;
   }
-  printData({ jobDirectory, result: outcome.result }, flags, (d) => `job directory: ${d.jobDirectory}`);
+  printData(
+    { jobDirectory, result: outcome.result, exportedPath: exportResult.path },
+    flags,
+    (d) => `job directory: ${d.jobDirectory}`
+  );
 }
 
 // ---------------------------------------------------------------- commands
@@ -942,12 +1081,14 @@ Usage:
       [--batch-size N] [--no-align] [--dictionary w1,w2] [--display-name <s>]
       [--allow-model-download] [--notes-provider <p>] [--notes-model <m>]
       [--wait] [--poll SECONDS] [--timeout SECONDS] [--text]
-      [--local] [--device cuda|cpu] [--worker-timeout SECONDS]
+      [--local] [--device cuda|cpu] [--worker-timeout SECONDS] [--no-export]
       (--local spawns the WhisperX sidecar worker directly, no desktop app
        needed — auto-fallback also kicks in when the desktop bridge is
        unreachable and the sidecar is installed; --wait/--poll/--timeout are
        bridge-only and ignored in local mode; --worker-timeout is the local-mode
-       inactivity watchdog, default 600s, 0 disables)
+       inactivity watchdog, default 600s, 0 disables; local mode also writes a
+       Markdown transcript next to the source file by default — --no-export
+       disables it)
   openwhispr-whisperx jobs <list|get|cancel|retry|delete> [id] [--status s] [--limit N]
   openwhispr-whisperx transcript <id> [--format json|text|srt|vtt|md]
   openwhispr-whisperx notes <generate|list|get> <id> [--provider p] [--model m] [--strict]
