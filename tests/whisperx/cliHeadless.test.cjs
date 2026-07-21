@@ -322,6 +322,7 @@ test("buildLocalRequest — hotword/speaker limits mirror schemas.py", () => {
 // races an early exit. Mode selected via STUB_MODE, forwarded through the
 // same OPENWHISPR_WORKER_CMD full-env-passthrough test-only mechanism.
 const STUB_WORKER_SOURCE = `
+const fs = require("fs");
 function readStdin() {
   return new Promise((resolve) => {
     let data = "";
@@ -331,6 +332,10 @@ function readStdin() {
   });
 }
 function emit(obj) { process.stdout.write(JSON.stringify(obj) + "\\n"); }
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+if (process.env.STUB_PID_FILE) {
+  fs.writeFileSync(process.env.STUB_PID_FILE, String(process.pid));
+}
 (async () => {
   await readStdin();
   const mode = process.env.STUB_MODE || "no-complete";
@@ -344,6 +349,24 @@ function emit(obj) { process.stdout.write(JSON.stringify(obj) + "\\n"); }
     process.exit(3);
   } else if (mode === "leak-token") {
     process.stderr.write("auth token in use: hf_STUBSECRETTOKEN123456\\n");
+    process.exit(1);
+  } else if (mode === "sleep-60") {
+    emit({ type: "stage", stage: "transcribing", timestamp: new Date().toISOString() });
+    await sleep(60000);
+    process.exit(0);
+  } else if (mode === "heartbeat-then-complete") {
+    for (let i = 0; i < 8; i++) {
+      emit({ type: "heartbeat", stage: "transcribing", timestamp: new Date().toISOString() });
+      await sleep(300);
+    }
+    emit({ type: "artifact", kind: "raw-transcript", relativePath: "transcript.raw.txt", sha256: "0".repeat(64), bytes: 0, createdAt: new Date().toISOString() });
+    emit({ type: "complete", result: { jobId: "stub-job", artifacts: [] } });
+    process.exit(0);
+  } else if (mode === "big-stderr") {
+    const marker = "EARLY_MARKER_SHOULD_BE_DROPPED";
+    const padA = "a".repeat(5 * 1024 - marker.length);
+    const padB = "b".repeat(15 * 1024);
+    process.stderr.write(padA + marker + padB);
     process.exit(1);
   } else {
     process.exit(1);
@@ -419,6 +442,116 @@ test("integration: OOM on every attempt exhausts retries, exit 1, manifest recor
     assert.equal(manifest.settings.length, 3); // initial attempt + 2 retries
     assert.ok(manifest.settings.every((a) => a.exitCode === 3));
     assert.equal(manifest.error.code, "CUDA_OUT_OF_MEMORY");
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+function pidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+test("integration: inactivity watchdog kills a hung worker and CLI exits 1", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-watchdog-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  writeTinyWav(wavPath);
+  const stubPath = writeStubWorker(tmpDir);
+  const homeDir = mkTempHome();
+  const pidFile = path.join(tmpDir, "stub.pid");
+
+  try {
+    const result = await runCli(["transcribe", wavPath, "--local", "--worker-timeout", "1"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "sleep-60",
+      STUB_PID_FILE: pidFile,
+    });
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /inactivity|timeout|killed/i);
+
+    assert.ok(fs.existsSync(pidFile), "stub never started (no pid file written)");
+    const stubPid = Number(fs.readFileSync(pidFile, "utf8").trim());
+    assert.ok(!pidAlive(stubPid), "stub process is still alive after watchdog kill");
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("integration: heartbeats reset the inactivity watchdog (per-line reset)", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-heartbeat-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  writeTinyWav(wavPath);
+  const stubPath = writeStubWorker(tmpDir);
+  const homeDir = mkTempHome();
+
+  try {
+    const result = await runCli(["transcribe", wavPath, "--local", "--worker-timeout", "1"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "heartbeat-then-complete",
+    });
+    assert.equal(result.code, 0, result.stderr);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("integration: stderr capture is byte-bounded to the last 8 KiB", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-stderrbound-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  writeTinyWav(wavPath);
+  const stubPath = writeStubWorker(tmpDir);
+  const homeDir = mkTempHome();
+
+  try {
+    const result = await runCli(["transcribe", wavPath, "--local"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "big-stderr",
+    });
+    assert.equal(result.code, 1);
+    assert.ok(!result.stderr.includes("EARLY_MARKER_SHOULD_BE_DROPPED"), "early stderr marker was not trimmed");
+    // Bounded: the CLI's own diagnostic message is the captured 8 KiB tail
+    // plus a small fixed prefix/suffix — well under the original 20 KiB.
+    assert.ok(result.stderr.length < 8 * 1024 + 512, `stderr output too large: ${result.stderr.length} bytes`);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("integration: spawn failure (nonexistent worker binary) still writes manifest.json", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-spawnfail-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  writeTinyWav(wavPath);
+  const homeDir = mkTempHome();
+  const nonexistentBinary = path.join(tmpDir, "does-not-exist-binary");
+
+  try {
+    const result = await runCli(["transcribe", wavPath, "--local"], {
+      HOME: homeDir,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: nonexistentBinary,
+    });
+    assert.equal(result.code, 1);
+
+    const jobsRoot = path.join(homeDir, ".cache", "openwhispr", "headless-jobs");
+    const jobDir = path.join(jobsRoot, fs.readdirSync(jobsRoot)[0]);
+    const manifest = JSON.parse(fs.readFileSync(path.join(jobDir, "manifest.json"), "utf8"));
+    assert.equal(manifest.settings.length, 1);
+    assert.ok(manifest.error, "manifest missing error on spawn failure");
+    assert.equal(manifest.error.code, "WORKER_SPAWN_FAILED");
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
     fs.rmSync(homeDir, { recursive: true, force: true });

@@ -415,9 +415,16 @@ export function buildLocalWorkerEnv(sidecarDir, cliDir) {
 // extra args) and the caller's full process.env is forwarded to the child —
 // used to run the deterministic Node fake worker fixture instead of
 // `uv run python -m openwhispr_whisperx.worker`. Never set in real usage.
+//
+// Threat model: anyone who can set env vars for this process can already run
+// arbitrary code (PATH hijack, LD_PRELOAD, etc.) — this override adds no new
+// attack surface, it only makes an already-possible substitution deliberate
+// and loud. Hence: always print a stderr warning (never TTY-gated) whenever
+// it's active, so any unexpected/malicious use is visible rather than silent.
 function resolveWorkerCommand(sidecarDir, cliDir) {
   const override = process.env.OPENWHISPR_WORKER_CMD;
   if (override) {
+    process.stderr.write(`warning: OPENWHISPR_WORKER_CMD override active (test-only) — running: ${override}\n`);
     const parts = override.split(" ").filter(Boolean);
     return { command: parts[0], args: parts.slice(1), env: { ...process.env } };
   }
@@ -609,7 +616,24 @@ async function cmdTranscribeLocal(positional, flags) {
   let request = baseRequest;
   let outcome = null;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    outcome = await runWorkerAttempt(request, sidecarDir, cliDir, workerTimeoutSeconds);
+    try {
+      outcome = await runWorkerAttempt(request, sidecarDir, cliDir, workerTimeoutSeconds);
+    } catch (err) {
+      // Spawn/exec failure (e.g. `uv` missing): synthesize an outcome so this
+      // still flows through the normal failure path below, including the
+      // manifest.json write — a spawn error must not leave the job dir empty.
+      outcome = {
+        exitCode: EXIT.USER,
+        result: null,
+        error: {
+          code: "WORKER_SPAWN_FAILED",
+          message: err instanceof Error ? err.message : String(err),
+        },
+        stderrText: "",
+        unparseableCount: 0,
+        missingComplete: false,
+      };
+    }
     attempts.push({
       requestId: request.requestId,
       profile: request.profile,

@@ -1,6 +1,6 @@
 ---
 name: openwhispr-whisperx-cli
-description: Use this skill whenever the user wants to transcribe an audio or video recording locally from a terminal, script, or agent — accurate word-timestamped transcripts, speaker diarization, SRT/VTT subtitles, or evidence-grounded notes — via the OpenWhispr WhisperX pipeline. The `openwhispr-whisperx` CLI talks to the running OpenWhispr desktop app over its loopback bridge, so any project can submit recordings, poll job status, and fetch transcript/subtitle/notes artifacts. Trigger on "transcribe this recording/meeting/interview", "generate subtitles", "diarize speakers", "whisperx cli", or any scripted/agentic transcription workflow — even if the user doesn't say "CLI".
+description: Use this skill whenever the user wants to transcribe an audio or video recording locally from a terminal, script, or agent — accurate word-timestamped transcripts, speaker diarization, SRT/VTT subtitles, or evidence-grounded notes — via the OpenWhispr WhisperX pipeline. The `openwhispr-whisperx` CLI runs fully WSL-native (`--local`, no desktop app needed — spawns the WhisperX sidecar directly on the GPU) or against the running OpenWhispr desktop app over its loopback bridge, so any project can submit recordings and fetch transcript/subtitle/notes artifacts. Trigger on "transcribe this recording/meeting/interview", "generate subtitles", "diarize speakers", "whisperx cli", or any scripted/agentic transcription workflow — even if the user doesn't say "CLI".
 ---
 
 # OpenWhispr WhisperX CLI
@@ -88,6 +88,8 @@ node cli/openwhispr-whisperx.mjs transcript <id> --format json | jq '.segments[0
 ```
 
 `text` → `transcript.raw.txt`, `srt` → `transcript.srt`, `vtt` → `transcript.vtt`, `md` → `transcript.speakers.md` (speaker-labelled, segment IDs), `json` → paged canonical segments (`--offset/--limit`). Notes render to `notes.md` with per-claim evidence citations back to segment IDs.
+
+`transcript <id> --max-bytes N` caps how much of a non-JSON artifact (`text`/`srt`/`vtt`/`md`) the desktop bridge returns in one response — useful for very long transcripts when piping to a tool with its own size limits (bridge mode only).
 
 ## Exit codes
 
