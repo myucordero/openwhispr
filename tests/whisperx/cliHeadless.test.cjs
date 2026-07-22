@@ -198,7 +198,12 @@ function writeTinyWav(filePath) {
 function runCli(args, env) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [CLI_PATH, ...args], {
-      env: { ...process.env, ...env },
+      env: {
+        ...process.env,
+        OPENWHISPR_CLI_DEFAULTS:
+          path.join(os.tmpdir(), `cli-defaults-missing-${process.pid}-${Date.now()}-${Math.random()}.json`),
+        ...env,
+      },
     });
     let stdout = "";
     let stderr = "";
@@ -211,6 +216,106 @@ function runCli(args, env) {
 function mkTempHome() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-home-"));
 }
+
+function captureStderr(callback) {
+  const originalWrite = process.stderr.write;
+  let output = "";
+  process.stderr.write = (chunk) => {
+    output += String(chunk);
+    return true;
+  };
+  try {
+    return { value: callback(), output };
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+}
+
+function withDefaultsFile(raw, callback) {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-defaults-unit-"));
+  const defaultsPath = path.join(tmpDir, "cli-defaults.json");
+  const previous = process.env.OPENWHISPR_CLI_DEFAULTS;
+  fs.writeFileSync(defaultsPath, raw);
+  process.env.OPENWHISPR_CLI_DEFAULTS = defaultsPath;
+  try {
+    return callback(defaultsPath);
+  } finally {
+    if (previous === undefined) delete process.env.OPENWHISPR_CLI_DEFAULTS;
+    else process.env.OPENWHISPR_CLI_DEFAULTS = previous;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+test("loadCliDefaults — missing file returns empty defaults", () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-defaults-missing-"));
+  const defaultsPath = path.join(tmpDir, "missing.json");
+  const previous = process.env.OPENWHISPR_CLI_DEFAULTS;
+  process.env.OPENWHISPR_CLI_DEFAULTS = defaultsPath;
+  try {
+    assert.deepEqual(cli.loadCliDefaults("transcribe"), {});
+  } finally {
+    if (previous === undefined) delete process.env.OPENWHISPR_CLI_DEFAULTS;
+    else process.env.OPENWHISPR_CLI_DEFAULTS = previous;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("loadCliDefaults — malformed JSON returns empty defaults and warns once", () => {
+  withDefaultsFile("{", (defaultsPath) => {
+    const captured = captureStderr(() => cli.loadCliDefaults("transcribe"));
+    assert.deepEqual(captured.value, {});
+    assert.equal(captured.output, `warning: ignoring malformed defaults file ${defaultsPath}\n`);
+  });
+});
+
+test("loadCliDefaults — credential-shaped keys are rejected with a warning", () => {
+  withDefaultsFile(
+    JSON.stringify({ transcribe: { profile: "meeting", "api-key": "must-not-load" } }),
+    (defaultsPath) => {
+      const captured = captureStderr(() => cli.loadCliDefaults("transcribe"));
+      assert.deepEqual(captured.value, { profile: "meeting" });
+      assert.match(captured.output, /warning: credential defaults ignored: api-key/);
+      assert.doesNotMatch(captured.output, /must-not-load/);
+      assert.ok(captured.output.includes(defaultsPath) === false);
+    }
+  );
+});
+
+test("loadCliDefaults — unknown keys and invalid values share one warning", () => {
+  withDefaultsFile(
+    JSON.stringify({ transcribe: { profile: "memo", mystery: true, speakers: [2] } }),
+    () => {
+      const captured = captureStderr(() => cli.loadCliDefaults("transcribe"));
+      assert.deepEqual(captured.value, { profile: "memo" });
+      assert.equal(captured.output, "warning: unknown defaults ignored: mystery, speakers\n");
+    }
+  );
+});
+
+test("loadCliDefaults — valid allowlisted transcribe values are returned", () => {
+  const values = {
+    profile: "meeting",
+    language: "es",
+    local: true,
+    device: "cpu",
+    diarize: true,
+    "no-diarize": false,
+    speakers: 2,
+    "min-speakers": 1,
+    "max-speakers": 3,
+    dictionary: "Qdrant,WhisperX",
+    "compute-type": "int8",
+    "batch-size": 2,
+    "no-align": true,
+    "worker-timeout": 30,
+    "no-export": true,
+    "allow-model-download": true,
+    "model-cache": "/tmp/whisperx-models",
+  };
+  withDefaultsFile(JSON.stringify({ transcribe: values }), () => {
+    assert.deepEqual(cli.loadCliDefaults("transcribe"), values);
+  });
+});
 
 const STUB_APP_SOURCE = `#!/usr/bin/env node
 const fs = require("node:fs");
@@ -354,6 +459,140 @@ test("integration: transcribe --local via the fake worker fixture", async () => 
     assert.equal(manifest.settings.length, 1);
     assert.equal(manifest.settings[0].exitCode, 0);
     assert.ok(manifest.result);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("integration: explicit argv profile wins over transcribe defaults", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-defaults-precedence-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  const defaultsPath = path.join(tmpDir, "cli-defaults.json");
+  const requestPath = path.join(tmpDir, "request.json");
+  writeTinyWav(wavPath);
+  const stubPath = writeStubWorker(tmpDir);
+  fs.writeFileSync(defaultsPath, JSON.stringify({ transcribe: { profile: "meeting" } }));
+  const homeDir = mkTempHome();
+
+  try {
+    const result = await runCli(["transcribe", wavPath, "--local", "--profile", "memo", "--no-export"], {
+      HOME: homeDir,
+      OPENWHISPR_CLI_DEFAULTS: defaultsPath,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "export-plain",
+      STUB_REQUEST_FILE: requestPath,
+    });
+    assert.equal(result.code, 0, result.stderr);
+    const request = JSON.parse(fs.readFileSync(requestPath, "utf8"));
+    assert.equal(request.profile, "memo");
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("integration: local=true default routes directly without bridge fallback notice", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-defaults-local-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  const defaultsPath = path.join(tmpDir, "cli-defaults.json");
+  const requestPath = path.join(tmpDir, "request.json");
+  writeTinyWav(wavPath);
+  const stubPath = writeStubWorker(tmpDir);
+  fs.writeFileSync(defaultsPath, JSON.stringify({ transcribe: { profile: "meeting", local: true } }));
+  const homeDir = mkTempHome();
+
+  try {
+    const result = await runCli(["transcribe", wavPath], {
+      HOME: homeDir,
+      OPENWHISPR_CLI_DEFAULTS: defaultsPath,
+      OPENWHISPR_BRIDGE_FILE: path.join(tmpDir, "missing-bridge.json"),
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "export-diarized",
+      STUB_REQUEST_FILE: requestPath,
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /desktop bridge unavailable — running locally via/);
+    const request = JSON.parse(fs.readFileSync(requestPath, "utf8"));
+    assert.equal(request.profile, "meeting");
+    assert.ok(request.output.formats.includes("speaker-markdown"));
+    assert.ok(JSON.parse(result.stdout).exportedPath);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("integration: --no-defaults leaves the memo profile and suppresses defaults notice", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-defaults-disabled-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  const defaultsPath = path.join(tmpDir, "cli-defaults.json");
+  const requestPath = path.join(tmpDir, "request.json");
+  writeTinyWav(wavPath);
+  const stubPath = writeStubWorker(tmpDir);
+  fs.writeFileSync(defaultsPath, JSON.stringify({ transcribe: { profile: "meeting", local: true } }));
+  const homeDir = mkTempHome();
+
+  try {
+    const result = await runCli(["transcribe", wavPath, "--local", "--no-defaults", "--no-export"], {
+      HOME: homeDir,
+      OPENWHISPR_CLI_DEFAULTS: defaultsPath,
+      OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+      OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+      STUB_MODE: "export-plain",
+      STUB_REQUEST_FILE: requestPath,
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /using defaults from/);
+    const request = JSON.parse(fs.readFileSync(requestPath, "utf8"));
+    assert.equal(request.profile, "memo");
+    assert.ok(!request.output.formats.includes("speaker-markdown"));
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
+test("integration: model-cache defaults are used, but OPENWHISPR_MODEL_CACHE wins", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-defaults-model-cache-"));
+  const wavPath = path.join(tmpDir, "source.wav");
+  const defaultsPath = path.join(tmpDir, "cli-defaults.json");
+  const defaultRequestPath = path.join(tmpDir, "default-request.json");
+  const envRequestPath = path.join(tmpDir, "env-request.json");
+  const defaultCache = path.join(tmpDir, "default-cache");
+  const envCache = path.join(tmpDir, "env-cache");
+  writeTinyWav(wavPath);
+  const stubPath = writeStubWorker(tmpDir);
+  fs.writeFileSync(defaultsPath, JSON.stringify({ transcribe: { local: true, "model-cache": defaultCache } }));
+  const homeDir = mkTempHome();
+  const commonEnv = {
+    HOME: homeDir,
+    OPENWHISPR_CLI_DEFAULTS: defaultsPath,
+    OPENWHISPR_MODEL_CACHE: "",
+    OPENWHISPR_SIDECAR_DIR: SIDECAR_DIR,
+    OPENWHISPR_WORKER_CMD: `${process.execPath} ${stubPath}`,
+    STUB_MODE: "export-plain",
+  };
+
+  try {
+    const fromDefaults = await runCli(["transcribe", wavPath, "--no-export"], {
+      ...commonEnv,
+      STUB_REQUEST_FILE: defaultRequestPath,
+    });
+    assert.equal(fromDefaults.code, 0, fromDefaults.stderr);
+    const defaultRequest = JSON.parse(fs.readFileSync(defaultRequestPath, "utf8"));
+    assert.equal(defaultRequest.runtime.modelCacheDirectory, defaultCache);
+
+    const fromEnv = await runCli(["transcribe", wavPath, "--no-export"], {
+      ...commonEnv,
+      OPENWHISPR_MODEL_CACHE: envCache,
+      STUB_REQUEST_FILE: envRequestPath,
+    });
+    assert.equal(fromEnv.code, 0, fromEnv.stderr);
+    const envRequest = JSON.parse(fs.readFileSync(envRequestPath, "utf8"));
+    assert.equal(envRequest.runtime.modelCacheDirectory, envCache);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
     fs.rmSync(homeDir, { recursive: true, force: true });
@@ -504,6 +743,9 @@ if (process.env.STUB_PID_FILE) {
     process.exit(1);
   } else if (mode === "export-plain" || mode === "export-diarized") {
     const request = JSON.parse(stdinData);
+    if (process.env.STUB_REQUEST_FILE) {
+      fs.writeFileSync(process.env.STUB_REQUEST_FILE, JSON.stringify(request, null, 2));
+    }
     const jobDirectory = request.output.jobDirectory;
     fs.mkdirSync(jobDirectory, { recursive: true });
     fs.writeFileSync(path.join(jobDirectory, "transcript.raw.txt"), "hello from the stub transcript\\n");
