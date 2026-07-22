@@ -5,6 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const WhisperXMain = require("../../src/helpers/whisperx/whisperxMain.js");
+const { resolveModelCacheRoots } = require("../../src/helpers/whisperx/whisperxMain.js");
 const {
   applyRecordingJobsSchema,
   createRecordingJobsRepo,
@@ -104,6 +105,8 @@ function makeMain(opts = {}) {
     artifactStore: opts.artifactStore,
     coordinator: opts.coordinator,
     jobManager: opts.jobManager,
+    env: opts.env,
+    homeDir: opts.homeDir,
   });
   return { main, tmpdir };
 }
@@ -159,6 +162,103 @@ test("getReadiness caches results for 5s (getStatus called once)", async () => {
   await main.getReadiness();
   await main.getReadiness();
   assert.equal(runtime.statusCalls, 1);
+});
+
+// ----------------------------------------------------- resolveModelCacheRoots
+
+test("resolveModelCacheRoots falls back to the HF/torch default caches under homeDir", () => {
+  const roots = resolveModelCacheRoots({
+    modelCacheDirectory: "/managed/whisperx-models",
+    env: {},
+    homeDir: "/home/fake",
+  });
+  assert.deepEqual(roots, [
+    "/managed/whisperx-models",
+    path.join("/home/fake", ".cache", "huggingface", "hub"),
+    path.join("/home/fake", ".cache", "torch", "hub", "checkpoints"),
+  ]);
+});
+
+test("resolveModelCacheRoots prefers HUGGINGFACE_HUB_CACHE over HF_HOME and the default", () => {
+  const roots = resolveModelCacheRoots({
+    modelCacheDirectory: "/managed/whisperx-models",
+    env: { HUGGINGFACE_HUB_CACHE: "/custom/hub-cache", HF_HOME: "/custom/hf-home" },
+    homeDir: "/home/fake",
+  });
+  assert.equal(roots[1], "/custom/hub-cache");
+});
+
+test("resolveModelCacheRoots derives the hub cache from HF_HOME when HUGGINGFACE_HUB_CACHE is unset", () => {
+  const roots = resolveModelCacheRoots({
+    modelCacheDirectory: "/managed/whisperx-models",
+    env: { HF_HOME: "/custom/hf-home" },
+    homeDir: "/home/fake",
+  });
+  assert.equal(roots[1], path.join("/custom/hf-home", "hub"));
+});
+
+test("resolveModelCacheRoots de-duplicates roots that coincide", () => {
+  const roots = resolveModelCacheRoots({
+    modelCacheDirectory: "/home/fake/.cache/huggingface/hub",
+    env: {},
+    homeDir: "/home/fake",
+  });
+  assert.deepEqual(roots, [
+    "/home/fake/.cache/huggingface/hub",
+    path.join("/home/fake", ".cache", "torch", "hub", "checkpoints"),
+  ]);
+});
+
+// --------------------------------------------- multi-root model cache scan
+
+test("asrModelReady is true when the model only exists in the fake HF hub cache", async () => {
+  const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "wxmain-home-"));
+  const hubDir = path.join(homeDir, ".cache", "huggingface", "hub");
+  const modelDir = path.join(hubDir, "models--mobiuslabsgmbh--faster-whisper-large-v3-turbo");
+  fs.mkdirSync(modelDir, { recursive: true });
+  fs.writeFileSync(path.join(modelDir, "snapshot.bin"), "data");
+
+  const { main } = makeMain({ runtimeManager: new FakeRuntime(), env: {}, homeDir });
+  const readiness = await main.getReadiness();
+
+  assert.equal(readiness.asrModelReady, true);
+  assert.ok(!readiness.blockers.some((b) => b.code === "MODEL_NOT_AVAILABLE_OFFLINE"));
+});
+
+test("alignmentModelReady is true when only a non-empty torch checkpoint file exists", async () => {
+  const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "wxmain-home-"));
+  const checkpointsDir = path.join(homeDir, ".cache", "torch", "hub", "checkpoints");
+  fs.mkdirSync(checkpointsDir, { recursive: true });
+  fs.writeFileSync(path.join(checkpointsDir, "wav2vec2_voxpopuli_base_10k_asr_es.pt"), "weights");
+
+  const { main } = makeMain({ runtimeManager: new FakeRuntime(), env: {}, homeDir });
+  const readiness = await main.getReadiness();
+
+  assert.equal(readiness.alignmentModelReady, true);
+});
+
+test("alignmentModelReady is false when the torch checkpoint file is empty", async () => {
+  const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "wxmain-home-"));
+  const checkpointsDir = path.join(homeDir, ".cache", "torch", "hub", "checkpoints");
+  fs.mkdirSync(checkpointsDir, { recursive: true });
+  fs.writeFileSync(path.join(checkpointsDir, "wav2vec2_voxpopuli_base_10k_asr_es.pt"), "");
+
+  const { main } = makeMain({ runtimeManager: new FakeRuntime(), env: {}, homeDir });
+  const readiness = await main.getReadiness();
+
+  assert.equal(readiness.alignmentModelReady, false);
+});
+
+test("all model-ready flags are false and MODEL_NOT_AVAILABLE_OFFLINE blocks when every cache root is empty", async () => {
+  const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "wxmain-home-"));
+  const { main } = makeMain({ runtimeManager: new FakeRuntime(), env: {}, homeDir });
+  const readiness = await main.getReadiness();
+
+  assert.equal(readiness.asrModelReady, false);
+  assert.equal(readiness.alignmentModelReady, false);
+  assert.equal(readiness.diarizationModelReady, false);
+  assert.equal(readiness.offlineReady, false);
+  assert.ok(readiness.blockers.some((b) => b.code === "MODEL_NOT_AVAILABLE_OFFLINE"));
 });
 
 test("startJob validates the renderer payload", async () => {
