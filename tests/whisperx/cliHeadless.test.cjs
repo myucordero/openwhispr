@@ -153,6 +153,25 @@ test("buildLocalRequest — no credential-shaped keys anywhere in the built requ
   assertNoCredentialKeys(request);
 });
 
+test("resolveAppExe — uses an existing override and has no Linux default", () => {
+  const previousExe = process.env.OPENWHISPR_APP_EXE;
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-app-exe-"));
+  const exePath = path.join(tmpDir, "OpenWhispr-test");
+  try {
+    delete process.env.OPENWHISPR_APP_EXE;
+    if (process.platform !== "win32") {
+      assert.equal(cli.resolveAppExe(path.dirname(CLI_PATH)), null);
+    }
+    fs.writeFileSync(exePath, "stub");
+    process.env.OPENWHISPR_APP_EXE = exePath;
+    assert.equal(cli.resolveAppExe(path.dirname(CLI_PATH)), exePath);
+  } finally {
+    if (previousExe === undefined) delete process.env.OPENWHISPR_APP_EXE;
+    else process.env.OPENWHISPR_APP_EXE = previousExe;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 // ------------------------------------------------------------ integration
 
 function writeTinyWav(filePath) {
@@ -192,6 +211,120 @@ function runCli(args, env) {
 function mkTempHome() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-home-"));
 }
+
+const STUB_APP_SOURCE = `#!/usr/bin/env node
+const fs = require("node:fs");
+const http = require("node:http");
+const path = require("node:path");
+
+const bridgeFile = process.env.OPENWHISPR_BRIDGE_FILE;
+const token = "stub-bridge-token";
+const server = http.createServer((req, res) => {
+  if (req.headers.authorization !== \`Bearer \${token}\`) {
+    res.writeHead(401);
+    res.end();
+    return;
+  }
+  if (req.url === "/v1/health") {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+  if (req.url.startsWith("/v1/recordings/list")) {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ data: [], has_more: false }));
+    return;
+  }
+  res.writeHead(404);
+  res.end();
+});
+
+server.listen(0, "127.0.0.1", () => {
+  fs.mkdirSync(path.dirname(bridgeFile), { recursive: true });
+  fs.writeFileSync(
+    bridgeFile,
+    JSON.stringify({ port: server.address().port, token })
+  );
+  if (process.env.OPENWHISPR_APP_PID_FILE) {
+    fs.writeFileSync(process.env.OPENWHISPR_APP_PID_FILE, String(process.pid));
+  }
+});
+process.on("SIGTERM", () => server.close(() => process.exit(0)));
+`;
+
+function writeStubApp(dir, source = STUB_APP_SOURCE) {
+  const appPath = path.join(dir, "openwhispr-stub");
+  fs.writeFileSync(appPath, source, { mode: 0o755 });
+  fs.chmodSync(appPath, 0o755);
+  return appPath;
+}
+
+function stopStubApp(pidFile) {
+  if (!fs.existsSync(pidFile)) return;
+  const pid = Number(fs.readFileSync(pidFile, "utf8").trim());
+  if (!Number.isInteger(pid) || pid <= 0) return;
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch {
+    /* already exited */
+  }
+}
+
+test("integration: bridge command auto-starts the desktop app and retries", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-autostart-ready-"));
+  const bridgeFile = path.join(tmpDir, "bridge.json");
+  const pidFile = path.join(tmpDir, "stub.pid");
+  const appPath = writeStubApp(tmpDir);
+  try {
+    assert.ok(!fs.existsSync(bridgeFile));
+    const result = await runCli(["jobs", "list"], {
+      OPENWHISPR_BRIDGE_FILE: bridgeFile,
+      OPENWHISPR_APP_EXE: appPath,
+      OPENWHISPR_APP_PID_FILE: pidFile,
+    });
+    assert.equal(result.code, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), []);
+    assert.match(result.stderr, /starting OpenWhispr desktop app/);
+    assert.match(result.stderr, /desktop app ready/);
+  } finally {
+    stopStubApp(pidFile);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("integration: --no-autostart preserves unreachable exit without starting", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-autostart-disabled-"));
+  const bridgeFile = path.join(tmpDir, "missing-bridge.json");
+  try {
+    const result = await runCli(["jobs", "list", "--no-autostart"], {
+      OPENWHISPR_BRIDGE_FILE: bridgeFile,
+      OPENWHISPR_APP_EXE: path.join(tmpDir, "missing-app"),
+    });
+    assert.equal(result.code, 2);
+    assert.doesNotMatch(result.stderr, /starting OpenWhispr desktop app/);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("integration: autostart timeout reports unreachable within the configured test window", async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-autostart-timeout-"));
+  const bridgeFile = path.join(tmpDir, "missing-bridge.json");
+  const appPath = writeStubApp(tmpDir, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  const startedAt = Date.now();
+  try {
+    const result = await runCli(["jobs", "list"], {
+      OPENWHISPR_BRIDGE_FILE: bridgeFile,
+      OPENWHISPR_APP_EXE: appPath,
+      OPENWHISPR_AUTOSTART_WAIT_MS: "1500",
+    });
+    assert.equal(result.code, 2);
+    assert.match(result.stderr, /bridge did not come up within 30s/);
+    assert.ok(Date.now() - startedAt < 35_000, "autostart timeout exceeded the test bound");
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
 
 test("integration: transcribe --local via the fake worker fixture", async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-headless-"));
