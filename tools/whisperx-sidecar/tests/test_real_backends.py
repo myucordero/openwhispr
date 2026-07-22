@@ -113,13 +113,61 @@ def test_diarize_passes_configured_speaker_limits(
 
 
 def test_load_diarize_requires_hf_token(make_request_dict):
-    request = WhisperXJobRequest.model_validate(make_request_dict())
+    request_dict = make_request_dict()
+    request_dict["runtime"]["offline"] = False
+    request = WhisperXJobRequest.model_validate(request_dict)
 
     with pytest.raises(WorkerError) as exc_info:
         RealBackends(request).load_diarize()
 
     assert exc_info.value.code == "HF_TOKEN_REQUIRED"
     assert exc_info.value.message == "Diarization requires a Hugging Face token"
+
+
+def test_load_diarize_offline_without_hf_token_forwards_none(
+    monkeypatch, make_request_dict
+):
+    calls = []
+    pipeline = object()
+
+    def diarization_pipeline(**kwargs):
+        calls.append(kwargs)
+        return pipeline
+
+    diarize_module = _stub_ml_modules(monkeypatch)
+    diarize_module.DiarizationPipeline = diarization_pipeline
+    request = WhisperXJobRequest.model_validate(make_request_dict())
+
+    loaded = RealBackends(request).load_diarize()
+
+    assert loaded is pipeline
+    assert calls == [
+        {
+            "model_name": "pyannote/speaker-diarization-community-1",
+            "token": None,
+            "device": "cuda",
+            "cache_dir": request.runtime.model_cache_directory,
+        }
+    ]
+
+
+def test_load_diarize_offline_cache_miss_is_model_not_ready(
+    monkeypatch, make_request_dict
+):
+    def diarization_pipeline(**kwargs):
+        raise RuntimeError("cache miss at /home/marco/.cache/huggingface/token")
+
+    diarize_module = _stub_ml_modules(monkeypatch)
+    diarize_module.DiarizationPipeline = diarization_pipeline
+    request = WhisperXJobRequest.model_validate(make_request_dict())
+
+    with pytest.raises(WorkerError) as exc_info:
+        RealBackends(request).load_diarize()
+
+    assert exc_info.value.code == "DIARIZATION_MODEL_NOT_READY"
+    assert exc_info.value.message == (
+        "Diarization model is not available in the offline cache"
+    )
 
 
 def test_load_diarize_rejects_openwhispr_local(make_request_dict):

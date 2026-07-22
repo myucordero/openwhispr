@@ -263,6 +263,106 @@ function parseArgs(argv) {
   return { positional, flags };
 }
 
+const CLI_DEFAULTS_ALLOWLIST = new Set([
+  "profile",
+  "language",
+  "local",
+  "device",
+  "diarize",
+  "no-diarize",
+  "speakers",
+  "min-speakers",
+  "max-speakers",
+  "dictionary",
+  "compute-type",
+  "batch-size",
+  "no-align",
+  "worker-timeout",
+  "no-export",
+  "allow-model-download",
+  "model-cache",
+]);
+const CLI_DEFAULTS_CREDENTIAL_RE = /token|secret|api[-_]?key|password|credential|authorization/i;
+
+function resolveCliDefaultsPath() {
+  return process.env.OPENWHISPR_CLI_DEFAULTS || path.join(os.homedir(), ".openwhispr", "cli-defaults.json");
+}
+
+function isPlainObject(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function writeCliDefaultsWarning(message) {
+  process.stderr.write(`warning: ${message}\n`);
+}
+
+export function loadCliDefaults(command) {
+  const defaultsPath = resolveCliDefaultsPath();
+  let raw;
+  try {
+    raw = fs.readFileSync(defaultsPath, "utf8");
+  } catch (err) {
+    if (err?.code === "ENOENT") return {};
+    writeCliDefaultsWarning(`ignoring malformed defaults file ${defaultsPath}`);
+    return {};
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    writeCliDefaultsWarning(`ignoring malformed defaults file ${defaultsPath}`);
+    return {};
+  }
+  if (!isPlainObject(parsed) || (parsed[command] !== undefined && !isPlainObject(parsed[command]))) {
+    writeCliDefaultsWarning(`ignoring malformed defaults file ${defaultsPath}`);
+    return {};
+  }
+
+  const section = parsed[command];
+  if (section === undefined) return {};
+
+  const defaults = {};
+  const credentialKeys = [];
+  const unknownKeys = [];
+  for (const [key, value] of Object.entries(section)) {
+    if (CLI_DEFAULTS_CREDENTIAL_RE.test(key)) {
+      credentialKeys.push(key);
+      continue;
+    }
+    if (!CLI_DEFAULTS_ALLOWLIST.has(key)) {
+      unknownKeys.push(key);
+      continue;
+    }
+    if (!["string", "number", "boolean"].includes(typeof value)) {
+      unknownKeys.push(key);
+      continue;
+    }
+    defaults[key] = value;
+  }
+  if (credentialKeys.length > 0) {
+    writeCliDefaultsWarning(`credential defaults ignored: ${credentialKeys.join(", ")}`);
+  }
+  if (unknownKeys.length > 0) {
+    writeCliDefaultsWarning(`unknown defaults ignored: ${unknownKeys.join(", ")}`);
+  }
+  return defaults;
+}
+
+function applyTranscribeDefaults(flags) {
+  const defaultsPath = resolveCliDefaultsPath();
+  const defaults = loadCliDefaults("transcribe");
+  let applied = 0;
+  for (const [key, value] of Object.entries(defaults)) {
+    if (flags[key] !== undefined) continue;
+    flags[key] = value;
+    applied++;
+  }
+  return { applied, defaultsPath };
+}
+
 function intFlag(flags, name) {
   if (flags[name] === undefined) return undefined;
   const n = Number(flags[name]);
@@ -803,7 +903,9 @@ async function cmdTranscribeLocal(positional, flags) {
   const temporaryDirectory = path.join(jobDirectory, "tmp");
   fs.mkdirSync(temporaryDirectory, { recursive: true });
   const modelCacheDirectory =
-    process.env.OPENWHISPR_MODEL_CACHE || path.join(os.homedir(), ".cache", "openwhispr", "whisperx-models");
+    process.env.OPENWHISPR_MODEL_CACHE ||
+    (flags["model-cache"] !== undefined ? String(flags["model-cache"]) : undefined) ||
+    path.join(os.homedir(), ".cache", "openwhispr", "whisperx-models");
   fs.mkdirSync(modelCacheDirectory, { recursive: true });
 
   const { request: baseRequest } = buildLocalRequest({
@@ -1187,6 +1289,7 @@ Usage:
       [--allow-model-download] [--notes-provider <p>] [--notes-model <m>]
       [--wait] [--poll SECONDS] [--timeout SECONDS] [--text]
       [--local] [--device cuda|cpu] [--worker-timeout SECONDS] [--no-export]
+      [--model-cache <path>] [--no-defaults]
       (--local spawns the WhisperX sidecar worker directly, no desktop app
        needed — auto-fallback also kicks in when the desktop bridge is
        unreachable and the sidecar is installed; --wait/--poll/--timeout are
@@ -1199,6 +1302,7 @@ Usage:
   openwhispr-whisperx notes <generate|list|get> <id> [--provider p] [--model m] [--strict]
 
 Bridge commands auto-start the desktop app when needed; use --no-autostart to disable this.
+Transcribe defaults are read from ~/.openwhispr/cli-defaults.json (or OPENWHISPR_CLI_DEFAULTS); use --no-defaults to skip them.
 All commands accept --format json. Exit codes: 0 ok, 1 user error,
 2 desktop bridge unreachable, 3 auth failure, 4 not found.`;
 
@@ -1210,6 +1314,12 @@ async function runBridgeCommand(flags, handler) {
 async function main() {
   const [command, ...rest] = process.argv.slice(2);
   const { positional, flags } = parseArgs(rest);
+  if (command === "transcribe" && flags["no-defaults"] === undefined) {
+    const { applied, defaultsPath } = applyTranscribeDefaults(flags);
+    if (applied > 0 && process.stderr.isTTY) {
+      process.stderr.write(`using defaults from ${defaultsPath} (--no-defaults to skip)\n`);
+    }
+  }
   switch (command) {
     case "doctor":
       return runBridgeCommand(flags, () => cmdDoctor(flags));

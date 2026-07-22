@@ -777,6 +777,8 @@ CLI bridge:
   `~/.cache/openwhispr/headless-jobs/<job-id>/`; successful jobs and
   non-cancellation failures write `manifest.json`, including
   `WORKER_SPAWN_FAILED` when the worker cannot start.
+- **Transcribe defaults**: optional `~/.openwhispr/cli-defaults.json` (or
+  `OPENWHISPR_CLI_DEFAULTS`) fills absent transcribe flags; `--no-defaults` skips it.
 - **Local Markdown export**: enabled by default in local mode and written next
   to the source as `<base>.md`; the ownership marker includes the complete,
   delimiter-scoped source basename:
