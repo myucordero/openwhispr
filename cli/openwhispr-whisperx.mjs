@@ -71,6 +71,111 @@ function readBridgeFile() {
   }
 }
 
+const BRIDGE_HEALTH_TIMEOUT_MS = 1500;
+const DEFAULT_AUTOSTART_WAIT_MS = 30_000;
+
+function bridgeUnavailableError() {
+  return new CliError(
+    "Local desktop bridge unreachable. Start the OpenWhispr desktop app and retry.",
+    EXIT.UNREACHABLE
+  );
+}
+
+async function checkBridgeHealth(timeoutMs = BRIDGE_HEALTH_TIMEOUT_MS) {
+  let bridge;
+  try {
+    bridge = readBridgeFile();
+  } catch (err) {
+    return { ok: false, error: err };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`http://127.0.0.1:${bridge.port}/v1/health`, {
+      headers: { Authorization: `Bearer ${bridge.token}` },
+      signal: controller.signal,
+    });
+    if (response.status === 200) return { ok: true, error: null };
+  } catch {
+    // A stale bridge file or an app that is still starting is unreachable.
+  } finally {
+    clearTimeout(timer);
+  }
+  return { ok: false, error: bridgeUnavailableError() };
+}
+
+export function resolveAppExe(cliDir) {
+  const configured = process.env.OPENWHISPR_APP_EXE;
+  if (configured) {
+    try {
+      if (fs.statSync(configured).isFile()) return configured;
+    } catch {
+      /* continue with platform defaults */
+    }
+  }
+  if (process.platform !== "win32") return null;
+
+  const bundled = path.resolve(cliDir, "..", "dist", "win-unpacked", "OpenWhispr.exe");
+  if (fs.existsSync(bundled)) return bundled;
+  const installed = path.join(process.env.LOCALAPPDATA || "", "Programs", "OpenWhispr", "OpenWhispr.exe");
+  return fs.existsSync(installed) ? installed : null;
+}
+
+export async function ensureBridgeAvailable(flags = {}) {
+  const initial = await checkBridgeHealth();
+  if (initial.ok) return;
+  const originalError =
+    initial.error instanceof CliError && initial.error.exitCode === EXIT.UNREACHABLE
+      ? initial.error
+      : bridgeUnavailableError();
+
+  if (flags["no-autostart"]) throw originalError;
+  const cliDir = path.dirname(fileURLToPath(import.meta.url));
+  const exe = resolveAppExe(cliDir);
+  if (!exe) throw originalError;
+
+  process.stderr.write("starting OpenWhispr desktop app…\n");
+  let child;
+  let spawnError = null;
+  try {
+    // cwd = the exe's own directory: the caller's cwd may be a UNC path
+    // (\\wsl.localhost\...), which kills Electron at startup (verified live).
+    child = spawn(exe, [], { detached: true, stdio: "ignore", cwd: path.dirname(exe) });
+    child.once("error", (err) => {
+      spawnError = err;
+    });
+    child.unref();
+  } catch (err) {
+    throw new CliError(`${originalError.message}; auto-start failed: ${err.message}`, EXIT.UNREACHABLE);
+  }
+
+  // OPENWHISPR_AUTOSTART_WAIT_MS is intentionally test-oriented; production
+  // uses the 30s default while tests can shorten the polling window.
+  const configuredWait = Number(process.env.OPENWHISPR_AUTOSTART_WAIT_MS);
+  const waitMs = Number.isFinite(configuredWait) && configuredWait >= 0 ? configuredWait : DEFAULT_AUTOSTART_WAIT_MS;
+  const deadline = Date.now() + waitMs;
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, Math.min(500, deadline - Date.now())));
+    if (spawnError) {
+      throw new CliError(`${originalError.message}; auto-start failed: ${spawnError.message}`, EXIT.UNREACHABLE);
+    }
+    const remaining = Math.max(1, deadline - Date.now());
+    const health = await checkBridgeHealth(Math.min(BRIDGE_HEALTH_TIMEOUT_MS, remaining));
+    if (health.ok) {
+      process.stderr.write("desktop app ready\n");
+      return;
+    }
+  }
+  if (spawnError) {
+    throw new CliError(`${originalError.message}; auto-start failed: ${spawnError.message}`, EXIT.UNREACHABLE);
+  }
+  throw new CliError(
+    "Started the OpenWhispr desktop app but the bridge did not come up within 30s",
+    EXIT.UNREACHABLE
+  );
+}
+
 async function request(method, pathname, { query, body } = {}) {
   const bridge = readBridgeFile();
   const url = new URL(`http://127.0.0.1:${bridge.port}${pathname}`);
@@ -1093,26 +1198,32 @@ Usage:
   openwhispr-whisperx transcript <id> [--format json|text|srt|vtt|md]
   openwhispr-whisperx notes <generate|list|get> <id> [--provider p] [--model m] [--strict]
 
+Bridge commands auto-start the desktop app when needed; use --no-autostart to disable this.
 All commands accept --format json. Exit codes: 0 ok, 1 user error,
 2 desktop bridge unreachable, 3 auth failure, 4 not found.`;
+
+async function runBridgeCommand(flags, handler) {
+  await ensureBridgeAvailable(flags);
+  return handler();
+}
 
 async function main() {
   const [command, ...rest] = process.argv.slice(2);
   const { positional, flags } = parseArgs(rest);
   switch (command) {
     case "doctor":
-      return cmdDoctor(flags);
+      return runBridgeCommand(flags, () => cmdDoctor(flags));
     case "readiness":
     case "status":
-      return cmdReadiness(flags);
+      return runBridgeCommand(flags, () => cmdReadiness(flags));
     case "transcribe":
       return cmdTranscribe(positional, flags);
     case "jobs":
-      return cmdJobs(positional, flags);
+      return runBridgeCommand(flags, () => cmdJobs(positional, flags));
     case "transcript":
-      return cmdTranscript(positional, flags);
+      return runBridgeCommand(flags, () => cmdTranscript(positional, flags));
     case "notes":
-      return cmdNotes(positional, flags);
+      return runBridgeCommand(flags, () => cmdNotes(positional, flags));
     case "version":
     case "--version":
       process.stdout.write("openwhispr-whisperx 0.1.0\n");
