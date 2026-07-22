@@ -140,7 +140,7 @@ class RealBackends:
                 "DIARIZATION_MODEL_NOT_READY",
                 f"Diarization provider '{provider}' is not handled by the WhisperX worker",
             )
-        if not self.hf_token:
+        if not self.request.runtime.offline and not self.hf_token:
             raise WorkerError(
                 "HF_TOKEN_REQUIRED", "Diarization requires a Hugging Face token"
             )
@@ -151,12 +151,20 @@ class RealBackends:
                 "DIARIZATION_MODEL_NOT_READY", "Diarization backend unavailable"
             ) from exc
         # whisperx 3.8.x signature: (model_name=None, token=None, device=..., cache_dir=None)
-        self._diarize_pipeline = DiarizationPipeline(
-            model_name=model_name,
-            token=self.hf_token,
-            device=self.device,
-            cache_dir=self.request.runtime.model_cache_directory,
-        )
+        try:
+            self._diarize_pipeline = DiarizationPipeline(
+                model_name=model_name,
+                token=self.hf_token,
+                device=self.device,
+                cache_dir=self.request.runtime.model_cache_directory,
+            )
+        except Exception as exc:
+            if self.request.runtime.offline:
+                raise WorkerError(
+                    "DIARIZATION_MODEL_NOT_READY",
+                    "Diarization model is not available in the offline cache",
+                ) from exc
+            raise
         return self._diarize_pipeline
 
     def diarize(
