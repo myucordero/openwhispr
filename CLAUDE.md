@@ -123,9 +123,9 @@ OpenWhispr is an Electron-based desktop dictation application that uses whisper.
 - **vectorIndex.js**: Qdrant collection management — upsert, delete, search, batch reindex
 - **windowConfig.js**: Centralized window configuration
 - **windowManager.js**: Window creation and lifecycle management
-- **cliBridge.js**: Loopback HTTP server on ports 8200–8219, bearer-token auth (token at `~/.openwhispr/cli-bridge.json`), 127.0.0.1-only. Used by the unified CLI to talk to a running desktop app. Fork addition: `/v1/recordings/*` routes expose the WhisperX recording-job pipeline (§18) to CLI/agent clients — see §22.
+- **cliBridge.js**: Loopback HTTP server on ports 8200–8219, bearer-token auth (token at `~/.openwhispr/cli-bridge.json`), 127.0.0.1-only. Used by the unified CLI to talk to a running desktop app. Fork addition: `/v1/recordings/*` routes expose the WhisperX recording-job pipeline (§18) to CLI/agent clients — see §22. These routes apply the same audio/MP4 extension allowlist, require an absolute source path, and use a byte-capped UTF-8 JSON-object parser.
 - **postMigrationDetector.js**: Detects users returning from the pre-Gizmo bundle ID via a `.bundle-migrated` sentinel in userData; consumed by `ipcHandlers.js` to drive the `PostMigrationOnboarding` modal
-- **whisperx/** (fork feature): WhisperX reliable-notes pipeline — `whisperxMain.js` (orchestration, ffmpeg normalization, source playback), `recordingJobManager.js`, `jobStateMachine.js`, `recordingJobsRepo.js`, `contracts.js`, `noteChunker.js`, `noteCompiler.js`. See §18
+- **whisperx/** (fork feature): WhisperX reliable-notes pipeline — `whisperxMain.js` (orchestration, ffmpeg normalization, source playback), `recordingJobManager.js`, `jobStateMachine.js`, `recordingJobsRepo.js`, `recordingArtifactStore.js` (staging, hash verification, manifest, atomic promotion), `whisperxProcessManager.js`, `gpuInferenceCoordinator.js`, `contracts.js`, `noteChunker.js`, `noteCompiler.js`. See §18
 - **cliInference.js** (fork feature): main-process bridge that runs the local `claude`/`codex` CLI as a reasoning backend (subscription auth). See §20
 
 ### React Components (src/components/)
@@ -629,27 +629,40 @@ Full spec: `docs/whisperx-reliable-notes.md`.
 
 - **Runtime**: managed Python 3.12 venv via `uv` (pinned by
   `tools/whisperx-sidecar/uv.lock`), provisioned by `scripts/setup-whisperx.js`
-  and verified by `scripts/doctor-whisperx.js`. WhisperX 3.8.x + faster-whisper
+  and verified by `scripts/doctor-whisperx.js`. WhisperX 3.8.6 + faster-whisper
   `large-v3-turbo`/`large-v3`, CUDA float16 by default (explicit CPU mode
-  available). Provisioned runtime runs offline (`HF_HUB_OFFLINE=1`).
+  available). Desktop jobs default to offline (`HF_HUB_OFFLINE=1`,
+  `TRANSFORMERS_OFFLINE=1`); the explicit model-download consent flow is the
+  exception for provisioning a missing model.
 - **Main-process orchestration** (`src/helpers/whisperx/`): `whisperxMain.js`
   (job lifecycle, readiness/probe, ffmpeg normalization, source-audio
   playback), `recordingJobManager.js` / `jobStateMachine.js` /
   `recordingJobsRepo.js` (cancellable, retryable jobs that survive restarts),
+  `recordingArtifactStore.js` (hash-checked staging and atomic finalization),
+  `whisperxProcessManager.js` / `gpuInferenceCoordinator.js`,
   `contracts.js` (structural validation), `noteChunker.js` / `noteCompiler.js`
   (evidence-grounded note extraction + deterministic merge/render).
 - **Reliable notes**: a schema-constrained LLM extraction where every
   substantive claim must cite transcript segment IDs; claims without valid
   evidence are dropped, never rendered. The note LLM is pluggable — a local
-  GGUF model (llama.cpp) OR the Claude/Codex CLI bridge (see §20).
+  GGUF model (llama.cpp) OR the Claude/Codex CLI bridge (see §20). Every
+  rendered note includes, immediately after any optional title, the permanent
+  notice: `> Generated from automated transcription. Evidence-linked does not
+  mean human-verified.`
 - **Uploads**: the WhisperX upload provider (`uploadLocalTranscriptionProvider=whisperx`)
   accepts audio and MP4 video (see §21). The original recording is never
   copied/modified/deleted; managed artifacts live under
   `<userData>/recording-jobs/<job-id>/`.
 - **UI**: `src/components/notes/*` (UploadAudioView, RecordingJob*,
   RecordingAudioPlayer, WhisperXUploadOptions). Store: `recordingJobsStore.ts`.
-- **Tests**: `tests/whisperx/*` (contracts/orchestration/notes) plus
-  `tools/whisperx-sidecar` `uv run pytest`.
+  `WhisperXUploadOptions` defaults use batch 4/4/2 for memo/meeting/critical
+  profiles and exact/min/max speakers 2/2/4; the renderer readiness IPC
+  returns `{success, ...readinessFields}` at the top level.
+- **Tests**: `npm test` runs 403 Node tests, including
+  `tests/whisperx/cliHeadless.test.cjs` (34) and
+  `tests/whisperx/cliBridgeRecordings.test.cjs` (11); the sidecar suite is
+  `cd tools/whisperx-sidecar && uv run pytest`, including
+  `tests/test_real_backends.py`.
 
 ### 19. Local-Only Build Mode (`VITE_LOCAL_ONLY`) (fork feature)
 
@@ -722,33 +735,63 @@ CLI bridge:
   `/v1/recordings/{readiness,list,create}` and per-job
   `/{id}{,/cancel,/retry,/transcript,/artifact?path=,/notes}` — thin HTTP
   mapping onto `whisperxMain` (which owns validation, path confinement, GPU
-  lease, redaction). The bridge itself gates the source extension (audio +
-  mp4/m4v) and requires absolute `source_path`, since no file dialog fronts
-  this entry point. WhisperX error codes map to HTTP statuses
-  (`WHISPERX_HTTP_ERRORS`).
+  lease, redaction). The bridge requires an absolute `source_path`, gates
+  `.mp3`, `.wav`, `.m4a`, `.webm`, `.ogg`, `.oga`, `.flac`, `.aac`, `.mp4`, and
+  `.m4v`, and rejects null/array/non-object JSON bodies or bodies over 1 MiB
+  (the parser counts UTF-8 bytes even when a multibyte character is split
+  across chunks). `WHISPERX_HTTP_ERRORS` maps `AUDIO_FILE_NOT_FOUND`→404,
+  validation/protocol/path errors→400, `NOTE_MODEL_UNAVAILABLE`→409,
+  `RUNTIME_NOT_INSTALLED`→503, and `ARTIFACT_WRITE_FAILED`→413; unmapped
+  failures remain 500 except the explicit "Job not found" 404 special case.
 - **CLI**: `cli/openwhispr-whisperx.mjs` (zero-dep Node 20+, bin
-  `openwhispr-whisperx`) — `transcribe <file> [--profile] [--diarize] [--wait]
+  `openwhispr-whisperx`) — `doctor`, `readiness`, `transcribe <file>
+  [--profile] [--diarize] [--wait]
   [--text]`, `jobs list/get/cancel/retry/delete`, `transcript <id> --format
-  text|srt|vtt|md|json`, `notes generate/list/get`. Upstream `@openwhispr/cli`
-  conventions: bare JSON on pipes, exit codes 0/1/2/3/4, reads
+  text|srt|vtt|md|json`, `notes generate/list/get` (all commands also accept
+  `--format json`). Upstream `@openwhispr/cli`
+  conventions: bare JSON on pipes, bridge exit codes 0/1/2/3/4 (success,
+  user error, bridge unreachable, auth, not found), reads
   `~/.openwhispr/cli-bridge.json` (override: `OPENWHISPR_BRIDGE_FILE`).
-- **Agent skill**: installed globally as `openwhispr-whisperx-cli` (not
-  checked into this repo — see `~/.claude/skills/openwhispr-whisperx-cli/SKILL.md`).
-- **HF token**: `environment.js getHuggingFaceToken()` accepts `HF_TOKEN`
-  (.env convention) as fallback to the secure-storage `HUGGINGFACE_TOKEN`.
-- **Tests**: `tests/whisperx/cliBridgeRecordings.test.cjs`.
-- **Headless local mode** (no desktop app): `transcribe <file> --local` spawns
-  the `tools/whisperx-sidecar` worker directly via `uv run`, one-shot, with
-  auto-fallback from bridge mode when the bridge is unreachable and the
-  sidecar dir exists. Env: `OPENWHISPR_SIDECAR_DIR` (sidecar location
-  override), `OPENWHISPR_MODEL_CACHE` (model cache override, default
+- **Agent skill**: `openwhispr-whisperx-cli` is GLOBAL-ONLY at
+  `~/.claude/skills/openwhispr-whisperx-cli/SKILL.md`; it is deliberately not
+  checked into this repository's `.claude` directory.
+- **HF token**: `environment.js getHuggingFaceToken()` checks secure
+  `HUGGINGFACE_TOKEN`, then `HF_TOKEN` (the conventional `.env` fallback).
+  The standalone doctor and benchmark scripts accept either process
+  environment variable, and the local CLI forwards either value to the worker
+  as `HF_TOKEN`.
+- **Tests**: `tests/whisperx/cliBridgeRecordings.test.cjs` (11 tests) and
+  `tests/whisperx/cliHeadless.test.cjs` (34 tests).
+- **Headless local mode** (no desktop app): `transcribe <file> --local` runs
+  the worker directly through `uv run`; normal `transcribe` automatically
+  falls back to this path when the bridge is unreachable and the sidecar
+  directory exists. `--device cuda|cpu` selects the worker device. The local
+  retry ladder for the default float16 request is float16 → int8 → int8 on CPU,
+  with a 600-second inactivity watchdog by default (`--worker-timeout 0`
+  disables it; heartbeats reset the timer). Env: `OPENWHISPR_SIDECAR_DIR`
+  (sidecar override),
+  `OPENWHISPR_MODEL_CACHE` (model cache override, default
   `~/.cache/openwhispr/whisperx-models`), and an `LD_LIBRARY_PATH` guard that
   prepends the venv's `nvidia/*/lib` dirs to work around CTranslate2's cuDNN
-  dlopen-by-soname discovery on Linux/WSL2. On a successful local-mode run,
-  `exportTranscriptMarkdown` also writes a Markdown transcript next to the
-  source file (`<base>.md`, falling back to `<base>.transcript.md` on a
-  foreign-content collision, skipped if both are taken) — disable with
-  `--no-export`. Tests: `tests/whisperx/cliHeadless.test.cjs`.
+  dlopen-by-soname discovery on Linux/WSL2. Jobs and temporary files live at
+  `~/.cache/openwhispr/headless-jobs/<job-id>/`; successful jobs and
+  non-cancellation failures write `manifest.json`, including
+  `WORKER_SPAWN_FAILED` when the worker cannot start.
+- **Local Markdown export**: enabled by default in local mode and written next
+  to the source as `<base>.md`; the ownership marker includes the complete,
+  delimiter-scoped source basename:
+  `<!-- openwhispr-whisperx export | source: <basename> | job: <job-id> -->`.
+  Ownership is recognized only in the first 512 bytes. A foreign-content collision diverts to
+  `<base>.transcript.md`; if both candidates are foreign, export is skipped
+  with a warning. `--no-export` disables it. JSON includes `exportedPath`, and
+  `manifest.json` includes `export: {status, path, source}`. Writes use an
+  atomic `.tmp-<pid>` sibling and clean the temporary file on handled failure.
+- **Windows verification and known latent bug**: bridge mode and
+  `transcribe --local` have been verified under native Windows Node when
+  winget-installed `ffmpeg` is on `PATH`. `resolveFfmpegPathForLocal`
+  (`cli/openwhispr-whisperx.mjs:369-373`) omits `ffmpeg.exe` from its bundled
+  `ffmpeg-static` fallback path, so that fallback does not resolve on Windows;
+  keep `ffmpeg.exe` on `PATH`.
 
 ## Development Guidelines
 
