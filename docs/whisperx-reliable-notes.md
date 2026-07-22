@@ -121,7 +121,11 @@ Speaker diarization uses `pyannote/speaker-diarization-community-1`:
 ```text
 <userData>/recording-jobs/<job-id>/   transcripts, subtitles, notes, manifest
 <userData>/whisperx-runtime/          managed Python venv (uv)
-<userData>/whisperx-models/           HF model caches
+<userData>/whisperx-models/           pyannote diarization model cache only
+                                       (ASR models live in the default Hugging
+                                       Face hub cache; alignment checkpoints in
+                                       the torch hub cache — readiness scans
+                                       all three)
 <userData>/whisperx-tmp/              per-job temporary audio
 ~/.cache/openwhispr/headless-jobs/    headless CLI job directories
 ```

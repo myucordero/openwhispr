@@ -10,6 +10,7 @@
 // error, code }. Redaction happens at that IPC boundary, not here.
 
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
 
@@ -46,6 +47,30 @@ const ALLOWED_OVERRIDE_KEYS = new Set([
 const ASR_MODEL_RE = /faster-whisper|whisper/i;
 const ALIGNMENT_MODEL_RE = /wav2vec|alignment/i;
 const DIARIZATION_MODEL_RE = /pyannote|speaker-diarization/i;
+
+// Readiness has to scan multiple cache roots because the sidecar's loaders
+// only forward `cache_dir` to the diarization pipeline (pyannote). ASR
+// (faster-whisper/CT2) and alignment (torch hub) models load through their
+// libraries' own default caches regardless of our managed model cache
+// directory. This function is presence-detection only — it never influences
+// where the sidecar actually loads models from.
+function resolveModelCacheRoots({ modelCacheDirectory, env = process.env, homeDir = os.homedir() } = {}) {
+  const hfHubCache =
+    (env && env.HUGGINGFACE_HUB_CACHE) ||
+    (env && env.HF_HOME ? path.join(env.HF_HOME, "hub") : path.join(homeDir, ".cache", "huggingface", "hub"));
+  const torchCheckpointsCache = path.join(homeDir, ".cache", "torch", "hub", "checkpoints");
+
+  const candidates = [modelCacheDirectory, hfHubCache, torchCheckpointsCache];
+  const roots = [];
+  const seen = new Set();
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    if (seen.has(candidate)) continue;
+    seen.add(candidate);
+    roots.push(candidate);
+  }
+  return roots;
+}
 
 class WhisperXMainError extends Error {
   constructor(code, message) {
@@ -95,6 +120,8 @@ class WhisperXMain {
     coordinator,
     jobManager,
     runLocalInference,
+    env,
+    homeDir,
   } = {}) {
     if (!app || typeof app.getPath !== "function") {
       throw new TypeError("WhisperXMain requires an injected electron `app`");
@@ -109,6 +136,9 @@ class WhisperXMain {
     this._getWindows = typeof getWindows === "function" ? getWindows : () => [];
     this._now = typeof now === "function" ? now : () => new Date().toISOString();
     this._uuid = typeof uuid === "function" ? uuid : () => crypto.randomUUID();
+    // Test-only overrides for readiness's HF hub / torch hub cache scanning.
+    this._env = env || process.env;
+    this._homeDir = homeDir || os.homedir();
 
     const userData = app.getPath("userData");
     this.jobsRoot = path.join(userData, "recording-jobs");
@@ -305,19 +335,32 @@ class WhisperXMain {
   }
 
   _scanModelCache(regexp) {
-    let entries;
-    try {
-      entries = fs.readdirSync(this.modelCacheDirectory, { withFileTypes: true });
-    } catch {
-      return false;
-    }
-    for (const entry of entries) {
-      if (!entry.isDirectory() || !regexp.test(entry.name)) continue;
+    const roots = resolveModelCacheRoots({
+      modelCacheDirectory: this.modelCacheDirectory,
+      env: this._env,
+      homeDir: this._homeDir,
+    });
+    for (const root of roots) {
+      let entries;
       try {
-        const inner = fs.readdirSync(path.join(this.modelCacheDirectory, entry.name));
-        if (inner.length > 0) return true;
+        entries = fs.readdirSync(root, { withFileTypes: true });
       } catch {
-        /* unreadable subdir — treat as not ready */
+        continue; // root missing/unreadable — try the next one
+      }
+      for (const entry of entries) {
+        if (!regexp.test(entry.name)) continue;
+        const entryPath = path.join(root, entry.name);
+        try {
+          if (entry.isDirectory()) {
+            const inner = fs.readdirSync(entryPath);
+            if (inner.length > 0) return true;
+          } else if (entry.isFile()) {
+            const stats = fs.statSync(entryPath);
+            if (stats.size > 0) return true;
+          }
+        } catch {
+          /* unreadable entry — treat as not ready */
+        }
       }
     }
     return false;
@@ -1061,3 +1104,4 @@ class WhisperXMain {
 module.exports = WhisperXMain;
 module.exports.WhisperXMain = WhisperXMain;
 module.exports.WhisperXMainError = WhisperXMainError;
+module.exports.resolveModelCacheRoots = resolveModelCacheRoots;
